@@ -54,11 +54,12 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(20, length)
 
         # Arbitrary steps
+        import math
         xr = xrange(3,48,2)
         start, step, length = cloudpickle.xrange_params(xr)
         self.assertEqual(3, start)
         self.assertEqual(2, step)
-        self.assertEqual(48/2-1, length)
+        self.assertEqual(math.ceil((48-3)/2.0), length)
 
         # Empty xrange
         xr = xrange(50,1,5)
