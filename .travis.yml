@@ -7,4 +7,4 @@ python:
 install: 
   - pip install -e .
 script:
-  - python2 -m tests.cloudpickle_test
+  - python setup.py test
