@@ -117,7 +117,7 @@ class CloudPickler(pickle.Pickler):
     savedDjangoEnv = False #hack tro transport django environment
 
     def __init__(self, file, protocol=None, min_size_to_save= 0):
-        pickle.Pickler.__init__(self,file,protocol)
+        pickle.Pickler.__init__(self, file, protocol)
         self.modules = set() #set of modules needed to depickle
         self.globals_ref = {}  # map ids to dictionary. used to ensure that functions can share global env
 
@@ -964,4 +964,3 @@ def _genTimeSeries(reduce_args, state):
     # Update the _optinfo dictionary
     time_series._optinfo.update(infodict)
     return time_series
-
