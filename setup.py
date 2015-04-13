@@ -1,12 +1,16 @@
-from setuptools import setup
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-# We disable requirements.txt parsing for now since users are having problems
-# with their cwd being elsewhere than their requirements.txt file.
-#from pip.req import parse_requirements
-# parse_requirements() returns generator of pip.req.InstallRequirement objects
-#install_reqs = [str(ir.req) for ir in parse_requirements('requirements.txt')]
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
 
-install_reqs = []
+requirements = [
+]
+
+test_requirements = [
+]
 
 dist = setup(
     name='cloudpickle',
@@ -15,11 +19,10 @@ dist = setup(
     author='Cloudpipe',
     author_email='cloudpipe@googlegroups.com',
     url='https://github.com/cloudpipe/cloudpickle',
-    install_requires=install_reqs,
+    install_requires=requirements,
     license='LICENSE.txt',
     packages=['cloudpickle'],
     long_description=open('README.md').read(),
-    platforms=['CPython 2.6', 'CPython 2.7'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -33,4 +36,6 @@ dist = setup(
         'Topic :: Scientific/Engineering',
         'Topic :: System :: Distributed Computing',
         ],
+    test_suite='tests',
+    tests_require=test_requirements
 )
