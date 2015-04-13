@@ -5,7 +5,7 @@ import sys
 from operator import itemgetter, attrgetter
 from StringIO import StringIO
 
-from cloudpickle import cloudpickle
+import cloudpickle
 
 class CloudPickleTest(unittest.TestCase):
 
