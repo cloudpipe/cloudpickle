@@ -6,8 +6,13 @@ from operator import itemgetter, attrgetter
 from StringIO import StringIO
 
 import cloudpickle
-
 import pytest
+
+class CloudPicklerTest(unittest.TestCase):
+    def setUp(self):
+        self.file_obj = StringIO()
+        self.cloudpickler = cloudpickle.CloudPickler(self.file_obj, 2)
+
 
 class CloudPickleTest(unittest.TestCase):
 
