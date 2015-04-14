@@ -684,10 +684,11 @@ class CloudPickler(pickle.Pickler):
             return self.save_reduce(getattr, (sys,'stderr'), obj=obj)
         if obj is sys.stdin:
             raise pickle.PicklingError("Cannot pickle standard input")
-        if  hasattr(obj, 'isatty') and obj.isatty():
-            raise pickle.PicklingError("Cannot pickle files that map to tty objects")
-        if 'r' not in obj.mode:
-            raise pickle.PicklingError("Cannot pickle files that are not opened for reading")
+        if not obj.closed:
+            if hasattr(obj, 'isatty') and obj.isatty():
+                raise pickle.PicklingError("Cannot pickle files that map to tty objects")
+            if 'r' not in obj.mode and '+' not in obj.mode:
+                raise pickle.PicklingError("Cannot pickle files that are not opened for reading: %s" % obj.mode)
         name = obj.name
         try:
             fsize = os.stat(name).st_size
