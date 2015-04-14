@@ -10,6 +10,8 @@ requirements = [
 ]
 
 test_requirements = [
+    'pytest',
+    'pytest-cov'
 ]
 
 dist = setup(
