@@ -7,6 +7,8 @@ from StringIO import StringIO
 
 import cloudpickle
 
+import pytest
+
 class CloudPickleTest(unittest.TestCase):
 
     def test_itemgetter(self):
@@ -106,6 +108,16 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertTrue("exit" in foo.func_code.co_names)
         cloudpickle.dumps(foo)
+
+    def test_save_unsupported(self):
+        sio = StringIO()
+        pickler = cloudpickle.CloudPickler(sio, 2)
+
+        with pytest.raises(pickle.PicklingError) as excinfo:
+            pickler.save_unsupported("test")
+
+        assert "Cannot pickle objects of type" in str(excinfo.value)
+
 
 if __name__ == '__main__':
     unittest.main()
