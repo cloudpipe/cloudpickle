@@ -690,34 +690,23 @@ class CloudPickler(pickle.Pickler):
             if 'r' not in obj.mode and '+' not in obj.mode:
                 raise pickle.PicklingError("Cannot pickle files that are not opened for reading: %s" % obj.mode)
         name = obj.name
-        try:
-            fsize = os.stat(name).st_size
-        except OSError:
-            raise pickle.PicklingError("Cannot pickle file %s as it cannot be stat" % name)
-
+        
+        retval = pystringIO.StringIO()
+        
         if obj.closed:
             #create an empty closed string io
-            retval = pystringIO.StringIO("")
             retval.close()
-        elif not fsize: #empty file
-            retval = pystringIO.StringIO("")
-            try:
-                tmpfile = file(name)
-                tst = tmpfile.read(1)
-            except IOError:
-                raise pickle.PicklingError("Cannot pickle file %s as it cannot be read" % name)
-            tmpfile.close()
-            if tst != '':
-                raise pickle.PicklingError("Cannot pickle file %s as it does not appear to map to a physical, real file" % name)
         else:
             try:
-                tmpfile = file(name)
-                contents = tmpfile.read()
-                tmpfile.close()
+                # Read the whole file
+                curloc = obj.tell()
+                obj.seek(0)
+                contents = obj.read()
+                obj.seek(curloc)
+
             except IOError:
                 raise pickle.PicklingError("Cannot pickle file %s as it cannot be read" % name)
-            retval = pystringIO.StringIO(contents)
-            curloc = obj.tell()
+            retval.write(contents)
             retval.seek(curloc)
 
         retval.name = name
