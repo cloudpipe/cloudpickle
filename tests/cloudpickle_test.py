@@ -10,6 +10,9 @@ import pytest
 
 
 def pickle_depickle(obj):
+    """Helper function to test whether object pickled with cloudpickle can be
+    depickled with pickle
+    """
     return pickle.loads(cloudpickle.dumps(obj))
 
 
@@ -122,6 +125,8 @@ class CloudPickleTest(unittest.TestCase):
     def test_buffer(self):
         try:
             buffer_obj = buffer("Hello")
+            self.assertEqual(pickle_depickle(buffer_obj), str(buffer_obj))
+            buffer_obj = buffer("Hello", 2, 3)
             self.assertEqual(pickle_depickle(buffer_obj), str(buffer_obj))
         except NameError: # Python 3 does no longer support buffers
             pass
