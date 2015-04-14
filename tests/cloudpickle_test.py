@@ -8,6 +8,11 @@ from StringIO import StringIO
 import cloudpickle
 import pytest
 
+
+def pickle_depickle(obj):
+    return pickle.loads(cloudpickle.dumps(obj))
+
+
 class CloudPicklerTest(unittest.TestCase):
     def setUp(self):
         self.file_obj = StringIO()
@@ -113,6 +118,13 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertTrue("exit" in foo.func_code.co_names)
         cloudpickle.dumps(foo)
+
+    def test_buffer(self):
+        try:
+            buffer_obj = buffer("Hello")
+            self.assertEqual(pickle_depickle(buffer_obj), str(buffer_obj))
+        except NameError: # Python 3 does no longer support buffers
+            pass
 
     def test_save_unsupported(self):
         sio = StringIO()
