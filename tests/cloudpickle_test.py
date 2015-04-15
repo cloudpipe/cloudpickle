@@ -4,6 +4,8 @@ import pytest
 import pickle
 import sys
 import functools
+import numpy as np
+import scipy.special
 
 from operator import itemgetter, attrgetter
 
@@ -143,6 +145,16 @@ class CloudPickleTest(unittest.TestCase):
     def test_partial(self):
         partial_obj = functools.partial(min, 1)
         self.assertEqual(pickle_depickle(partial_obj)(4), 1)
+
+    def test_ufunc(self):
+        # test a numpy ufunc (universal function), which is a C-based function
+        # that is applied on a numpy array
+
+        # try a simple ufunc, np.add
+        self.assertEqual(pickle_depickle(np.add), np.add)
+
+        # try a custom ufunc
+        self.assertEqual(pickle_depickle(scipy.special.iv), scipy.special.iv)
 
     def test_save_unsupported(self):
         sio = StringIO()
