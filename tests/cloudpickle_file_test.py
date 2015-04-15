@@ -22,7 +22,7 @@ class CloudPickleFileTests(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         self.tmpfilepath = os.path.join(self.tmpdir, 'testfile')
-        self.teststring = 'Hello world!'
+        self.teststring = u'Hello world!'
         
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -82,12 +82,13 @@ class CloudPickleFileTests(unittest.TestCase):
         os.remove(self.tmpfilepath)
             
     def test_temp_file(self):
-        with tempfile.NamedTemporaryFile() as fp:
-            fp.write(bytes(self.teststring, 'UTF-8'))
+        with tempfile.NamedTemporaryFile(mode='wb') as fp:
+            fp.write(self.teststring.encode('UTF-8'))
             fp.seek(0)
             f = fp.file
             # FIXME this doesn't work yet: cloudpickle.dumps(fp)
-            self.assertEquals(self.teststring, pickle.loads(cloudpickle.dumps(f)).read())
+            newfile = pickle.loads(cloudpickle.dumps(f))
+            self.assertEquals(self.teststring, newfile.read())
             
     def test_pickling_special_file_handles(self):
         # Warning: if you want to run your tests with nose, add -s option
