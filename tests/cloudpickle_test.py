@@ -2,6 +2,7 @@ import unittest
 import pytest
 import pickle
 import sys
+import functools
 
 from operator import itemgetter, attrgetter
 from StringIO import StringIO
@@ -133,6 +134,10 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
+
+    def test_partial(self):
+        partial_obj = functools.partial(min, 1)
+        self.assertEqual(pickle_depickle(partial_obj)(4), 1)
 
     def test_save_unsupported(self):
         sio = StringIO()
