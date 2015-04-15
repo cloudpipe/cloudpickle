@@ -1,6 +1,7 @@
 import unittest
 import pickle
 import sys
+import functools
 
 from operator import itemgetter, attrgetter
 from StringIO import StringIO
@@ -130,6 +131,10 @@ class CloudPickleTest(unittest.TestCase):
             self.assertEqual(pickle_depickle(buffer_obj), str(buffer_obj))
         except NameError: # Python 3 does no longer support buffers
             pass
+
+    def test_partial(self):
+        partial_obj = functools.partial(min, 1)
+        self.assertEqual(pickle_depickle(partial_obj)(4), 1)
 
     def test_save_unsupported(self):
         sio = StringIO()
