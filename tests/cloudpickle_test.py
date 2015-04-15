@@ -1,12 +1,13 @@
 import unittest
+import pytest
 import pickle
 import sys
+import functools
 
 from operator import itemgetter, attrgetter
 from StringIO import StringIO
 
 import cloudpickle
-import pytest
 
 
 def pickle_depickle(obj):
@@ -128,8 +129,15 @@ class CloudPickleTest(unittest.TestCase):
             self.assertEqual(pickle_depickle(buffer_obj), str(buffer_obj))
             buffer_obj = buffer("Hello", 2, 3)
             self.assertEqual(pickle_depickle(buffer_obj), str(buffer_obj))
-        except NameError: # Python 3 does no longer support buffers
+        except NameError:  # Python 3 does no longer support buffers
             pass
+
+    def test_lambda(self):
+        self.assertEqual(pickle_depickle(lambda: 1)(), 1)
+
+    def test_partial(self):
+        partial_obj = functools.partial(min, 1)
+        self.assertEqual(pickle_depickle(partial_obj)(4), 1)
 
     def test_save_unsupported(self):
         sio = StringIO()
