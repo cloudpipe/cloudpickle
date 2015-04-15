@@ -83,7 +83,7 @@ class CloudPickleFileTests(unittest.TestCase):
             
     def test_temp_file(self):
         with tempfile.NamedTemporaryFile() as fp:
-            fp.write(self.teststring)
+            fp.write(bytes(self.teststring, 'UTF-8'))
             fp.seek(0)
             f = fp.file
             # FIXME this doesn't work yet: cloudpickle.dumps(fp)
