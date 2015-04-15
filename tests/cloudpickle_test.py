@@ -4,7 +4,11 @@ import pickle
 import sys
 
 from operator import itemgetter, attrgetter
-from StringIO import StringIO
+
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 import cloudpickle
 
