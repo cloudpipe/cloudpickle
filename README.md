@@ -1,6 +1,9 @@
 # cloudpickle
 Cloudpickle as a standalone python library
 
+[![Build Status](https://travis-ci.org/cloudpipe/cloudpickle.svg?branch=master
+    )](https://travis-ci.org/cloudpipe/cloudpickle)
+
 
 Running the tests
 -----------------
