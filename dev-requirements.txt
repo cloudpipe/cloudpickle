@@ -1,0 +1,4 @@
+# Dependencies for running the tests with py.test
+pytest
+pytest-cov
+mock
