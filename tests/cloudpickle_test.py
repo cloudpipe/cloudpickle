@@ -59,15 +59,6 @@ class CloudPickleTest(unittest.TestCase):
         getter2 = pickle.loads(cloudpickle.dumps(getter))
         self.assertEqual(getter(d), getter2(d))
 
-    def test_pickling_xrange(self):
-        xr1 = xrange(1,100, 3)
-        xr2 = pickle.loads(cloudpickle.dumps(xr1))
-
-        # Can't just `self.assertEquals(xr1, xr2)` because it compares
-        # the objects
-        for a,b in zip(xr1, xr2):
-            self.assertEquals(a,b)
-
     # Regression test for SPARK-3415
     def test_pickling_file_handles(self):
         out1 = sys.stderr
