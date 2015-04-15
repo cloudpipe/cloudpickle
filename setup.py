@@ -6,7 +6,6 @@ try:
 except ImportError:
     from distutils.core import setup
 
-
 dist = setup(
     name='cloudpickle',
     version='0.2.0.dev0',
