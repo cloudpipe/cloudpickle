@@ -8,5 +8,6 @@ python:
   - "pypy"
 install: 
   - pip install -e .
+  - pip install -r dev-requirements.txt
 script:
-  - python setup.py test
+  - PYTHONPATH='.:tests' py.test
