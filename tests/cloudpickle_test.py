@@ -143,6 +143,16 @@ class CloudPickleTest(unittest.TestCase):
 
         assert "Cannot pickle objects of type" in str(excinfo.value)
 
+    def test_pickling_sys_stdin(self):
+        self.assertRaisesRegexp(pickle.PicklingError,
+                                "Cannot pickle standard input",
+                                cloudpickle.dumps,
+                                sys.stdin)
+
+    def test_pickling_sys_stdout(self):
+        pickled_stdout = pickle_depickle(sys.stdout)
+        pickled_stdout.write("test_stdoud")
+
 
 if __name__ == '__main__':
     unittest.main()
