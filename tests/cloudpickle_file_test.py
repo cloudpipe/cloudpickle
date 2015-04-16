@@ -82,7 +82,7 @@ class CloudPickleFileTests(unittest.TestCase):
         os.remove(self.tmpfilepath)
             
     def test_temp_file(self):
-        with tempfile.NamedTemporaryFile(mode='wb') as fp:
+        with tempfile.NamedTemporaryFile(mode='ab+') as fp:
             fp.write(self.teststring.encode('UTF-8'))
             fp.seek(0)
             f = fp.file
