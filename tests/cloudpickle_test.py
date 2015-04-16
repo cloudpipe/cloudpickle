@@ -4,8 +4,17 @@ import pytest
 import pickle
 import sys
 import functools
-import numpy as np
-import scipy.special
+import platform
+
+try:
+    # try importing numpy and scipy. These are not hard dependencies and
+    # tests should be skipped if these modules are not available
+    import numpy as np
+    import scipy.special as spp
+except ImportError:
+    np = None
+    spp = None
+
 
 from operator import itemgetter, attrgetter
 
@@ -146,15 +155,23 @@ class CloudPickleTest(unittest.TestCase):
         partial_obj = functools.partial(min, 1)
         self.assertEqual(pickle_depickle(partial_obj)(4), 1)
 
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy')
     def test_ufunc(self):
         # test a numpy ufunc (universal function), which is a C-based function
         # that is applied on a numpy array
 
-        # try a simple ufunc, np.add
-        self.assertEqual(pickle_depickle(np.add), np.add)
+        if np:
+            # simple ufunc: np.add
+            self.assertEqual(pickle_depickle(np.add), np.add)
+        else:  # skip if numpy is not available
+            pass
 
-        # try a custom ufunc
-        self.assertEqual(pickle_depickle(scipy.special.iv), scipy.special.iv)
+        if spp:
+            # custom ufunc: scipy.special.iv
+            self.assertEqual(pickle_depickle(spp.iv), spp.iv)
+        else:  # skip if scipy is not available
+            pass
+
 
     def test_save_unsupported(self):
         sio = StringIO()
