@@ -25,6 +25,8 @@ except ImportError:
 
 import cloudpickle
 
+from .testutils import subprocess_pickle_echo
+
 
 def pickle_depickle(obj):
     """Helper function to test whether object pickled with cloudpickle can be
@@ -92,7 +94,7 @@ class CloudPickleTest(unittest.TestCase):
             sys.exit(0)
 
         func_code = getattr(foo, '__code__', None)
-        if func_code is None: # PY2 backwards compatibility
+        if func_code is None:  # PY2 backwards compatibility
             func_code = foo.func_code
 
         self.assertTrue("exit" in func_code.co_names)
@@ -116,6 +118,9 @@ class CloudPickleTest(unittest.TestCase):
         f2 = lambda x: f1(x) // b
         self.assertEqual(pickle_depickle(f2)(1), 1)
 
+    @pytest.mark.skipif(sys.version_info >= (3, 4)
+                        and sys.version_info < (3, 4, 3),
+                        reason="subprocess has a bug in 3.4.0 to 3.4.2")
     def test_locally_defined_function_and_class(self):
         LOCAL_CONSTANT = 42
 
@@ -142,14 +147,20 @@ class CloudPickleTest(unittest.TestCase):
         # pickle the class definition
         self.assertEqual(pickle_depickle(SomeClass)(1).one(), 1)
         self.assertEqual(pickle_depickle(SomeClass)(5).some_method(41), 7)
+        new_class = subprocess_pickle_echo(SomeClass)
+        self.assertEqual(new_class(5).some_method(41), 7)
 
         # pickle the class instances
         self.assertEqual(pickle_depickle(SomeClass(1)).one(), 1)
         self.assertEqual(pickle_depickle(SomeClass(5)).some_method(41), 7)
+        new_instance = subprocess_pickle_echo(SomeClass(5))
+        self.assertEqual(new_instance.some_method(41), 7)
 
         # pickle the method instances
         self.assertEqual(pickle_depickle(SomeClass(1).one)(), 1)
         self.assertEqual(pickle_depickle(SomeClass(5).some_method)(41), 7)
+        new_method = subprocess_pickle_echo(SomeClass(5).some_method)
+        self.assertEqual(new_method(41), 7)
 
     def test_partial(self):
         partial_obj = functools.partial(min, 1)
