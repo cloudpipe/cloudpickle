@@ -6,14 +6,6 @@ try:
 except ImportError:
     from distutils.core import setup
 
-requirements = [
-]
-
-test_requirements = [
-    'pytest',
-    'pytest-cov',
-    'mock'
-]
 
 dist = setup(
     name='cloudpickle',
@@ -22,7 +14,6 @@ dist = setup(
     author='Cloudpipe',
     author_email='cloudpipe@googlegroups.com',
     url='https://github.com/cloudpipe/cloudpickle',
-    install_requires=requirements,
     license='LICENSE.txt',
     packages=['cloudpickle'],
     long_description=open('README.md').read(),
@@ -42,7 +33,6 @@ dist = setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Scientific/Engineering',
         'Topic :: System :: Distributed Computing',
-        ],
+    ],
     test_suite='tests',
-    tests_require=test_requirements
 )
