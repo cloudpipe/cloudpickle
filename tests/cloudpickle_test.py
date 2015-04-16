@@ -155,7 +155,8 @@ class CloudPickleTest(unittest.TestCase):
         partial_obj = functools.partial(min, 1)
         self.assertEqual(pickle_depickle(partial_obj)(4), 1)
 
-    @pytest.mark.skipif(platform.python_implementation() == 'PyPy')
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                        reason="Skip numpy and scipy tests on PyPy")
     def test_ufunc(self):
         # test a numpy ufunc (universal function), which is a C-based function
         # that is applied on a numpy array
