@@ -14,6 +14,8 @@ except ImportError:
 
 import cloudpickle
 
+from .testutils import subprocess_pickle_echo
+
 
 def pickle_depickle(obj):
     """Helper function to test whether object pickled with cloudpickle can be
@@ -131,14 +133,20 @@ class CloudPickleTest(unittest.TestCase):
         # pickle the class definition
         self.assertEqual(pickle_depickle(SomeClass)(1).one(), 1)
         self.assertEqual(pickle_depickle(SomeClass)(5).some_method(41), 7)
+        new_class = subprocess_pickle_echo(SomeClass)
+        self.assertEqual(new_class(5).some_method(41), 7)
 
         # pickle the class instances
         self.assertEqual(pickle_depickle(SomeClass(1)).one(), 1)
         self.assertEqual(pickle_depickle(SomeClass(5)).some_method(41), 7)
+        new_instance = subprocess_pickle_echo(SomeClass(5))
+        self.assertEqual(new_instance.some_method(41), 7)
 
         # pickle the method instances
         self.assertEqual(pickle_depickle(SomeClass(1).one)(), 1)
         self.assertEqual(pickle_depickle(SomeClass(5).some_method)(41), 7)
+        new_method = subprocess_pickle_echo(SomeClass(5).some_method)
+        self.assertEqual(new_method(41), 7)
 
     def test_partial(self):
         partial_obj = functools.partial(min, 1)
