@@ -28,26 +28,29 @@ Examples
 
 Pickling a lambda expression:
 
-    >>> import cloudpickle
-    >>> squared = lambda x: x ** 2
-    >>> pickled_lambda = cloudpickle.dumps(squared)
+```python
+>>> import cloudpickle
+>>> squared = lambda x: x ** 2
+>>> pickled_lambda = cloudpickle.dumps(squared)
 
-    >>> import pickle
-    >>> new_squared = pickle.loads(pickled_lambda)
-    >>> new_squared(2)
-    4
+>>> import pickle
+>>> new_squared = pickle.loads(pickled_lambda)
+>>> new_squared(2)
+4
+```
 
 Pickling a function interactively defined in a Python shell session
 (in the `__main__` module):
 
-    >>> CONSTANT = 42
-    >>> def my_function(data):
-    ...    return data + CONSTANT
-    ...
-    >>> pickled_function = cloudpickle.dumps(my_function)
-    >>> pickle.loads(pickled_function)(43)
-    85
-
+```python
+>>> CONSTANT = 42
+>>> def my_function(data):
+...    return data + CONSTANT
+...
+>>> pickled_function = cloudpickle.dumps(my_function)
+>>> pickle.loads(pickled_function)(43)
+85
+```
 
 Running the tests
 -----------------
