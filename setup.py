@@ -12,7 +12,9 @@ requirements = [
 test_requirements = [
     'pytest',
     'pytest-cov',
-    'mock'
+    'mock',
+    'numpy',
+    'scipy'
 ]
 
 dist = setup(
