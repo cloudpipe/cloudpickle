@@ -10,6 +10,8 @@ try:
 except ImportError:
     from io import StringIO
 
+import pytest
+
 from mock import patch, mock_open
 
 import cloudpickle
@@ -34,6 +36,8 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEquals('', pickle.loads(cloudpickle.dumps(f)).read())
         os.remove(self.tmpfilepath)
         
+    @pytest.mark.skipif(sys.version_info > (2,7),
+                    reason="only works on Python 2.x")
     def test_closed_file(self):
         # Write & close
         with open(self.tmpfilepath, 'w') as f:
@@ -81,6 +85,8 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEquals(self.teststring, unpickled.read())
         os.remove(self.tmpfilepath)
             
+    @pytest.mark.skipif(sys.version_info > (2,7),
+                    reason="only works on Python 2.x")
     def test_temp_file(self):
         with tempfile.NamedTemporaryFile(mode='ab+') as fp:
             fp.write(self.teststring.encode('UTF-8'))
