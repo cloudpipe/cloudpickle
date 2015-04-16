@@ -13,7 +13,20 @@ close to the data.
 Among other things, `cloudpickle` supports pickling for lambda expressions,
 functions and classes defined interactively in the `__main__` module.
 
-Example:
+
+Installation
+------------
+
+The latest release of `cloudpickle` is available from
+[pypi](https://pypi.python.org/pypi/cloudpickle):
+
+    pip install cloudpickle
+
+
+Examples
+--------
+
+Pickling a lambda expression:
 
     >>> import cloudpickle
     >>> squared = lambda x: x ** 2
@@ -23,6 +36,17 @@ Example:
     >>> new_squared = pickle.loads(pickled_lambda)
     >>> new_squared(2)
     4
+
+Pickling a function interactively defined in a Python shell session
+(in the `__main__` module):
+
+    >>> CONSTANT = 42
+    >>> def my_function(data):
+    ...    return data + CONSTANT
+    ...
+    >>> pickled_function = cloudpickle.dumps(my_function)
+    >>> pickle.loads(pickled_function)(43)
+    85
 
 
 Running the tests
@@ -44,3 +68,19 @@ Running the tests
 
       pip install -r dev-requirements.txt
       PYTHONPATH='.:tests' py.test
+
+
+History
+-------
+
+`cloudpickle` was initially developed by picloud.com and shipped as part of
+the client SDK.
+
+A copy of `cloudpickle.py` was included as part of PySpark, the Python
+interface to [Apache Spark](https://spark.apache.org/). Davies Liu, Josh
+Rosen, Thom Neale and other Apache Spark developers improved it significantly,
+most notably to add support for PyPy and Python 3.
+
+The aim of the `cloudpickle` project is to make that work available to a wider
+audience outside of the Spark ecosystem and to make it easier to improve it
+further notably with the help of a dedicated non-regression test suite.
