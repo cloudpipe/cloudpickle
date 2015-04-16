@@ -1,3 +1,4 @@
+from __future__ import division
 import unittest
 import pytest
 import pickle
@@ -134,6 +135,47 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
+
+    def test_nested_lambdas(self):
+        a, b = 1, 2
+        f1 = lambda x: x + a
+        f2 = lambda x: f1(x) // b
+        self.assertEqual(pickle_depickle(f2)(1), 1)
+
+    def test_locally_defined_function_and_class(self):
+        LOCAL_CONSTANT = 42
+
+        def some_function(x, y):
+            return (x + y) / LOCAL_CONSTANT
+
+        # pickle the function definition
+        self.assertEqual(pickle_depickle(some_function)(41, 1), 1)
+        self.assertEqual(pickle_depickle(some_function)(81, 3), 2)
+
+        hidden_constant = lambda: LOCAL_CONSTANT
+
+        class SomeClass(object):
+            """Overly complicated class with nested references to symbols"""
+            def __init__(self, value):
+                self.value = value
+
+            def one(self):
+                return LOCAL_CONSTANT / hidden_constant()
+
+            def some_method(self, x):
+                return self.one() + some_function(x, 1) + self.value
+
+        # pickle the class definition
+        self.assertEqual(pickle_depickle(SomeClass)(1).one(), 1)
+        self.assertEqual(pickle_depickle(SomeClass)(5).some_method(41), 7)
+
+        # pickle the class instances
+        self.assertEqual(pickle_depickle(SomeClass(1)).one(), 1)
+        self.assertEqual(pickle_depickle(SomeClass(5)).some_method(41), 7)
+
+        # pickle the method instances
+        self.assertEqual(pickle_depickle(SomeClass(1).one)(), 1)
+        self.assertEqual(pickle_depickle(SomeClass(5).some_method)(41), 7)
 
     def test_partial(self):
         partial_obj = functools.partial(min, 1)
