@@ -6,7 +6,11 @@ import sys
 import functools
 
 from operator import itemgetter, attrgetter
-from StringIO import StringIO
+
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 import cloudpickle
 
@@ -57,51 +61,6 @@ class CloudPickleTest(unittest.TestCase):
         getter2 = pickle.loads(cloudpickle.dumps(getter))
         self.assertEqual(getter(d), getter2(d))
 
-    def test_xrange_params(self):
-        xr = xrange(1,100)
-        start, step, length = cloudpickle.xrange_params(xr)
-        self.assertEqual(1, start)
-        self.assertEqual(1, step)
-        self.assertEqual(99, length)
-
-        xr = xrange(20)
-        start, step, length = cloudpickle.xrange_params(xr)
-        self.assertEqual(0, start)
-        self.assertEqual(1, step)
-        self.assertEqual(20, length)
-
-        # Arbitrary steps
-        import math
-        xr = xrange(3,48,2)
-        start, step, length = cloudpickle.xrange_params(xr)
-        self.assertEqual(3, start)
-        self.assertEqual(2, step)
-        self.assertEqual(math.ceil((48-3)/2.0), length)
-
-        # Empty xrange
-        xr = xrange(50,1,5)
-        start, step, length = cloudpickle.xrange_params(xr)
-        #self.assertEqual(50, start) # These currently are inferred
-        #self.assertEqual(5, step)   # only by the length in Python2
-        self.assertEqual(0, length)
-
-        # Single element
-        xr = xrange(42,43)
-        start, step, length = cloudpickle.xrange_params(xr)
-        self.assertEqual(1, length)
-        self.assertEqual(42, start)
-        self.assertEqual(1, step)
-
-
-    def test_pickling_xrange(self):
-        xr1 = xrange(1,100, 3)
-        xr2 = pickle.loads(cloudpickle.dumps(xr1))
-
-        # Can't just `self.assertEquals(xr1, xr2)` because it compares
-        # the objects
-        for a,b in zip(xr1, xr2):
-            self.assertEquals(a,b)
-
     # Regression test for SPARK-3415
     def test_pickling_file_handles(self):
         out1 = sys.stderr
@@ -121,7 +80,11 @@ class CloudPickleTest(unittest.TestCase):
         def foo():
             sys.exit(0)
 
-        self.assertTrue("exit" in foo.func_code.co_names)
+        func_code = getattr(foo, '__code__', None)
+        if func_code is None: # PY2 backwards compatibility
+            func_code = foo.func_code
+
+        self.assertTrue("exit" in func_code.co_names)
         cloudpickle.dumps(foo)
 
     def test_buffer(self):

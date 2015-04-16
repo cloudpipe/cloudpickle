@@ -1,1 +1,0 @@
-import cloudpickle_test
