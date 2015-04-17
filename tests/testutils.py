@@ -36,7 +36,6 @@ def subprocess_pickle_echo(input_data):
         if timeout_supported:
             comm_kwargs['timeout'] = 5
         out, err = proc.communicate(pickled_input_data, **comm_kwargs)
-        proc.stdin.close()  # sends EOF
         if proc.returncode != 0 or len(err):
             message = "Subprocess returned %d: " % proc.returncode
             message += err.decode('utf-8')
@@ -63,8 +62,9 @@ def pickle_echo(stream_in=None, stream_out=None):
         stream_out = stream_out.buffer
 
     input_bytes = stream_in.read()
-    stuff = loads(input_bytes)
-    stream_out.write(dumps(stuff))
+    stream_in.close()
+    unpickled_content = loads(input_bytes)
+    stream_out.write(dumps(unpickled_content))
     stream_out.flush()
     stream_out.close()
 
