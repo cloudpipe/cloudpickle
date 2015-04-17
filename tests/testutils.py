@@ -66,6 +66,7 @@ def pickle_echo(stream_in=None, stream_out=None):
     stuff = loads(input_bytes)
     stream_out.write(dumps(stuff))
     stream_out.flush()
+    stream_out.close()
 
 
 if __name__ == '__main__':
