@@ -35,17 +35,13 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEquals('', pickle.loads(cloudpickle.dumps(f)).read())
         os.remove(self.tmpfilepath)
 
-    # XXX: investigate why this is a problem under Python 3
-    @pytest.mark.skipif(sys.version_info > (2, 7),
-                        reason="only works on Python 2.x")
     def test_closed_file(self):
         # Write & close
         with open(self.tmpfilepath, 'w') as f:
             f.write(self.teststring)
-        # Cloudpickle returns an empty (& closed!) StringIO if the file was
-        # closed...
-        unpickled = pickle.loads(cloudpickle.dumps(f))
-        self.assertTrue(unpickled.closed)
+        with pytest.raises(pickle.PicklingError) as excinfo:
+            cloudpickle.dumps(f)
+        assert "Cannot pickle closed files" in str(excinfo.value)
         os.remove(self.tmpfilepath)
 
     def test_r_mode(self):
