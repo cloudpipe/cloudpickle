@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # if python version is not PyPY, then install miniconda
 if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]
 then
