@@ -16,7 +16,7 @@ matrix:
 # This disables sudo, but makes builds start much faster
 # See http://blog.travis-ci.com/2014-12-17-faster-builds-with-container-based-infrastructure/
 sudo: false
-before_install: ./ci/before_install.sh
+before_install: bash ./ci/before_install.sh
 install:
   - pip install .
   - pip install -r dev-requirements.txt
