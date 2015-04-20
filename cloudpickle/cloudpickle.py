@@ -576,27 +576,9 @@ class CloudPickler(Pickler):
         dispatch[file] = save_file
 
     """Special functions for Add-on libraries"""
-
-    def inject_numpy(self):
-        numpy = sys.modules.get('numpy')
-        if not numpy or not hasattr(numpy, 'ufunc'):
-            return
-        self.dispatch[numpy.ufunc] = self.__class__.save_ufunc
-
-    def save_ufunc(self, obj):
-        """Hack function for saving numpy ufunc objects"""
-        name = obj.__name__
-        numpy_tst_mods = ['numpy', 'scipy.special']
-        for tst_mod_name in numpy_tst_mods:
-            tst_mod = sys.modules.get(tst_mod_name, None)
-            if tst_mod and name in tst_mod.__dict__:
-                return self.save_reduce(_getobject, (tst_mod_name, name))
-        raise pickle.PicklingError('cannot save %s. Cannot resolve what module it is defined in'
-                                   % str(obj))
-
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
-        self.inject_numpy()
+        pass
 
 
 # Shorthands for legacy support
