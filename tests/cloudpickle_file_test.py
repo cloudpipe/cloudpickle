@@ -97,7 +97,6 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEquals(self.teststring, newfile.read())
 
     def test_pickling_special_file_handles(self):
-        # Warning: if you want to run your tests with nose, add -s option
         for out in sys.stdout, sys.stderr:  # Regression test for SPARK-3415
             self.assertEquals(out, pickle.loads(cloudpickle.dumps(out)))
         self.assertRaises(pickle.PicklingError,
@@ -114,7 +113,3 @@ class CloudPickleFileTests(unittest.TestCase):
         with patch.object(builtins, 'open', mock_open(), create=True):
             with open('foo', 'w+') as handle:
                 cloudpickle.dumps(handle)
-
-
-if __name__ == '__main__':
-    unittest.main()
