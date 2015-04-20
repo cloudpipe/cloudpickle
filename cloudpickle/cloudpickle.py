@@ -541,30 +541,27 @@ class CloudPickler(Pickler):
             return self.save_reduce(getattr, (sys,'stderr'), obj=obj)
         if obj is sys.stdin:
             raise pickle.PicklingError("Cannot pickle standard input")
-        if not obj.closed:
-            if hasattr(obj, 'isatty') and obj.isatty():
-                raise pickle.PicklingError("Cannot pickle files that map to tty objects")
-            if 'r' not in obj.mode and '+' not in obj.mode:
-                raise pickle.PicklingError("Cannot pickle files that are not opened for reading: %s" % obj.mode)
+        if obj.closed:
+            raise pickle.PicklingError("Cannot pickle closed files")
+        if hasattr(obj, 'isatty') and obj.isatty():
+            raise pickle.PicklingError("Cannot pickle files that map to tty objects")
+        if 'r' not in obj.mode and '+' not in obj.mode:
+            raise pickle.PicklingError("Cannot pickle files that are not opened for reading: %s" % obj.mode)
 
         name = obj.name
 
         retval = pystringIO.StringIO()
 
-        if obj.closed:
-            #create an empty closed string io
-            retval.close()
-        else:
-            try:
-                # Read the whole file
-                curloc = obj.tell()
-                obj.seek(0)
-                contents = obj.read()
-                obj.seek(curloc)
-            except IOError:
-                raise pickle.PicklingError("Cannot pickle file %s as it cannot be read" % name)
-            retval.write(contents)
-            retval.seek(curloc)
+        try:
+            # Read the whole file
+            curloc = obj.tell()
+            obj.seek(0)
+            contents = obj.read()
+            obj.seek(curloc)
+        except IOError:
+            raise pickle.PicklingError("Cannot pickle file %s as it cannot be read" % name)
+        retval.write(contents)
+        retval.seek(curloc)
 
         retval.name = name
         self.save(retval)
