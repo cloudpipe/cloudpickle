@@ -23,6 +23,8 @@ try:
 except ImportError:
     from io import StringIO
 
+from io import BytesIO
+
 import cloudpickle
 
 from .testutils import subprocess_pickle_echo
@@ -196,6 +198,14 @@ class CloudPickleTest(unittest.TestCase):
     def test_loads_namespace(self):
         obj = 1, 2, 3, 4
         returned_obj = cloudpickle.loads(cloudpickle.dumps(obj))
+        self.assertEqual(obj, returned_obj)
+
+    def test_load_namespace(self):
+        obj = 1, 2, 3, 4
+        bio = BytesIO()
+        cloudpickle.dump(obj, bio)
+        bio.seek(0)
+        returned_obj = cloudpickle.load(bio)
         self.assertEqual(obj, returned_obj)
 
 if __name__ == '__main__':
