@@ -47,11 +47,11 @@ class CloudPickleTest(unittest.TestCase):
         d = range(10)
         getter = itemgetter(1)
 
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
         getter = itemgetter(0, 3)
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
     def test_attrgetter(self):
@@ -60,18 +60,18 @@ class CloudPickleTest(unittest.TestCase):
                 return item
         d = C()
         getter = attrgetter("a")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
         getter = attrgetter("a", "b")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
         d.e = C()
         getter = attrgetter("e.a")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
         getter = attrgetter("e.a", "e.b")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
     # Regression test for SPARK-3415
