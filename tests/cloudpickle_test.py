@@ -17,6 +17,7 @@ except ImportError:
 
 
 from operator import itemgetter, attrgetter
+from collections import namedtuple
 
 try:
     from StringIO import StringIO
@@ -43,15 +44,21 @@ class CloudPicklerTest(unittest.TestCase):
 
 class CloudPickleTest(unittest.TestCase):
 
+    def test_namedtuple(self):
+        P = namedtuple("P", "x y")
+        p1 = P(1, 3)
+        p2 = pickle_depickle(p1)
+        self.assertEqual(p1, p2)
+
     def test_itemgetter(self):
         d = range(10)
         getter = itemgetter(1)
 
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
         getter = itemgetter(0, 3)
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
     def test_attrgetter(self):
@@ -60,25 +67,19 @@ class CloudPickleTest(unittest.TestCase):
                 return item
         d = C()
         getter = attrgetter("a")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
         getter = attrgetter("a", "b")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
 
         d.e = C()
         getter = attrgetter("e.a")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
         getter = attrgetter("e.a", "e.b")
-        getter2 = pickle.loads(cloudpickle.dumps(getter))
+        getter2 = pickle_depickle(getter)
         self.assertEqual(getter(d), getter2(d))
-
-    # Regression test for SPARK-3415
-    def test_pickling_file_handles(self):
-        out1 = sys.stderr
-        out2 = pickle.loads(cloudpickle.dumps(out1))
-        self.assertEquals(out1, out2)
 
     def test_func_globals(self):
         class Unpicklable(object):
@@ -194,6 +195,3 @@ class CloudPickleTest(unittest.TestCase):
 
         assert "Cannot pickle objects of type" in str(excinfo.value)
 
-
-if __name__ == '__main__':
-    unittest.main()
