@@ -592,6 +592,10 @@ def dumps(obj, protocol=2):
 
     return file.getvalue()
 
+# including pickles unloading functions in this namespace
+load = pickle.load
+loads = pickle.loads
+
 
 #hack for __import__ not working as desired
 def subimport(name):
