@@ -184,7 +184,6 @@ class CloudPickleTest(unittest.TestCase):
         else:  # skip if scipy is not available
             pass
 
-
     def test_save_unsupported(self):
         sio = StringIO()
         pickler = cloudpickle.CloudPickler(sio, 2)
@@ -194,6 +193,10 @@ class CloudPickleTest(unittest.TestCase):
 
         assert "Cannot pickle objects of type" in str(excinfo.value)
 
+    def test_loads_namespace(self):
+        obj = 1, 2, 3, 4
+        returned_obj = cloudpickle.loads(cloudpickle.dumps(obj))
+        self.assertEqual(obj, returned_obj)
 
 if __name__ == '__main__':
     unittest.main()
