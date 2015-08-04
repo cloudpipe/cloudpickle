@@ -208,5 +208,16 @@ class CloudPickleTest(unittest.TestCase):
         returned_obj = cloudpickle.load(bio)
         self.assertEqual(obj, returned_obj)
 
+    def test_generator(self):
+
+        def some_generator(cnt):
+            for i in range(cnt):
+                yield i
+
+        gen2 = pickle_depickle(some_generator)
+
+        assert type(gen2(3)) == type(some_generator(3))
+        assert list(gen2(3)) == list(range(3))
+
 if __name__ == '__main__':
     unittest.main()
