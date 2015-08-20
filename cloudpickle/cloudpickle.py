@@ -422,7 +422,13 @@ class CloudPickler(Pickler):
     dispatch[property] = save_property
 
     def save_classmethod(self, obj):
-        self.save_reduce(type(obj), (obj.__func__,), obj=obj)
+        try:
+            orig_func = obj.__func__
+        except AttributeError:  # Python 2.6
+            orig_func = obj.__get__(None, object)
+            if isinstance(obj, classmethod):
+                orig_func = orig_func.__func__  # Unbind
+        self.save_reduce(type(obj), (orig_func,), obj=obj)
     dispatch[classmethod] = save_classmethod
     dispatch[staticmethod] = save_classmethod
 
