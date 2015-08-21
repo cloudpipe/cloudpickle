@@ -219,5 +219,23 @@ class CloudPickleTest(unittest.TestCase):
         assert type(gen2(3)) == type(some_generator(3))
         assert list(gen2(3)) == list(range(3))
 
+    def test_classmethod(self):
+        class A(object):
+            @staticmethod
+            def test_sm():
+                return "sm"
+            @classmethod
+            def test_cm(cls):
+                return "cm"
+
+        sm = A.__dict__["test_sm"]
+        cm = A.__dict__["test_cm"]
+
+        A.test_sm = pickle_depickle(sm)
+        A.test_cm = pickle_depickle(cm)
+
+        self.assertEqual(A.test_sm(), "sm")
+        self.assertEqual(A.test_cm(), "cm")
+
 if __name__ == '__main__':
     unittest.main()
