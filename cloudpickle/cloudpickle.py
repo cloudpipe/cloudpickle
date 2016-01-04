@@ -359,10 +359,13 @@ class CloudPickler(Pickler):
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
-        if PY3:
-            self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
+        if obj.__self__ is None:
+            self.save_reduce(getattr, (obj.im_class, obj.__name__))
         else:
-            self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
+            if PY3:
+                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
+            else:
+                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
                          obj=obj)
     dispatch[types.MethodType] = save_instancemethod
 
