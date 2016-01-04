@@ -237,5 +237,10 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(A.test_sm(), "sm")
         self.assertEqual(A.test_cm(), "cm")
 
+    def test_method_descriptors(self):
+        f = cloudpickle.loads(cloudpickle.dumps(str.upper))
+        self.assertEqual(f('abc'), 'ABC')
+
+
 if __name__ == '__main__':
     unittest.main()

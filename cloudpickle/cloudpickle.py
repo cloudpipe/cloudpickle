@@ -698,3 +698,18 @@ Note: These can never be renamed due to client compatibility issues"""
 def _getobject(modname, attribute):
     mod = __import__(modname, fromlist=[attribute])
     return mod.__dict__[attribute]
+
+
+""" Use copy_reg to extend global pickle definitions """
+
+if sys.version_info < (3, 4):
+    method_descriptor = type(str.upper)
+
+    def _reduce_method_descriptor(obj):
+        return (getattr, (obj.__objclass__, obj.__name__))
+
+    try:
+        import copy_reg as copyreg
+    except ImportError:
+        import copyreg
+    copyreg.pickle(method_descriptor, _reduce_method_descriptor)
