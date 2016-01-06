@@ -359,10 +359,13 @@ class CloudPickler(Pickler):
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
-        if PY3:
-            self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
+        if obj.__self__ is None:
+            self.save_reduce(getattr, (obj.im_class, obj.__name__))
         else:
-            self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
+            if PY3:
+                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
+            else:
+                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
                          obj=obj)
     dispatch[types.MethodType] = save_instancemethod
 
@@ -698,3 +701,18 @@ Note: These can never be renamed due to client compatibility issues"""
 def _getobject(modname, attribute):
     mod = __import__(modname, fromlist=[attribute])
     return mod.__dict__[attribute]
+
+
+""" Use copy_reg to extend global pickle definitions """
+
+if sys.version_info < (3, 4):
+    method_descriptor = type(str.upper)
+
+    def _reduce_method_descriptor(obj):
+        return (getattr, (obj.__objclass__, obj.__name__))
+
+    try:
+        import copy_reg as copyreg
+    except ImportError:
+        import copyreg
+    copyreg.pickle(method_descriptor, _reduce_method_descriptor)

@@ -237,5 +237,21 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(A.test_sm(), "sm")
         self.assertEqual(A.test_cm(), "cm")
 
+    def test_method_descriptors(self):
+        f = pickle_depickle(str.upper)
+        self.assertEqual(f('abc'), 'ABC')
+
+    def test_instancemethods_without_self(self):
+        class F(object):
+            def f(self, x):
+                return x + 1
+
+        g = pickle_depickle(F.f)
+        self.assertEqual(g.__name__, F.f.__name__)
+        if sys.version_info[0] < 3:
+            self.assertEqual(g.im_class.__name__, F.f.im_class.__name__)
+        # self.assertEqual(g(F(), 1), 2)  # still fails
+
+
 if __name__ == '__main__':
     unittest.main()
