@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/cloudpipe/cloudpickle.svg?branch=master
     )](https://travis-ci.org/cloudpipe/cloudpickle)
+[![codecov.io](https://codecov.io/github/cloudpipe/cloudpickle/coverage.svg?branch=master)](https://codecov.io/github/cloudpipe/cloudpickle?branch=master)
 
 `cloudpickle` makes it possible to serialize Python constructs not supported
 by the default `pickle` module from the Python standard library.
