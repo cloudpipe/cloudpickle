@@ -43,7 +43,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import print_function
 
 import operator
-import os
 import io
 import pickle
 import struct
@@ -188,8 +187,9 @@ class CloudPickler(Pickler):
         # if func is lambda, def'ed at prompt, is in main, or is nested, then
         # we'll pickle the actual function object rather than simply saving a
         # reference (as is done in default pickler), via save_function_tuple.
-        if islambda(obj) or obj.__code__.co_filename == '<stdin>' or themodule is None:
-            #print("save global", islambda(obj), obj.__code__.co_filename, modname, themodule)
+        if (islambda(obj)
+                or getattr(obj.__code__, 'co_filename', None) == '<stdin>'
+                or themodule is None):
             self.save_function_tuple(obj)
             return
         else:
@@ -249,7 +249,10 @@ class CloudPickler(Pickler):
         """
         Find all globals names read or written to by codeblock co
         """
-        code = co.co_code
+
+        code = getattr(co, 'co_code', None)
+        if code is None:
+            return set()
         if not PY3:
             code = [ord(c) for c in code]
         names = co.co_names
