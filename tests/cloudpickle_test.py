@@ -1,10 +1,12 @@
 from __future__ import division
+import imp
 import unittest
 import pytest
 import pickle
 import sys
 import functools
 import platform
+import textwrap
 
 try:
     # try importing numpy and scipy. These are not hard dependencies and
@@ -26,6 +28,7 @@ except ImportError:
 from io import BytesIO
 
 import cloudpickle
+from cloudpickle.cloudpickle import _find_module
 
 from .testutils import subprocess_pickle_echo
 
@@ -252,6 +255,41 @@ class CloudPickleTest(unittest.TestCase):
             self.assertEqual(g.im_class.__name__, F.f.im_class.__name__)
         # self.assertEqual(g(F(), 1), 2)  # still fails
 
+    def test_module(self):
+        self.assertEqual(pickle, pickle_depickle(pickle))
+
+    def test_dynamic_module(self):
+        mod = imp.new_module('mod')
+        code = '''
+        x = 1
+        def f(y):
+            return x + y
+        '''
+        exec(textwrap.dedent(code), mod.__dict__)
+        mod2 = pickle_depickle(mod)
+        self.assertEqual(mod.x, mod2.x)
+        self.assertEqual(mod.f(5), mod2.f(5))
+
+        # Test dynamic modules when imported back are singletons
+        mod1, mod2 = pickle_depickle([mod, mod])
+        self.assertEqual(id(mod1), id(mod2))
+
+    def test_find_module(self):
+        import pickle  # ensure this test is decoupled from global imports
+        _find_module('pickle')
+
+        with pytest.raises(ImportError):
+            _find_module('invalid_module')
+
+        with pytest.raises(ImportError):
+            valid_module = imp.new_module('valid_module')
+            _find_module('valid_module')
+
+    def test_Ellipsis(self):
+        self.assertEqual(Ellipsis, pickle_depickle(Ellipsis))
+
+    def test_NotImplemented(self):
+        self.assertEqual(NotImplemented, pickle_depickle(NotImplemented))
 
 if __name__ == '__main__':
     unittest.main()

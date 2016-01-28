@@ -44,6 +44,7 @@ from __future__ import print_function
 
 import operator
 import io
+import imp
 import pickle
 import struct
 import sys
@@ -134,8 +135,19 @@ class CloudPickler(Pickler):
         """
         Save a module as an import
         """
+        mod_name = obj.__name__
+        # If module is successfully found then it is not a dynamically created module
+        try:
+            _find_module(mod_name)
+            is_dynamic = False
+        except ImportError:
+            is_dynamic = True
+
         self.modules.add(obj)
-        self.save_reduce(subimport, (obj.__name__,), obj=obj)
+        if is_dynamic:
+            self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)), obj=obj)
+        else:
+            self.save_reduce(subimport, (obj.__name__,), obj=obj)
     dispatch[types.ModuleType] = save_module
 
     def save_codeobject(self, obj):
@@ -313,7 +325,7 @@ class CloudPickler(Pickler):
         return (code, f_globals, defaults, closure, dct, base_globals)
 
     def save_builtin_function(self, obj):
-        if obj.__module__ is "__builtin__":
+        if obj.__module__ == "__builtin__":
             return self.save_global(obj)
         return self.save_function(obj)
     dispatch[types.BuiltinFunctionType] = save_builtin_function
@@ -584,10 +596,19 @@ class CloudPickler(Pickler):
         self.save(retval)
         self.memoize(obj)
 
+    def save_ellipsis(self, obj):
+        self.save_reduce(_gen_ellipsis, ())
+
+    def save_not_implemented(self, obj):
+        self.save_reduce(_gen_not_implemented, ())
+
     if PY3:
         dispatch[io.TextIOWrapper] = save_file
     else:
         dispatch[file] = save_file
+
+    dispatch[type(Ellipsis)] = save_ellipsis
+    dispatch[type(NotImplemented)] = save_not_implemented
 
     """Special functions for Add-on libraries"""
     def inject_addons(self):
@@ -619,6 +640,12 @@ def subimport(name):
     __import__(name)
     return sys.modules[name]
 
+
+def dynamic_subimport(name, vars):
+    mod = imp.new_module(name)
+    mod.__dict__.update(vars)
+    sys.modules[name] = mod
+    return mod
 
 # restores function attributes
 def _restore_attr(obj, attr):
@@ -663,6 +690,11 @@ def _genpartial(func, args, kwds):
         kwds = {}
     return partial(func, *args, **kwds)
 
+def _gen_ellipsis():
+    return Ellipsis
+
+def _gen_not_implemented():
+    return NotImplemented
 
 def _fill_function(func, globals, defaults, dict):
     """ Fills in the rest of function data into the skeleton function object
@@ -697,6 +729,18 @@ def _make_skel_func(code, closures, base_globals = None):
     return types.FunctionType(code, base_globals,
                               None, None, closure)
 
+
+def _find_module(mod_name):
+    """
+    Iterate over each part instead of calling imp.find_module directly.
+    This function is able to find submodules (e.g. sickit.tree)
+    """
+    path = None
+    for part in mod_name.split('.'):
+        if path is not None:
+            path = [path]
+        file, path, description = imp.find_module(part, path)
+    return file, path, description
 
 """Constructors for 3rd party libraries
 Note: These can never be renamed due to client compatibility issues"""
