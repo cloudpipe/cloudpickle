@@ -1,17 +1,10 @@
-0.2.0.dev0
+0.2.0
 ==========
 
-New features
-------------
-
-- TODO
-
-
-Bug fixes
----------
-
-- TODO
-
+* Support `method_descriptor`
+* Support unbound instancemethods
+* Fixes for PyPy3
+* More support for pickling dynamic imports
 
 0.1.0
 =====
