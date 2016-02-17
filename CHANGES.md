@@ -1,5 +1,10 @@
+0.2.1
+=====
+
+* Packaging fix
+
 0.2.0
-==========
+=====
 
 * Support `method_descriptor`
 * Support unbound instancemethods
