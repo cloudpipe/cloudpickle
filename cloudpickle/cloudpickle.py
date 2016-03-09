@@ -53,7 +53,6 @@ from functools import partial
 import itertools
 import dis
 import traceback
-import inspect
 
 if sys.version < '3':
     from pickle import Pickler
@@ -182,7 +181,7 @@ class CloudPickler(Pickler):
         if name is None:
             name = obj.__name__
         modname = pickle.whichmodule(obj, name)
-        #print('which gives %s %s %s' % (modname, obj, name))
+        # print('which gives %s %s %s' % (modname, obj, name))
         try:
             themodule = sys.modules[modname]
         except KeyError:
