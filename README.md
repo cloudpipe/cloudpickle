@@ -77,7 +77,7 @@ Running the tests
 History
 -------
 
-`cloudpickle` was initially developed by picloud.com and shipped as part of
+`cloudpickle` was initially developed by [picloud.com](http://web.archive.org/web/20140721022102/http://blog.picloud.com/2013/11/17/picloud-has-joined-dropbox/) and shipped as part of
 the client SDK.
 
 A copy of `cloudpickle.py` was included as part of PySpark, the Python
