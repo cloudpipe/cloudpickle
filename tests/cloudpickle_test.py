@@ -289,6 +289,10 @@ class CloudPickleTest(unittest.TestCase):
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis, pickle_depickle(Ellipsis))
 
+    def test_weakref(self):
+        import weakref
+        self.assertEqual(weakref.ref, pickle_depickle(weakref.ref))
+
     def test_NotImplemented(self):
         self.assertEqual(NotImplemented, pickle_depickle(NotImplemented))
 
