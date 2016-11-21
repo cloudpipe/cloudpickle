@@ -328,7 +328,7 @@ class CloudPickleTest(unittest.TestCase):
         data = cloudpickle.dumps([g, g])
         f = g = None
         g2, g3 = pickle.loads(data)
-        self.assertIs(g2, g3)
+        self.assertTrue(g2 is g3)
         loop = ioloop.IOLoop.current()
         res = loop.run_sync(functools.partial(g2, 5))
         self.assertEqual(res, 7)
