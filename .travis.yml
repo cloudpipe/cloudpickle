@@ -21,6 +21,7 @@ before_install: bash ./ci/before_install.sh
 install:
   - pip install .
   - pip install -r dev-requirements.txt
+  - pip list
 script:
   - PYTHONPATH='.:tests' py.test -r s --cov-config .coveragerc --cov=cloudpickle
 after_success:
