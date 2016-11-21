@@ -14,5 +14,4 @@ then
     conda update -q conda
     conda info -a
     conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION numpy scipy pip pandas
-    source activate testenv
 fi
