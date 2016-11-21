@@ -22,6 +22,6 @@ install:
   - pip install .
   - pip install -r dev-requirements.txt
 script:
-  - PYTHONPATH='.:tests' py.test --cov-config .coveragerc --cov=cloudpickle
+  - PYTHONPATH='.:tests' py.test -r s --cov-config .coveragerc --cov=cloudpickle
 after_success:
   - codecov
