@@ -19,10 +19,14 @@ matrix:
 sudo: false
 before_install: bash ./ci/before_install.sh
 install:
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
   - pip install .
   - pip install -r dev-requirements.txt
+  - pip install tornado
   - pip list
 script:
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
   - PYTHONPATH='.:tests' py.test -r s --cov-config .coveragerc --cov=cloudpickle
 after_success:
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
   - codecov
