@@ -93,7 +93,11 @@ def _builtin_type(name):
 
 
 if sys.version_info < (3, 4):
-    def _walk_global_ops_real(code):
+    def _walk_global_ops(code):
+        """
+        Yield (opcode, argument number) tuples for all
+        global-referencing instructions in *code*.
+        """
         code = getattr(code, 'co_code', b'')
         if not PY3:
             code = map(ord, code)
@@ -114,26 +118,15 @@ if sys.version_info < (3, 4):
                     yield op, oparg
 
 else:
-    def _walk_global_ops_real(code):
+    def _walk_global_ops(code):
+        """
+        Yield (opcode, argument number) tuples for all
+        global-referencing instructions in *code*.
+        """
         for instr in dis.get_instructions(code):
             op = instr.opcode
             if op in GLOBAL_OPS:
                 yield op, instr.arg
-
-
-_walk_global_ops_cache = (weakref.WeakKeyDictionary()
-                          if sys.version_info >= (2, 7)
-                          else {})
-
-def _walk_global_ops(code):
-    """
-    Return a list of (opcode, argument number) tuples for all
-    global-referencing instructions in *code*.
-    """
-    res = _walk_global_ops_cache.get(code)
-    if res is None:
-        res = _walk_global_ops_cache[code] = list(_walk_global_ops_real(code))
-    return res
 
 
 class CloudPickler(Pickler):
@@ -327,24 +320,34 @@ class CloudPickler(Pickler):
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
+
+    _extract_code_globals_cache = (weakref.WeakKeyDictionary()
+                                   if sys.version_info >= (2, 7)
+                                   else {})
+
     @classmethod
     def extract_code_globals(cls, co):
         """
         Find all globals names read or written to by codeblock co
         """
-        try:
-            names = co.co_names
-        except AttributeError:
-            # PyPy "builtin-code" object
-            return set()
+        out_names = cls._extract_code_globals_cache.get(co)
+        if out_names is None:
+            try:
+                names = co.co_names
+            except AttributeError:
+                # PyPy "builtin-code" object
+                out_names = set()
+            else:
+                out_names = set(names[oparg]
+                                for op, oparg in _walk_global_ops(co))
 
-        out_names = set(names[oparg] for op, oparg in _walk_global_ops(co))
+                # see if nested function have any global refs
+                if co.co_consts:
+                    for const in co.co_consts:
+                        if type(const) is types.CodeType:
+                            out_names |= cls.extract_code_globals(const)
 
-        # see if nested function have any global refs
-        if co.co_consts:
-            for const in co.co_consts:
-                if type(const) is types.CodeType:
-                    out_names |= cls.extract_code_globals(const)
+            cls._extract_code_globals_cache[co] = out_names
 
         return out_names
 
