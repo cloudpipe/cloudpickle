@@ -85,7 +85,7 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEquals(self.teststring, unpickled.read())
         os.remove(self.tmpfilepath)
 
-    @pytest.mark.skipif(sys.version_info > (2, 7),
+    @pytest.mark.skipif(sys.version_info >= (3,),
                         reason="only works on Python 2.x")
     def test_temp_file(self):
         with tempfile.NamedTemporaryFile(mode='ab+') as fp:

@@ -121,14 +121,18 @@ else:
                 yield op, instr.arg
 
 
-def _walk_global_ops(code, _cache=weakref.WeakKeyDictionary()):
+_walk_global_ops_cache = (weakref.WeakKeyDictionary()
+                          if sys.version_info >= (2, 7)
+                          else {})
+
+def _walk_global_ops(code):
     """
     Return a list of (opcode, argument number) tuples for all
     global-referencing instructions in *code*.
     """
-    res = _cache.get(code)
+    res = _walk_global_ops_cache.get(code)
     if res is None:
-        res = _cache[code] = list(_walk_global_ops_real(code))
+        res = _walk_global_ops_cache[code] = list(_walk_global_ops_real(code))
     return res
 
 
@@ -328,11 +332,13 @@ class CloudPickler(Pickler):
         """
         Find all globals names read or written to by codeblock co
         """
-        names = co.co_names
-        out_names = set()
+        try:
+            names = co.co_names
+        except AttributeError:
+            # PyPy "builtin-code" object
+            return set()
 
-        for op, oparg in _walk_global_ops(co):
-            out_names.add(names[oparg])
+        out_names = set(names[oparg] for op, oparg in _walk_global_ops(co))
 
         # see if nested function have any global refs
         if co.co_consts:
