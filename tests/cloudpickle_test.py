@@ -4,6 +4,7 @@ import unittest
 import pytest
 import pickle
 import sys
+import random
 import functools
 import itertools
 import platform
@@ -332,6 +333,32 @@ class CloudPickleTest(unittest.TestCase):
         loop = ioloop.IOLoop.current()
         res = loop.run_sync(functools.partial(g2, 5))
         self.assertEqual(res, 7)
+
+    def test_extended_arg(self):
+        # Functions with more than 65535 global vars prefix some global
+        # variable references with the EXTENDED_ARG opcode.
+        nvars = 65537 + 258
+        names = ['g%d' % i for i in range(1, nvars)]
+        r = random.Random(42)
+        d = dict((name, r.randrange(100)) for name in names)
+        # def f(x):
+        #     x = g1, g2, ...
+        #     return zlib.crc32(bytes(bytearray(x)))
+        code = """
+        import zlib
+
+        def f():
+            x = {tup}
+            return zlib.crc32(bytes(bytearray(x)))
+        """.format(tup=', '.join(names))
+        exec(textwrap.dedent(code), d)
+        f = d['f']
+        res = f()
+        data = cloudpickle.dumps([f, f])
+        d = f = None
+        f2, f3 = pickle.loads(data)
+        self.assertTrue(f2 is f3)
+        self.assertEqual(f2(), res)
 
 
 if __name__ == '__main__':
