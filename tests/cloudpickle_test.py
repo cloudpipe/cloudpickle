@@ -340,7 +340,7 @@ class CloudPickleTest(unittest.TestCase):
         nvars = 65537 + 258
         names = ['g%d' % i for i in range(1, nvars)]
         r = random.Random(42)
-        d = dict((name, r.randrange(100)) for name in names)
+        d = dict([(name, r.randrange(100)) for name in names])
         # def f(x):
         #     x = g1, g2, ...
         #     return zlib.crc32(bytes(bytearray(x)))
@@ -351,7 +351,7 @@ class CloudPickleTest(unittest.TestCase):
             x = {tup}
             return zlib.crc32(bytes(bytearray(x)))
         """.format(tup=', '.join(names))
-        exec(textwrap.dedent(code), d)
+        exec(textwrap.dedent(code), d, d)
         f = d['f']
         res = f()
         data = cloudpickle.dumps([f, f])
