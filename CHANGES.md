@@ -1,3 +1,10 @@
+0.2.2
+=====
+
+* Support Python 3.6
+* Support Tornado Coroutines
+* Support builtin methods
+
 0.2.1
 =====
 
