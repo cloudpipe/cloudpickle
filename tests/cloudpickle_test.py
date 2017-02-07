@@ -360,6 +360,46 @@ class CloudPickleTest(unittest.TestCase):
         self.assertTrue(f2 is f3)
         self.assertEqual(f2(), res)
 
+    def test_submodule(self):
+        # Function that refers (by attribute) to a sub-module of a package.
+
+        # Choose any module NOT imported by __init__ of the parent package
+        # examples in standard library include http.cookies and unittest.mock
+        global http # imitate performing this import at top of file
+        import http.cookies
+        def example():
+            x = http.HTTPStatus
+            x = http.cookies.Morsel # potential AttributeError
+
+        s = cloudpickle.dumps(example)
+
+        # refresh the environment (unimport http.cookies)
+        del http
+        del sys.modules['http.cookies']
+        del sys.modules['http']
+
+        # deserialise
+        f = pickle.loads(s)
+        f() # perform test for error
+
+    def test_submodule_closure(self):
+        # Same as test_submodule except the package is not a global
+        def scope():
+            import http.cookies
+            def example():
+                x = http.HTTPStatus
+                x = http.cookies.Morsel # potential AttributeError
+            return example
+        example = scope()
+
+        s = cloudpickle.dumps(example)
+
+        # refresh the environment (unimport http.cookies)
+        del sys.modules['http.cookies']
+        del sys.modules['http']
+
+        f = cloudpickle.loads(s)
+        f() # test
 
 if __name__ == '__main__':
     unittest.main()
