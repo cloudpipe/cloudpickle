@@ -364,19 +364,21 @@ class CloudPickleTest(unittest.TestCase):
         # Function that refers (by attribute) to a sub-module of a package.
 
         # Choose any module NOT imported by __init__ of the parent package
-        # examples in standard library include http.cookies and unittest.mock
-        global http # imitate performing this import at top of file
-        import http.cookies
+        # examples in standard library include:
+        # - http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
+
+        global xml # imitate performing this import at top of file
+        import xml.etree.ElementTree
         def example():
-            x = http.HTTPStatus
-            x = http.cookies.Morsel # potential AttributeError
+            x = xml.etree.ElementTree.Comment # potential AttributeError
 
         s = cloudpickle.dumps(example)
 
-        # refresh the environment (unimport http.cookies)
-        del http
-        del sys.modules['http.cookies']
-        del sys.modules['http']
+        # refresh the environment (unimport the dependency)
+        del xml
+        del sys.modules['xml.etree.ElementTree']
+        del sys.modules['xml.etree']
+        del sys.modules['xml']
 
         # deserialise
         f = pickle.loads(s)
@@ -385,18 +387,18 @@ class CloudPickleTest(unittest.TestCase):
     def test_submodule_closure(self):
         # Same as test_submodule except the package is not a global
         def scope():
-            import http.cookies
+            import xml.etree.ElementTree
             def example():
-                x = http.HTTPStatus
-                x = http.cookies.Morsel # potential AttributeError
+                x = xml.etree.ElementTree.Comment # potential AttributeError
             return example
         example = scope()
 
         s = cloudpickle.dumps(example)
 
-        # refresh the environment (unimport http.cookies)
-        del sys.modules['http.cookies']
-        del sys.modules['http']
+        # refresh the environment (unimport dependency)
+        del sys.modules['xml.etree.ElementTree']
+        del sys.modules['xml.etree']
+        del sys.modules['xml']
 
         f = cloudpickle.loads(s)
         f() # test
