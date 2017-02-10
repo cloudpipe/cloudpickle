@@ -9,6 +9,8 @@ import functools
 import itertools
 import platform
 import textwrap
+import base64
+import subprocess
 
 try:
     # try importing numpy and scipy. These are not hard dependencies and
@@ -402,6 +404,28 @@ class CloudPickleTest(unittest.TestCase):
 
         f = cloudpickle.loads(s)
         f() # test
+
+    def test_multiprocess(self):
+        # running a function pickled by another process (a la dask.distributed)
+        def scope():
+            import curses.textpad
+            def example():
+                x = xml.etree.ElementTree.Comment
+                x = curses.textpad.Textbox
+            return example
+        global xml
+        import xml.etree.ElementTree
+        example = scope()
+
+        s = cloudpickle.dumps(example)
+
+        # choose "subprocess" rather than "multiprocessing" because the latter
+        # library uses fork to preserve the parent environment.
+        command = ("import pickle, base64; "
+                   "pickle.loads(base64.b32decode('" +
+                   base64.b32encode(s).decode('ascii') +
+                   "'))()")
+        assert not subprocess.call([sys.executable, '-c', command])
 
 if __name__ == '__main__':
     unittest.main()
