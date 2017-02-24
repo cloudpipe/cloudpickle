@@ -431,11 +431,14 @@ class CloudPickleTest(unittest.TestCase):
         # like test_multiprocess except subpackage modules referenced directly
         # (unlike test_submodule)
         global etree
+        def scope():
+            import curses.textpad as foobar
+            def example():
+                x = etree.Comment
+                x = foobar.Textbox
+            return example
+        example = scope()
         import xml.etree.ElementTree as etree
-        import curses.textpad as foobar
-        def example():
-            x = etree.Comment
-            x = foobar.Textbox
 
         s = cloudpickle.dumps(example)
 
