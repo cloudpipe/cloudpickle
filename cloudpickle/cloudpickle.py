@@ -238,7 +238,7 @@ class CloudPickler(Pickler):
         # a builtin_function_or_method which comes in as an attribute of some
         # object (e.g., object.__new__, itertools.chain.from_iterable) will end
         # up with modname "__main__" and so end up here. But these functions
-        # have no __code__ attribute in CPython, so the handling for 
+        # have no __code__ attribute in CPython, so the handling for
         # user-defined functions below will fail.
         # So we pickle them here using save_reduce; have to do it differently
         # for different python versions.
@@ -282,6 +282,27 @@ class CloudPickler(Pickler):
             self.memoize(obj)
     dispatch[types.FunctionType] = save_function
 
+    def _save_subimports(self, code, top_level_dependencies):
+        """
+        Ensure de-pickler imports any package child-modules that
+        are needed by the function
+        """
+        # check if any known dependency is an imported package
+        for x in top_level_dependencies:
+            if isinstance(x, types.ModuleType) and x.__package__:
+                # check if the package has any currently loaded sub-imports
+                prefix = x.__name__ + '.'
+                for name, module in sys.modules.items():
+                    if name.startswith(prefix):
+                        # check whether the function can address the sub-module
+                        tokens = set(name[len(prefix):].split('.'))
+                        if not tokens - set(code.co_names):
+                            # ensure unpickler executes this import
+                            self.save(module)
+                            # then discards the reference to it
+                            self.write(pickle.POP)
+
+
     def save_function_tuple(self, func):
         """  Pickles an actual func object.
 
@@ -306,6 +327,8 @@ class CloudPickler(Pickler):
 
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
+
+        self._save_subimports(code, set(f_globals.values()) | set(closure))
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)

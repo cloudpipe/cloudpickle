@@ -9,6 +9,8 @@ import functools
 import itertools
 import platform
 import textwrap
+import base64
+import subprocess
 
 try:
     # try importing numpy and scipy. These are not hard dependencies and
@@ -359,6 +361,92 @@ class CloudPickleTest(unittest.TestCase):
         f2, f3 = pickle.loads(data)
         self.assertTrue(f2 is f3)
         self.assertEqual(f2(), res)
+
+    def test_submodule(self):
+        # Function that refers (by attribute) to a sub-module of a package.
+
+        # Choose any module NOT imported by __init__ of its parent package
+        # examples in standard library include:
+        # - http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
+
+        global xml # imitate performing this import at top of file
+        import xml.etree.ElementTree
+        def example():
+            x = xml.etree.ElementTree.Comment # potential AttributeError
+
+        s = cloudpickle.dumps(example)
+
+        # refresh the environment, i.e., unimport the dependency
+        del xml
+        for item in list(sys.modules):
+            if item.split('.')[0] == 'xml':
+                del sys.modules[item]
+
+        # deserialise
+        f = pickle.loads(s)
+        f() # perform test for error
+
+    def test_submodule_closure(self):
+        # Same as test_submodule except the package is not a global
+        def scope():
+            import xml.etree.ElementTree
+            def example():
+                x = xml.etree.ElementTree.Comment # potential AttributeError
+            return example
+        example = scope()
+
+        s = cloudpickle.dumps(example)
+
+        # refresh the environment (unimport dependency)
+        for item in list(sys.modules):
+            if item.split('.')[0] == 'xml':
+                del sys.modules[item]
+
+        f = cloudpickle.loads(s)
+        f() # test
+
+    def test_multiprocess(self):
+        # running a function pickled by another process (a la dask.distributed)
+        def scope():
+            import curses.textpad
+            def example():
+                x = xml.etree.ElementTree.Comment
+                x = curses.textpad.Textbox
+            return example
+        global xml
+        import xml.etree.ElementTree
+        example = scope()
+
+        s = cloudpickle.dumps(example)
+
+        # choose "subprocess" rather than "multiprocessing" because the latter
+        # library uses fork to preserve the parent environment.
+        command = ("import pickle, base64; "
+                   "pickle.loads(base64.b32decode('" +
+                   base64.b32encode(s).decode('ascii') +
+                   "'))()")
+        assert not subprocess.call([sys.executable, '-c', command])
+
+    def test_import(self):
+        # like test_multiprocess except subpackage modules referenced directly
+        # (unlike test_submodule)
+        global etree
+        def scope():
+            import curses.textpad as foobar
+            def example():
+                x = etree.Comment
+                x = foobar.Textbox
+            return example
+        example = scope()
+        import xml.etree.ElementTree as etree
+
+        s = cloudpickle.dumps(example)
+
+        command = ("import pickle, base64; "
+                   "pickle.loads(base64.b32decode('" +
+                   base64.b32encode(s).decode('ascii') +
+                   "'))()")
+        assert not subprocess.call([sys.executable, '-c', command])
 
 
 if __name__ == '__main__':
