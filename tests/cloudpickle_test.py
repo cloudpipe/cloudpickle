@@ -427,5 +427,24 @@ class CloudPickleTest(unittest.TestCase):
                    "'))()")
         assert not subprocess.call([sys.executable, '-c', command])
 
+    def test_import(self):
+        # like test_multiprocess except subpackage modules referenced directly
+        # (unlike test_submodule)
+        global etree
+        import xml.etree.ElementTree as etree
+        import curses.textpad as foobar
+        def example():
+            x = etree.Comment
+            x = foobar.Textbox
+
+        s = cloudpickle.dumps(example)
+
+        command = ("import pickle, base64; "
+                   "pickle.loads(base64.b32decode('" +
+                   base64.b32encode(s).decode('ascii') +
+                   "'))()")
+        assert not subprocess.call([sys.executable, '-c', command])
+
+
 if __name__ == '__main__':
     unittest.main()
