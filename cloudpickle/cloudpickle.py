@@ -283,7 +283,10 @@ class CloudPickler(Pickler):
     dispatch[types.FunctionType] = save_function
 
     def _save_subimports(self, code, top_level_dependencies):
-        """Ensure de-pickler imports any package sub-modules needed by the function"""
+        """
+        Ensure de-pickler imports any package child-modules that
+        are needed by the function
+        """
         # check if any known dependency is an imported package
         for x in top_level_dependencies:
             if isinstance(x, types.ModuleType) and x.__package__:
@@ -294,8 +297,11 @@ class CloudPickler(Pickler):
                         # check whether the function can address the sub-module
                         tokens = set(name[len(prefix):].split('.'))
                         if not tokens - set(code.co_names):
-                            self.save(module) # ensure the unpickler executes import of this submodule
-                            self.write(pickle.POP) # then discard the reference to it
+                            # ensure unpickler executes this import
+                            self.save(module)
+                            # then discards the reference to it
+                            self.write(pickle.POP)
+
 
     def save_function_tuple(self, func):
         """  Pickles an actual func object.
