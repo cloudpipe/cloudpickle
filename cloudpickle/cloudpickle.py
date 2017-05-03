@@ -176,11 +176,14 @@ class CloudPickler(Pickler):
         """
         mod_name = obj.__name__
         # If module is successfully found then it is not a dynamically created module
-        try:
-            _find_module(mod_name)
+        if hasattr(obj, '__file__'):
             is_dynamic = False
-        except ImportError:
-            is_dynamic = True
+        else:
+            try:
+                _find_module(mod_name)
+                is_dynamic = False
+            except ImportError:
+                is_dynamic = True
 
         self.modules.add(obj)
         if is_dynamic:
