@@ -138,9 +138,10 @@ class CloudPickleTest(unittest.TestCase):
                         reason="subprocess has a bug in 3.4.0 to 3.4.2")
     def test_locally_defined_function_and_class(self):
         LOCAL_CONSTANT = 42
+        LOCAL_LIST = []  # unhashable closure variable
 
         def some_function(x, y):
-            return (x + y) / LOCAL_CONSTANT
+            return (x + y) / LOCAL_CONSTANT + len(LOCAL_LIST)
 
         # pickle the function definition
         self.assertEqual(pickle_depickle(some_function)(41, 1), 1)
@@ -390,8 +391,10 @@ class CloudPickleTest(unittest.TestCase):
         # Same as test_submodule except the package is not a global
         def scope():
             import xml.etree.ElementTree
+            l = []  # unhashable closure variable
             def example():
                 x = xml.etree.ElementTree.Comment # potential AttributeError
+                return len(l)
             return example
         example = scope()
 
