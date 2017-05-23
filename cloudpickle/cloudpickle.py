@@ -843,7 +843,9 @@ def _find_module(mod_name):
         if path is not None:
             path = [path]
         file, path, description = imp.find_module(part, path)
-    return file, path, description
+        if file is not None:
+            file.close()
+    return path, description
 
 """Constructors for 3rd party libraries
 Note: These can never be renamed due to client compatibility issues"""
