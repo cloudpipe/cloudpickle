@@ -93,7 +93,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_pickling_file_handles(self):
         out1 = sys.stderr
         out2 = pickle.loads(cloudpickle.dumps(out1))
-        self.assertEquals(out1, out2)
+        self.assertEqual(out1, out2)
 
     def test_func_globals(self):
         class Unpicklable(object):
