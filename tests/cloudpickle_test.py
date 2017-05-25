@@ -154,6 +154,19 @@ class CloudPickleTest(unittest.TestCase):
         g2 = pickle_depickle(f2(2))
         self.assertEqual(g2(5), 240)
 
+    @pytest.mark.skipif(
+        supports_recursive_closure,
+        reason="Recursive closures shouldn't raise an exception if supported"
+    )
+    @pytest.mark.xfail
+    def test_recursive_closure_unsupported(self):
+        def f1():
+            def g():
+                return g
+            return g
+
+        pickle_depickle(f1())
+
     def test_unhashable_closure(self):
         def f():
             s = set((1, 2))  # mutable set is unhashable
