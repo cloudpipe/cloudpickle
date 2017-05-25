@@ -38,7 +38,7 @@ except ImportError:
 from io import BytesIO
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module, supports_recursive_closure
+from cloudpickle.cloudpickle import _find_module
 
 from .testutils import subprocess_pickle_echo
 
@@ -133,10 +133,6 @@ class CloudPickleTest(unittest.TestCase):
         f2 = lambda x: f1(x) // b
         self.assertEqual(pickle_depickle(f2)(1), 1)
 
-    @pytest.mark.skipif(
-        not supports_recursive_closure,
-        reason='The C API is needed for recursively defined closures'
-    )
     def test_recursive_closure(self):
         def f1():
             def g():
@@ -154,10 +150,6 @@ class CloudPickleTest(unittest.TestCase):
         g2 = pickle_depickle(f2(2))
         self.assertEqual(g2(5), 240)
 
-    @pytest.mark.skipif(
-        not supports_recursive_closure,
-        reason='The C API is needed for recursively defined closures'
-    )
     def test_closure_none_is_preserved(self):
         def f():
             """a function with no closure cells
@@ -174,19 +166,6 @@ class CloudPickleTest(unittest.TestCase):
             g.__closure__ is None,
             msg='g now has closure cells even though f does not',
         )
-
-    @pytest.mark.skipif(
-        supports_recursive_closure,
-        reason="Recursive closures shouldn't raise an exception if supported"
-    )
-    def test_recursive_closure_unsupported(self):
-        def f1():
-            def g():
-                return g
-            return g
-
-        with pytest.raises(pickle.PicklingError):
-            pickle_depickle(f1())
 
     def test_unhashable_closure(self):
         def f():

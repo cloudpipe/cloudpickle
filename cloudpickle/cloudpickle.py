@@ -56,6 +56,7 @@ import traceback
 import types
 import weakref
 
+
 if sys.version < '3':
     from pickle import Pickler
     try:
@@ -70,50 +71,114 @@ else:
     PY3 = True
 
 
-try:
-    from ctypes import pythonapi, py_object, c_int, PYFUNCTYPE
-except ImportError:
-    supports_recursive_closure = False
+def compress_closure(closure):
+    """Compress the closure by storing only the number of cells.
+    """
+    return len(closure) if closure is not None else -1
 
-    def compress_closure(closure):
-        return closure
 
-    def decompress_closure(compressed_closure):
-        return (
-            tuple(map(_make_cell, compressed_closure))
-            if compressed_closure is not None else
-            None
+def _make_cell_set_template_code():
+    """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
+
+    Notes
+    -----
+    In Python 3, we could use an easier function:
+
+    .. code-block:: python
+
+       def f():
+           cell = None
+
+           def _stub(value):
+               nonlocal cell
+               cell = value
+
+           return _stub
+
+        _cell_set_template_code = f()
+
+    This function is _only_ a LOAD_FAST(arg); STORE_DEREF, but that is
+    invalid syntax on Python 2. If we use this function we also don't need
+    to do the weird freevars/cellvars swap below
+    """
+    def inner(value):
+        lambda: cell  # make ``cell`` a closure so that we get a STORE_DEREF
+        cell = value
+
+    co = inner.__code__
+
+    # NOTE: we are marking the cell variable as a free variable intentionally
+    # so that we simulate an inner function instead of the outer function. This
+    # is what gives us the ``nonlocal`` behavior in a Python 2 compatible way.
+    if not PY3:
+        return types.CodeType(
+            co.co_argcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            co.co_name,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_cellvars,
+            (),
+        )
+    else:
+        return types.CodeType(
+            co.co_argcount,
+            co.co_kwonlyargcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            co.co_name,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_cellvars,
+            (),
         )
 
-    def save_closure(save, closure):
-        pass
 
-    def fill_cells(cells, values):
-        pass
-else:
-    supports_recursive_closure = True
+_cell_set_template_code = _make_cell_set_template_code()
 
-    def compress_closure(closure):
-        return len(closure) if closure is not None else -1
 
-    def decompress_closure(compressed_closure):
-        return (
-            tuple(_make_cell(None) for _ in range(compressed_closure))
-            if compressed_closure >= 0 else
-            None
-        )
+def _cell_set(cell, value):
+    """Set the value of a closure cell.
+    """
+    return types.FunctionType(
+        _cell_set_template_code,
+        {},
+        '_cell_set_inner',
+        (),
+        (cell,),
+    )(value)
 
-    def save_closure(save, closure):
-        save(closure)
 
-    _cell_set = PYFUNCTYPE(c_int, py_object, py_object)(
-        ('PyCell_Set', pythonapi), ((1, 'cell'), (1, 'value')),
+def fill_cells(cells, values):
+    """If we have a closure, fill the cells with their real values.
+    """
+    if cells is not None:
+        for cell, value in zip(cells, values):
+            _cell_set(cell, value)
+
+
+def decompress_closure(compressed_closure):
+    """Decompress the closure creating ``compressed_closure`` empty cells or
+    returning None.
+    """
+    return (
+        tuple(_make_cell(None) for _ in range(compressed_closure))
+        if compressed_closure >= 0 else
+        None
     )
-
-    def fill_cells(cells, values):
-        if cells is not None:
-            for cell, value in zip(cells, values):
-                _cell_set(cell, value)
 
 
 #relevant opcodes
@@ -392,7 +457,7 @@ class CloudPickler(Pickler):
         save(f_globals)
         save(defaults)
         save(dct)
-        save_closure(save, closure)
+        save(closure)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
@@ -852,11 +917,9 @@ def _gen_ellipsis():
 def _gen_not_implemented():
     return NotImplemented
 
-def _fill_function(func, globals, defaults, dict, closure=None):
+def _fill_function(func, globals, defaults, dict, closure):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
-
-        ``closure`` defaults to None because we don't send this value on PyPy.
     """
     func.__globals__.update(globals)
     func.__defaults__ = defaults
@@ -867,10 +930,6 @@ def _fill_function(func, globals, defaults, dict, closure=None):
 
 def _make_cell(value):
     return (lambda: value).__closure__[0]
-
-
-def _reconstruct_closure(values):
-    return tuple([_make_cell(v) for v in values])
 
 
 def _make_skel_func(code, compressed_closure, base_globals=None):
