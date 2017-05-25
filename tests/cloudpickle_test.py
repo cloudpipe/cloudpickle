@@ -154,6 +154,18 @@ class CloudPickleTest(unittest.TestCase):
         g2 = pickle_depickle(f2(2))
         self.assertEqual(g2(5), 240)
 
+    def test_unhashable_closure(self):
+        def f():
+            s = set((1, 2))  # mutable set is unhashable
+
+            def g():
+                return len(s)
+
+            return g
+
+        g = pickle_depickle(f())
+        self.assertEqual(g(), 2)
+
     @pytest.mark.skipif(sys.version_info >= (3, 4)
                         and sys.version_info < (3, 4, 3),
                         reason="subprocess has a bug in 3.4.0 to 3.4.2")
