@@ -71,7 +71,7 @@ else:
 
 
 try:
-    from ctypes import pythonapi, py_object, c_int
+    from ctypes import pythonapi, py_object, c_int, PYFUNCTYPE
 except ImportError:
     supports_recursive_closure = False
 
@@ -87,14 +87,18 @@ else:
     supports_recursive_closure = True
 
     def compress_closure(closure):
-        return len(closure)
+        return len(closure) if closure is not None else -1
 
-    def decompress_closure(closure):
-        return tuple(_make_cell(None) for _ in range(closure))
+    def decompress_closure(compressed_closure):
+        return (
+            tuple(_make_cell(None) for _ in range(compressed_closure))
+            if compressed_closure >= 0 else
+            None
+        )
 
-    _cell_set = pythonapi.PyCell_Set
-    _cell_set.argtypes = (py_object, py_object)
-    _cell_set.restype = c_int
+    _cell_set = PYFUNCTYPE(c_int, py_object, py_object)(
+        ('PyCell_Set', pythonapi), ((1, 'cell'), (1, 'value')),
+    )
 
     def fill_cells(cells, values):
         if cells is not None:
@@ -370,7 +374,7 @@ class CloudPickler(Pickler):
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
-        save((code, compress_closure(closure), base_globals))
+        save((code, compress_closure(func.__closure__), base_globals))
         write(pickle.REDUCE)
         self.memoize(func)
 
