@@ -81,6 +81,9 @@ except ImportError:
     def decompress_closure(compressed_closure):
         return compressed_closure
 
+    def save_closure(save, closure):
+        pass
+
     def fill_cells(cells, values):
         pass
 else:
@@ -95,6 +98,9 @@ else:
             if compressed_closure >= 0 else
             None
         )
+
+    def save_closure(save, closure):
+        save(closure)
 
     _cell_set = PYFUNCTYPE(c_int, py_object, py_object)(
         ('PyCell_Set', pythonapi), ((1, 'cell'), (1, 'value')),
@@ -382,7 +388,7 @@ class CloudPickler(Pickler):
         save(f_globals)
         save(defaults)
         save(dct)
-        save(closure)
+        save_closure(save, closure)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
@@ -839,10 +845,12 @@ def _gen_ellipsis():
 def _gen_not_implemented():
     return NotImplemented
 
-def _fill_function(func, globals, defaults, dict, closure):
+def _fill_function(func, globals, defaults, dict, closure=None):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
-         """
+
+        ``closure`` defaults to None because we don't send this value on PyPy.
+    """
     func.__globals__.update(globals)
     func.__defaults__ = defaults
     func.__dict__ = dict
