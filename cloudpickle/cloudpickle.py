@@ -71,12 +71,6 @@ else:
     PY3 = True
 
 
-def compress_closure(closure):
-    """Compress the closure by storing only the number of cells.
-    """
-    return len(closure) if closure is not None else -1
-
-
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
@@ -150,7 +144,7 @@ def _make_cell_set_template_code():
 _cell_set_template_code = _make_cell_set_template_code()
 
 
-def _cell_set(cell, value):
+def cell_set(cell, value):
     """Set the value of a closure cell.
     """
     return types.FunctionType(
@@ -160,25 +154,6 @@ def _cell_set(cell, value):
         (),
         (cell,),
     )(value)
-
-
-def fill_cells(cells, values):
-    """If we have a closure, fill the cells with their real values.
-    """
-    if cells is not None:
-        for cell, value in zip(cells, values):
-            _cell_set(cell, value)
-
-
-def decompress_closure(compressed_closure):
-    """Decompress the closure creating ``compressed_closure`` empty cells or
-    returning None.
-    """
-    return (
-        tuple(_make_cell(None) for _ in range(compressed_closure))
-        if compressed_closure >= 0 else
-        None
-    )
 
 
 #relevant opcodes
@@ -437,19 +412,23 @@ class CloudPickler(Pickler):
         save = self.save
         write = self.write
 
-        code, f_globals, defaults, closure, dct, base_globals = self.extract_func_data(func)
+        code, f_globals, defaults, closure_values, dct, base_globals = self.extract_func_data(func)
 
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
         self._save_subimports(
             code,
-            itertools.chain(f_globals.values(), closure or ()),
+            itertools.chain(f_globals.values(), closure_values or ()),
         )
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
-        save((code, compress_closure(closure), base_globals))
+        save((
+            code,
+            len(closure_values) if closure_values is not None else -1,
+            base_globals,
+        ))
         write(pickle.REDUCE)
         self.memoize(func)
 
@@ -457,7 +436,7 @@ class CloudPickler(Pickler):
         save(f_globals)
         save(defaults)
         save(dct)
-        save(closure)
+        save(closure_values)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
@@ -495,7 +474,7 @@ class CloudPickler(Pickler):
     def extract_func_data(self, func):
         """
         Turn the function into a tuple of data necessary to recreate it:
-            code, globals, defaults, closure, dict
+            code, globals, defaults, closure_values, dict
         """
         code = func.__code__
 
@@ -917,14 +896,19 @@ def _gen_ellipsis():
 def _gen_not_implemented():
     return NotImplemented
 
-def _fill_function(func, globals, defaults, dict, closure):
+def _fill_function(func, globals, defaults, dict, closure_values):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
     """
     func.__globals__.update(globals)
     func.__defaults__ = defaults
     func.__dict__ = dict
-    fill_cells(func.__closure__, closure)
+
+    cells = func.__closure__
+    if cells is not None:
+        for cell, value in zip(cells, closure_values):
+            cell_set(cell, value)
+
     return func
 
 
@@ -932,7 +916,7 @@ def _make_cell(value):
     return (lambda: value).__closure__[0]
 
 
-def _make_skel_func(code, compressed_closure, base_globals=None):
+def _make_skel_func(code, cell_count, base_globals=None):
     """ Creates a skeleton function object that contains just the provided
         code and the correct number of cells in func_closure.  All other
         func attributes (e.g. func_globals) are empty.
@@ -941,7 +925,11 @@ def _make_skel_func(code, compressed_closure, base_globals=None):
         base_globals = {}
     base_globals['__builtins__'] = __builtins__
 
-    closure = decompress_closure(compressed_closure)
+    closure = (
+        tuple(_make_cell(None) for _ in range(cell_count))
+        if cell_count >= 0 else
+        None
+    )
     return types.FunctionType(code, base_globals, None, None, closure)
 
 
