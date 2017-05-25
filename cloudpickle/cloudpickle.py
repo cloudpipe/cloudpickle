@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
+import ctypes
 import dis
 from functools import partial
 import imp
@@ -68,6 +69,20 @@ else:
     from pickle import _Pickler as Pickler
     from io import BytesIO as StringIO
     PY3 = True
+
+pythonapi = None
+try:
+    from ctypes import pythonapi
+except ImportError:
+    pass
+
+PyCell_Set = None
+if pythonapi:
+    try:
+        PyCell_Set = ctypes.PYFUNCTYPE(ctypes.c_int, ctypes.py_object, ctypes.py_object)(
+            ('PyCell_Set', ctypes.pythonapi), ((1, 'cell'), (1, 'value')))
+    except AttributeError:
+        pass
 
 #relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
@@ -127,6 +142,10 @@ else:
             op = instr.opcode
             if op in GLOBAL_OPS:
                 yield op, instr.arg
+
+
+def _make_cell(value):
+    return (lambda: value).__closure__[0]
 
 
 class CloudPickler(Pickler):
@@ -333,9 +352,13 @@ class CloudPickler(Pickler):
 
         self._save_subimports(code, set(f_globals.values()) | set(closure))
 
+        closure_cells = closure
+        if closure is not None and PyCell_Set is not None:
+            closure_cells = list(map(lambda _: _make_cell(None), closure))
+
         # create a skeleton function object and memoize it
         save(_make_skel_func)
-        save((code, closure, base_globals))
+        save((code, closure_cells, base_globals))
         write(pickle.REDUCE)
         self.memoize(func)
 
@@ -343,8 +366,19 @@ class CloudPickler(Pickler):
         save(f_globals)
         save(defaults)
         save(dct)
+        save(closure)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
+
+    def save_cell(self, obj):
+        save = self.save
+        write = self.write
+
+        save(_make_cell)
+        save((obj.cell_contents,))
+        write(pickle.REDUCE)
+
+    dispatch[_make_cell(None).__class__] = save_cell
 
     _extract_code_globals_cache = (
         weakref.WeakKeyDictionary()
@@ -799,19 +833,18 @@ def _gen_ellipsis():
 def _gen_not_implemented():
     return NotImplemented
 
-def _fill_function(func, globals, defaults, dict):
+def _fill_function(func, globals, defaults, dict, closure=None):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
          """
     func.__globals__.update(globals)
     func.__defaults__ = defaults
     func.__dict__ = dict
+    if closure is not None and PyCell_Set:
+        for i, v in enumerate(closure):
+            PyCell_Set(func.__closure__[i], v)
 
     return func
-
-
-def _make_cell(value):
-    return (lambda: value).__closure__[0]
 
 
 def _reconstruct_closure(values):

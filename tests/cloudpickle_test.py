@@ -13,6 +13,11 @@ import base64
 import subprocess
 
 try:
+    from ctypes import pythonapi
+except ImportError:
+    pythonapi = None
+
+try:
     # try importing numpy and scipy. These are not hard dependencies and
     # tests should be skipped if these modules are not available
     import numpy as np
@@ -132,6 +137,20 @@ class CloudPickleTest(unittest.TestCase):
         f1 = lambda x: x + a
         f2 = lambda x: f1(x) // b
         self.assertEqual(pickle_depickle(f2)(1), 1)
+
+    @pytest.mark.skipif(not pythonapi or not hasattr(pythonapi, 'PyCell_Set'),
+                        reason="missing required Python C API functionality")
+    def test_recursive_nested_function(self):
+        def f1():
+            def g(): return g
+            return g
+        def f2(base):
+            def g(n): return base if n <= 1 else n * g(n - 1)
+            return g
+        g1 = pickle_depickle(f1())
+        self.assertEqual(g1(), g1)
+        g2 = pickle_depickle(f2(2))
+        self.assertEqual(g2(5), 240)
 
     @pytest.mark.skipif(sys.version_info >= (3, 4)
                         and sys.version_info < (3, 4, 3),
