@@ -163,12 +163,15 @@ class CloudPickleTest(unittest.TestCase):
             """a function with no closure cells
             """
 
-        self.assertIsNone(f.__closure__, msg='f actually has closure cells!')
+        self.assertTrue(
+            f.__closure__ is None,
+            msg='f actually has closure cells!',
+        )
 
         g = pickle_depickle(f)
 
-        self.assertIsNone(
-            g.__closure__,
+        self.assertTrue(
+            g.__closure__ is None,
             msg='g now has closure cells even though f does not',
         )
 
