@@ -38,7 +38,7 @@ except ImportError:
 from io import BytesIO
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module
+from cloudpickle.cloudpickle import _find_module, supports_recursive_closure
 
 from .testutils import subprocess_pickle_echo
 
@@ -132,6 +132,27 @@ class CloudPickleTest(unittest.TestCase):
         f1 = lambda x: x + a
         f2 = lambda x: f1(x) // b
         self.assertEqual(pickle_depickle(f2)(1), 1)
+
+    @pytest.mark.skipif(
+        not supports_recursive_closure,
+        reason='The C API is needed for recursively defined closures'
+    )
+    def test_recursive_closure(self):
+        def f1():
+            def g():
+                return g
+            return g
+
+        def f2(base):
+            def g(n):
+                return base if n <= 1 else n * g(n - 1)
+            return g
+
+        g1 = pickle_depickle(f1())
+        self.assertEqual(g1(), g1)
+
+        g2 = pickle_depickle(f2(2))
+        self.assertEqual(g2(5), 240)
 
     @pytest.mark.skipif(sys.version_info >= (3, 4)
                         and sys.version_info < (3, 4, 3),

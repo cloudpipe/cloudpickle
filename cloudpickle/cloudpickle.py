@@ -69,6 +69,39 @@ else:
     from io import BytesIO as StringIO
     PY3 = True
 
+
+try:
+    from ctypes import pythonapi, py_object, c_int
+except ImportError:
+    supports_recursive_closure = False
+
+    def compress_closure(closure):
+        return closure
+
+    def decompress_closure(compressed_closure):
+        return compressed_closure
+
+    def fill_cells(cells, values):
+        pass
+else:
+    supports_recursive_closure = True
+
+    def compress_closure(closure):
+        return len(closure)
+
+    def decompress_closure(closure):
+        return tuple(_make_cell(None) for _ in range(closure))
+
+    _cell_set = pythonapi.PyCell_Set
+    _cell_set.argtypes = (py_object, py_object)
+    _cell_set.restype = c_int
+
+    def fill_cells(cells, values):
+        if cells is not None:
+            for cell, value in zip(cells, values):
+                _cell_set(cell, value)
+
+
 #relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
 DELETE_GLOBAL = opcode.opmap['DELETE_GLOBAL']
@@ -305,7 +338,6 @@ class CloudPickler(Pickler):
                             # then discards the reference to it
                             self.write(pickle.POP)
 
-
     def save_function_tuple(self, func):
         """  Pickles an actual func object.
 
@@ -335,7 +367,7 @@ class CloudPickler(Pickler):
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
-        save((code, closure, base_globals))
+        save((code, compress_closure(closure), base_globals))
         write(pickle.REDUCE)
         self.memoize(func)
 
@@ -343,6 +375,7 @@ class CloudPickler(Pickler):
         save(f_globals)
         save(defaults)
         save(dct)
+        save(closure)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
@@ -799,14 +832,14 @@ def _gen_ellipsis():
 def _gen_not_implemented():
     return NotImplemented
 
-def _fill_function(func, globals, defaults, dict):
+def _fill_function(func, globals, defaults, dict, closure):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
          """
     func.__globals__.update(globals)
     func.__defaults__ = defaults
     func.__dict__ = dict
-
+    fill_cells(func.__closure__, closure)
     return func
 
 
@@ -818,19 +851,17 @@ def _reconstruct_closure(values):
     return tuple([_make_cell(v) for v in values])
 
 
-def _make_skel_func(code, closures, base_globals = None):
+def _make_skel_func(code, compressed_closure, base_globals=None):
     """ Creates a skeleton function object that contains just the provided
         code and the correct number of cells in func_closure.  All other
         func attributes (e.g. func_globals) are empty.
     """
-    closure = _reconstruct_closure(closures) if closures else None
-
     if base_globals is None:
         base_globals = {}
     base_globals['__builtins__'] = __builtins__
 
-    return types.FunctionType(code, base_globals,
-                              None, None, closure)
+    closure = decompress_closure(compressed_closure)
+    return types.FunctionType(code, base_globals, None, None, closure)
 
 
 def _find_module(mod_name):
