@@ -179,14 +179,14 @@ class CloudPickleTest(unittest.TestCase):
         supports_recursive_closure,
         reason="Recursive closures shouldn't raise an exception if supported"
     )
-    @pytest.mark.xfail
     def test_recursive_closure_unsupported(self):
         def f1():
             def g():
                 return g
             return g
 
-        pickle_depickle(f1())
+        with pytest.raises(pickle.PicklingError):
+            pickle_depickle(f1())
 
     def test_unhashable_closure(self):
         def f():
