@@ -79,7 +79,11 @@ except ImportError:
         return closure
 
     def decompress_closure(compressed_closure):
-        return compressed_closure
+        return (
+            tuple(map(_make_cell, compressed_closure))
+            if compressed_closure is not None else
+            None
+        )
 
     def save_closure(save, closure):
         pass
@@ -375,12 +379,12 @@ class CloudPickler(Pickler):
 
         self._save_subimports(
             code,
-            itertools.chain(f_globals.values(), closure),
+            itertools.chain(f_globals.values(), closure or ()),
         )
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
-        save((code, compress_closure(func.__closure__), base_globals))
+        save((code, compress_closure(closure), base_globals))
         write(pickle.REDUCE)
         self.memoize(func)
 
@@ -443,7 +447,10 @@ class CloudPickler(Pickler):
         defaults = func.__defaults__
 
         # process closure
-        closure = [c.cell_contents for c in func.__closure__] if func.__closure__ else []
+        closure = (
+            [c.cell_contents for c in func.__closure__]
+            if func.__closure__ is not None else None
+        )
 
         # save the dict
         dct = func.__dict__
