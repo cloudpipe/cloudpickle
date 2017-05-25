@@ -155,6 +155,24 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(g2(5), 240)
 
     @pytest.mark.skipif(
+        not supports_recursive_closure,
+        reason='The C API is needed for recursively defined closures'
+    )
+    def test_closure_none_is_preserved(self):
+        def f():
+            """a function with no closure cells
+            """
+
+        self.assertIsNone(f.__closure__, msg='f actually has closure cells!')
+
+        g = pickle_depickle(f)
+
+        self.assertIsNone(
+            g.__closure__,
+            msg='g now has closure cells even though f does not',
+        )
+
+    @pytest.mark.skipif(
         supports_recursive_closure,
         reason="Recursive closures shouldn't raise an exception if supported"
     )
