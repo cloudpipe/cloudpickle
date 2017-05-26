@@ -118,7 +118,7 @@ def _make_cell_set_template_code():
             co.co_name,
             co.co_firstlineno,
             co.co_lnotab,
-            co.co_cellvars,
+            co.co_cellvars,  # this is the trickery
             (),
         )
     else:
@@ -136,7 +136,7 @@ def _make_cell_set_template_code():
             co.co_name,
             co.co_firstlineno,
             co.co_lnotab,
-            co.co_cellvars,
+            co.co_cellvars,  # this is the trickery
             (),
         )
 
