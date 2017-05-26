@@ -912,8 +912,13 @@ def _fill_function(func, globals, defaults, dict, closure_values):
     return func
 
 
-def _make_cell(value):
-    return (lambda: value).__closure__[0]
+def _make_empty_cell():
+    if False:
+        # trick the compiler into creating an empty cell in our lambda
+        cell = None
+        raise AssertionError('this route should not be executed')
+
+    return (lambda: cell).__closure__[0]
 
 
 def _make_skel_func(code, cell_count, base_globals=None):
@@ -926,7 +931,7 @@ def _make_skel_func(code, cell_count, base_globals=None):
     base_globals['__builtins__'] = __builtins__
 
     closure = (
-        tuple(_make_cell(None) for _ in range(cell_count))
+        tuple(_make_empty_cell() for _ in range(cell_count))
         if cell_count >= 0 else
         None
     )
