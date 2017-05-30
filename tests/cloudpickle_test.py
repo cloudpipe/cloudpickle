@@ -38,7 +38,7 @@ except ImportError:
 from io import BytesIO
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module
+from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 
@@ -132,6 +132,52 @@ class CloudPickleTest(unittest.TestCase):
         f1 = lambda x: x + a
         f2 = lambda x: f1(x) // b
         self.assertEqual(pickle_depickle(f2)(1), 1)
+
+    def test_recursive_closure(self):
+        def f1():
+            def g():
+                return g
+            return g
+
+        def f2(base):
+            def g(n):
+                return base if n <= 1 else n * g(n - 1)
+            return g
+
+        g1 = pickle_depickle(f1())
+        self.assertEqual(g1(), g1)
+
+        g2 = pickle_depickle(f2(2))
+        self.assertEqual(g2(5), 240)
+
+    def test_closure_none_is_preserved(self):
+        def f():
+            """a function with no closure cells
+            """
+
+        self.assertTrue(
+            f.__closure__ is None,
+            msg='f actually has closure cells!',
+        )
+
+        g = pickle_depickle(f)
+
+        self.assertTrue(
+            g.__closure__ is None,
+            msg='g now has closure cells even though f does not',
+        )
+
+    def test_unhashable_closure(self):
+        def f():
+            s = set((1, 2))  # mutable set is unhashable
+
+            def g():
+                return len(s)
+
+            return g
+
+        g = pickle_depickle(f())
+        self.assertEqual(g(), 2)
 
     @pytest.mark.skipif(sys.version_info >= (3, 4)
                         and sys.version_info < (3, 4, 3),
@@ -447,6 +493,19 @@ class CloudPickleTest(unittest.TestCase):
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
         assert not subprocess.call([sys.executable, '-c', command])
+
+    def test_cell_manipulation(self):
+        cell = _make_empty_cell()
+
+        with pytest.raises(ValueError):
+            cell.cell_contents
+
+        ob = object()
+        cell_set(cell, ob)
+        self.assertTrue(
+            cell.cell_contents is ob,
+            msg='cell contents not set correctly',
+        )
 
 
 if __name__ == '__main__':
