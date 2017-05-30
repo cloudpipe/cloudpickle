@@ -38,7 +38,7 @@ except ImportError:
 from io import BytesIO
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module
+from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 
@@ -493,6 +493,19 @@ class CloudPickleTest(unittest.TestCase):
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
         assert not subprocess.call([sys.executable, '-c', command])
+
+    def test_cell_manipulation(self):
+        cell = _make_empty_cell()
+
+        with pytest.raises(ValueError):
+            cell.cell_contents
+
+        ob = object()
+        cell_set(cell, ob)
+        self.assertTrue(
+            cell.cell_contents is ob,
+            msg='cell contents not set correctly',
+        )
 
 
 if __name__ == '__main__':
