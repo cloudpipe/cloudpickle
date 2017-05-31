@@ -1,6 +1,7 @@
 from __future__ import division
 import imp
 import unittest
+import logging
 import pytest
 import pickle
 import sys
@@ -506,6 +507,12 @@ class CloudPickleTest(unittest.TestCase):
             cell.cell_contents is ob,
             msg='cell contents not set correctly',
         )
+
+    def test_logger(self):
+        log1 = logging.getLogger('name')
+
+        log2 = pickle_depickle(log1)
+        self.assertEqual(log1.name, log2.name)
 
 
 if __name__ == '__main__':
