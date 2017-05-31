@@ -570,6 +570,12 @@ class CloudPickler(Pickler):
         Supports __transient__"""
         cls = obj.__class__
 
+        # Try the dispatch table (pickle module doesn't do it)
+        f = self.dispatch.get(cls)
+        if f:
+            f(self, obj)  # Call unbound method with explicit self
+            return
+
         memo = self.memo
         write = self.write
         save = self.save

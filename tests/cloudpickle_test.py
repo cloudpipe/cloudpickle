@@ -509,7 +509,8 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_logger(self):
         logger = logging.getLogger('cloudpickle.dummy_test_logger')
-        self.assertTrue(pickle_depickle(logger) is logger)
+        pickled = pickle_depickle(logger)
+        self.assertTrue(pickled is logger, (pickled, logger))
 
         dumped = cloudpickle.dumps(logger)
 
