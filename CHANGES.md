@@ -1,3 +1,11 @@
+0.3.0
+=====
+
+* Import submodules accessed by pickled functions
+* Support recursive functions inside closures
+* Fix `ResourceWarnings` and `DeprecationWarnings`
+* Assume modules with `__file__` attribute are not dynamic
+
 0.2.2
 =====
 
