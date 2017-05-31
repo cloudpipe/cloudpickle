@@ -1,3 +1,8 @@
+0.3.1
+=====
+
+* Fix version information and ship a changelog
+
 0.3.0
 =====
 
