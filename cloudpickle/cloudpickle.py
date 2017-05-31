@@ -47,6 +47,7 @@ from functools import partial
 import imp
 import io
 import itertools
+import logging
 import opcode
 import operator
 import pickle
@@ -569,6 +570,12 @@ class CloudPickler(Pickler):
         Supports __transient__"""
         cls = obj.__class__
 
+        # Try the dispatch table (pickle module doesn't do it)
+        f = self.dispatch.get(cls)
+        if f:
+            f(self, obj)  # Call unbound method with explicit self
+            return
+
         memo = self.memo
         write = self.write
         save = self.save
@@ -794,6 +801,11 @@ class CloudPickler(Pickler):
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
         pass
+
+    def save_logger(self, obj):
+        self.save_reduce(logging.getLogger, (obj.name,), obj=obj)
+
+    dispatch[logging.Logger] = save_logger
 
 
 # Tornado support
