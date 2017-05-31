@@ -238,7 +238,11 @@ class CloudPickler(Pickler):
 
     def save_memoryview(self, obj):
         """Fallback to save_string"""
-        Pickler.save_string(self, str(obj))
+        try:
+            arg = obj.obj
+        except ValueError:
+            arg = _released_memory_view_sentinel
+        self.save_reduce(_fill_memoryview, (arg,), obj=obj)
 
     def save_buffer(self, obj):
         """Fallback to save_string"""
@@ -895,6 +899,27 @@ def _gen_ellipsis():
 
 def _gen_not_implemented():
     return NotImplemented
+
+
+@bytes.__new__
+class _released_memory_view_sentinel(bytes):
+    """Sentinel used to mark that a serialized memoryview was released.
+
+    Notes
+    -----
+    This is a subclass of bytes so that it can be passed to memoryview
+    """
+    @classmethod
+    def __reduce__(cls):
+        return cls.__name__
+
+
+def _fill_memoryview(arg):
+    view = memoryview(arg)
+    if arg is _released_memory_view_sentinel:
+        view.release()
+    return view
+
 
 def _fill_function(func, globals, defaults, dict, closure_values):
     """ Fills in the rest of function data into the skeleton function object
