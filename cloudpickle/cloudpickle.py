@@ -49,6 +49,7 @@ import io
 import itertools
 import opcode
 import operator
+import logging
 import pickle
 import struct
 import sys
@@ -789,6 +790,10 @@ class CloudPickler(Pickler):
 
     dispatch[type(Ellipsis)] = save_ellipsis
     dispatch[type(NotImplemented)] = save_not_implemented
+
+    def save_logger(self, obj):
+        self.save_reduce(logging.getLogger, (obj.name,), obj=obj)
+    dispatch[logging.Logger] = save_logger
 
     """Special functions for Add-on libraries"""
     def inject_addons(self):
