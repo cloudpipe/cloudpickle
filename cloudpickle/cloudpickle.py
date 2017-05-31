@@ -797,7 +797,7 @@ class CloudPickler(Pickler):
         pass
 
     def save_logger(self, obj):
-        self.save_reduce(logging.getLogger, (obj.name,))
+        self.save_reduce(logging.getLogger, (obj.name,), obj=obj)
 
     dispatch[logging.Logger] = save_logger
 
