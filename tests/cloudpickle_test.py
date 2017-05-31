@@ -509,7 +509,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_logger(self):
         logger = logging.getLogger('cloudpickle.dummy_test_logger')
-        self.assertIs(pickle_depickle(logger), logger)
+        self.assertTrue(pickle_depickle(logger) is logger)
 
         dumped = cloudpickle.dumps(logger)
 
@@ -520,8 +520,11 @@ class CloudPickleTest(unittest.TestCase):
             logger = cloudpickle.loads(%(dumped)r)
             logger.info('hello')
             """ % locals()
-        out = subprocess.check_output([sys.executable, "-c", code],
-                                      stderr=subprocess.STDOUT)
+        proc = subprocess.Popen([sys.executable, "-c", code],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+        out, _ = proc.communicate()
+        self.assertEqual(proc.wait(), 0)
         self.assertEqual(out.strip().decode(),
                          'INFO:cloudpickle.dummy_test_logger:hello')
 
