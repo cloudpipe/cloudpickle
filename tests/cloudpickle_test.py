@@ -507,6 +507,24 @@ class CloudPickleTest(unittest.TestCase):
             msg='cell contents not set correctly',
         )
 
+    @pytest.mark.skipif(sys.version_info < (3, 0),
+                        reason="memoryview was added in 3.0")
+    def test_memoryview(self):
+        obj = b'abc'
+        view1 = memoryview(obj)
+
+        self.assertEqual(view1[:], obj)
+        view2 = pickle_depickle(view1)
+        self.assertEqual(view2[:], obj)
+
+        view1.release()
+        with pytest.raises(ValueError):
+            view1[:]
+
+        view2 = pickle_depickle(view1)
+        with pytest.raises(ValueError):
+            view2[:]
+
 
 if __name__ == '__main__':
     unittest.main()
