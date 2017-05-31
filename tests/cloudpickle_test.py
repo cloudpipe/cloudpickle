@@ -1,16 +1,26 @@
 from __future__ import division
-import imp
-import unittest
-import pytest
-import pickle
-import sys
-import random
-import functools
-import itertools
-import platform
-import textwrap
+
 import base64
+import functools
+import imp
+from io import BytesIO
+import itertools
+import logging
+from operator import itemgetter, attrgetter
+import pickle
+import platform
+import random
 import subprocess
+import sys
+import textwrap
+import unittest
+
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
+import pytest
 
 try:
     # try importing numpy and scipy. These are not hard dependencies and
@@ -26,16 +36,6 @@ try:
     import tornado
 except ImportError:
     tornado = None
-
-
-from operator import itemgetter, attrgetter
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
-from io import BytesIO
 
 import cloudpickle
 from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
@@ -506,6 +506,24 @@ class CloudPickleTest(unittest.TestCase):
             cell.cell_contents is ob,
             msg='cell contents not set correctly',
         )
+
+    def test_logger(self):
+        logger = logging.getLogger('cloudpickle.dummy_test_logger')
+        self.assertIs(pickle_depickle(logger), logger)
+
+        dumped = cloudpickle.dumps(logger)
+
+        code = """if 1:
+            import cloudpickle, logging
+
+            logging.basicConfig(level=logging.INFO)
+            logger = cloudpickle.loads(%(dumped)r)
+            logger.info('hello')
+            """ % locals()
+        out = subprocess.check_output([sys.executable, "-c", code],
+                                      stderr=subprocess.STDOUT)
+        self.assertEqual(out.strip().decode(),
+                         'INFO:cloudpickle.dummy_test_logger:hello')
 
 
 if __name__ == '__main__':

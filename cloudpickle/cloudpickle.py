@@ -47,6 +47,7 @@ from functools import partial
 import imp
 import io
 import itertools
+import logging
 import opcode
 import operator
 import pickle
@@ -794,6 +795,11 @@ class CloudPickler(Pickler):
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
         pass
+
+    def save_logger(self, obj):
+        self.save_reduce(logging.getLogger, (obj.name,))
+
+    dispatch[logging.Logger] = save_logger
 
 
 # Tornado support
