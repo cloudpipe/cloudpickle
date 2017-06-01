@@ -906,7 +906,23 @@ def _get_cell_contents(cell):
         return _empty_cell_value
 
 
-@object.__new__
+def instance(cls):
+    """Create a new instance of a class.
+
+    Parameters
+    ----------
+    cls : type
+        The class to create an instance of.
+
+    Returns
+    -------
+    instance : cls
+        A new instance of ``cls``.
+    """
+    return cls()
+
+
+@instance
 class _empty_cell_value(object):
     """sentinel for empty closures
     """
