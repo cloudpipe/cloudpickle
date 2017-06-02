@@ -167,6 +167,24 @@ class CloudPickleTest(unittest.TestCase):
             msg='g now has closure cells even though f does not',
         )
 
+    def test_empty_cell_preserved(self):
+        def f():
+            if False:  # pragma: no cover
+                cell = None
+
+            def g():
+                cell  # NameError, unbound free variable
+
+            return g
+
+        g1 = f()
+        with pytest.raises(NameError):
+            g1()
+
+        g2 = pickle_depickle(g1)
+        with pytest.raises(NameError):
+            g2()
+
     def test_unhashable_closure(self):
         def f():
             s = set((1, 2))  # mutable set is unhashable

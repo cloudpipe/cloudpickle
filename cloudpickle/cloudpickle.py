@@ -493,8 +493,9 @@ class CloudPickler(Pickler):
 
         # process closure
         closure = (
-            [c.cell_contents for c in func.__closure__]
-            if func.__closure__ is not None else None
+            list(map(_get_cell_contents, func.__closure__))
+            if func.__closure__ is not None
+            else None
         )
 
         # save the dict
@@ -908,6 +909,40 @@ def _gen_ellipsis():
 def _gen_not_implemented():
     return NotImplemented
 
+
+def _get_cell_contents(cell):
+    try:
+        return cell.cell_contents
+    except ValueError:
+        # sentinel used by ``_fill_function`` which will leave the cell empty
+        return _empty_cell_value
+
+
+def instance(cls):
+    """Create a new instance of a class.
+
+    Parameters
+    ----------
+    cls : type
+        The class to create an instance of.
+
+    Returns
+    -------
+    instance : cls
+        A new instance of ``cls``.
+    """
+    return cls()
+
+
+@instance
+class _empty_cell_value(object):
+    """sentinel for empty closures
+    """
+    @classmethod
+    def __reduce__(cls):
+        return cls.__name__
+
+
 def _fill_function(func, globals, defaults, dict, closure_values):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
@@ -919,7 +954,8 @@ def _fill_function(func, globals, defaults, dict, closure_values):
     cells = func.__closure__
     if cells is not None:
         for cell, value in zip(cells, closure_values):
-            cell_set(cell, value)
+            if value is not _empty_cell_value:
+                cell_set(cell, value)
 
     return func
 
