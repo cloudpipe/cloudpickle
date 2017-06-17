@@ -197,6 +197,51 @@ class CloudPickleTest(unittest.TestCase):
         g = pickle_depickle(f())
         self.assertEqual(g(), 2)
 
+    def test_dynamically_generated_class_that_uses_super(self):
+
+        class Base(object):
+            def method(self):
+                return 1
+
+        class Derived(Base):
+            "Derived Docstring"
+            def method(self):
+                return super(Derived, self).method() + 1
+
+        self.assertEqual(Derived().method(), 2)
+
+        # Pickle and unpickle the class.
+        UnpickledDerived = pickle_depickle(Derived)
+        self.assertEqual(UnpickledDerived().method(), 2)
+
+        # We have special logic for handling __doc__ because it's a readonly
+        # attribute on PyPy.
+        self.assertEqual(UnpickledDerived.__doc__, "Derived Docstring")
+
+        # Pickle and unpickle an instance.
+        orig_d = Derived()
+        d = pickle_depickle(orig_d)
+        self.assertEqual(d.method(), 2)
+
+    def test_cycle_in_classdict_globals(self):
+
+        class C(object):
+
+            def it_works(self):
+                return "woohoo!"
+
+        C.C_again = C
+        C.instance_of_C = C()
+
+        depickled_C = pickle_depickle(C)
+        depickled_instance = pickle_depickle(C())
+
+        # Test instance of depickled class.
+        self.assertEqual(depickled_C().it_works(), "woohoo!")
+        self.assertEqual(depickled_C.C_again().it_works(), "woohoo!")
+        self.assertEqual(depickled_C.instance_of_C.it_works(), "woohoo!")
+        self.assertEqual(depickled_instance.it_works(), "woohoo!")
+
     @pytest.mark.skipif(sys.version_info >= (3, 4)
                         and sys.version_info < (3, 4, 3),
                         reason="subprocess has a bug in 3.4.0 to 3.4.2")
