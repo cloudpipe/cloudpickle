@@ -859,7 +859,7 @@ class CloudPickler(Pickler):
     dispatch[type(NotImplemented)] = save_not_implemented
 
     # WeakSet was added in 2.7.
-    if sys.version_info >= (2, 7):
+    if hasattr(weakref, 'WeakSet'):
         def save_weakset(self, obj):
             self.save_reduce(weakref.WeakSet, (list(obj),))
 
