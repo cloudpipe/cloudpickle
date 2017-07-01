@@ -46,7 +46,7 @@ from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 from .testutils import subprocess_pickle_echo
 
 
-HAVE_WEAKSET = sys.version_info >= (2, 7)
+HAVE_WEAKSET = hasattr(weakref, 'WeakSet')
 
 
 def pickle_depickle(obj):
