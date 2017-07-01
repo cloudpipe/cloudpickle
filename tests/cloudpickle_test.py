@@ -1,5 +1,7 @@
 from __future__ import division
 
+import abc
+
 import base64
 import functools
 import imp
@@ -14,6 +16,7 @@ import subprocess
 import sys
 import textwrap
 import unittest
+import weakref
 
 try:
     from StringIO import StringIO
@@ -41,6 +44,9 @@ import cloudpickle
 from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
+
+
+HAVE_WEAKSET = sys.version_info >= (2, 7)
 
 
 def pickle_depickle(obj):
@@ -591,6 +597,62 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(proc.wait(), 0)
         self.assertEqual(out.strip().decode(),
                          'INFO:cloudpickle.dummy_test_logger:hello')
+
+    def test_abc(self):
+
+        @abc.abstractmethod
+        def foo(self):
+            raise NotImplementedError('foo')
+
+        # Invoke the metaclass directly rather than using class syntax for
+        # python 2/3 compat.
+        AbstractClass = abc.ABCMeta('AbstractClass', (object,), {'foo': foo})
+
+        class ConcreteClass(AbstractClass):
+            def foo(self):
+                return 'it works!'
+
+        depickled_base = pickle_depickle(AbstractClass)
+        depickled_class = pickle_depickle(ConcreteClass)
+        depickled_instance = pickle_depickle(ConcreteClass())
+
+        self.assertEqual(depickled_class().foo(), 'it works!')
+        self.assertEqual(depickled_instance.foo(), 'it works!')
+
+        # It should still be invalid to construct an instance of the abstract
+        # class without implementing its methods.
+        with self.assertRaises(TypeError):
+            depickled_base()
+
+        class DepickledBaseSubclass(depickled_base):
+            def foo(self):
+                return 'it works for realz!'
+
+        self.assertEqual(DepickledBaseSubclass().foo(), 'it works for realz!')
+
+    @pytest.mark.skipif(not HAVE_WEAKSET, reason="WeakSet doesn't exist")
+    def test_weakset_identity_preservation(self):
+        # Test that weaksets don't lose all their inhabitants if they're
+        # pickled in a larger data structure that includes other references to
+        # their inhabitants.
+
+        class SomeClass(object):
+            def __init__(self, x):
+                self.x = x
+
+        obj1, obj2, obj3 = SomeClass(1), SomeClass(2), SomeClass(3)
+
+        things = [weakref.WeakSet([obj1, obj2]), obj1, obj2, obj3]
+        result = pickle_depickle(things)
+
+        weakset, depickled1, depickled2, depickled3 = result
+
+        self.assertEqual(depickled1.x, 1)
+        self.assertEqual(depickled2.x, 2)
+        self.assertEqual(depickled3.x, 3)
+        self.assertEqual(len(weakset), 2)
+
+        self.assertEqual(set(weakset), set([depickled1, depickled2]))
 
 
 if __name__ == '__main__':

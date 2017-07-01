@@ -858,6 +858,13 @@ class CloudPickler(Pickler):
     dispatch[type(Ellipsis)] = save_ellipsis
     dispatch[type(NotImplemented)] = save_not_implemented
 
+    # WeakSet was added in 2.7.
+    if sys.version_info >= (2, 7):
+        def save_weakset(self, obj):
+            self.save_reduce(weakref.WeakSet, (list(obj),))
+
+        dispatch[weakref.WeakSet] = save_weakset
+
     """Special functions for Add-on libraries"""
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
