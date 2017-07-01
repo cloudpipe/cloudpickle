@@ -619,10 +619,8 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled_class().foo(), 'it works!')
         self.assertEqual(depickled_instance.foo(), 'it works!')
 
-        # It should still be invalid to construct an instance of the abstract
-        # class without implementing its methods.
-        with self.assertRaises(TypeError):
-            depickled_base()
+        # assertRaises doesn't return a contextmanager in python 2.6 :(.
+        self.failUnlessRaises(TypeError, depickled_base)
 
         class DepickledBaseSubclass(depickled_base):
             def foo(self):
