@@ -40,6 +40,18 @@ try:
 except ImportError:
     tornado = None
 
+
+try:
+    import enum
+
+    class SomeEnum(enum.Enum):
+        a = 'a'
+        b = 'b'
+        c = 'c'
+
+except ImportError:
+    SomeEnum = None
+
 import cloudpickle
 from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
@@ -651,6 +663,40 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(len(weakset), 2)
 
         self.assertEqual(set(weakset), set([depickled1, depickled2]))
+
+    def _check_enum(self, original):
+        if sys.version_info < (3,):
+            zip_longest = itertools.izip_longest
+        else:
+            zip_longest = itertools.zip_longest
+
+        depickled = pickle_depickle(original)
+        for orig_member, depickled_member in zip_longest(original, depickled):
+            self.assertEqual(orig_member.name, depickled_member.name)
+            self.assertEqual(orig_member.value, depickled_member.value)
+            self.assertIsInstance(depickled_member, depickled)
+
+        enum_then_members = [original] + list(original.__members__.values())
+        enum_ = enum_then_members[0]
+        members = enum_then_members[1:]
+
+        for before, after in itertools.zip_longest(enum_, members):
+            self.assertIs(before, after)
+
+    @pytest.mark.skipif(SomeEnum is None, reason="enum module doesn't exist")
+    def test_global_enum(self):
+        self._check_enum(SomeEnum)
+
+    @pytest.mark.skipif(SomeEnum is None, reason="enum module doesn't exist")
+    def test_dynamic_enum(self):
+
+        class DynamicEnum(enum.Enum):
+            a = 'a'
+            b = 'b'
+            c = 'c'
+            d = 'd'
+
+        self._check_enum(DynamicEnum)
 
 
 if __name__ == '__main__':

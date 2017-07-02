@@ -65,6 +65,7 @@ if sys.version < '3':
     except ImportError:
         from StringIO import StringIO
     PY3 = False
+
 else:
     types.ClassType = type
     from pickle import _Pickler as Pickler
@@ -205,6 +206,8 @@ if sys.version_info < (3, 4):
                 if op in GLOBAL_OPS:
                     yield op, oparg
 
+    HAVE_ENUM = False
+
 else:
     def _walk_global_ops(code):
         """
@@ -215,6 +218,9 @@ else:
             op = instr.opcode
             if op in GLOBAL_OPS:
                 yield op, instr.arg
+
+    HAVE_ENUM = True
+    import enum
 
 
 class CloudPickler(Pickler):
@@ -864,6 +870,51 @@ class CloudPickler(Pickler):
             self.save_reduce(weakref.WeakSet, (list(obj),))
 
         dispatch[weakref.WeakSet] = save_weakset
+
+    if HAVE_ENUM:
+
+        def save_enum_instance(self, obj):
+            """Save an **instance** of enum.Enum.
+
+            This is what gets called to save enum members.
+            """
+            self.save_reduce(getattr, (type(obj), obj.name))
+
+        def save_enum_subclass(self, obj):
+            """Save a **subclass** of enum.Enum.
+
+            This is what gets called to save the Enum class itself.
+            """
+            if obj is enum.Enum:
+                self.save_global(obj)
+                return
+
+            # EnumMeta uses a custom dictionary subclass during class
+            # construction to keep track of member order. The EnumMeta
+            # constructor assumes that it will get an instance of the custom
+            # subclass, so we need to re-create what EnumMeta would have
+            # received when creating this object.
+            clsdict = enum._EnumDict()
+            for member in obj:
+                clsdict[member.name] = member.value
+
+            self.save_reduce(type(obj), (obj.__name__, obj.__bases__, clsdict))
+
+        def save_enum_classdict(self, obj):
+            """
+            Save a dictionary to use as the third argument to EnumMeta.
+
+            This is called to save the custom subclass of dict used by
+            EnumMeta.__prepare__.
+            """
+            # Get the entries in _member_names order so that we preserve the
+            # order of the enum members.
+            items = [(name, obj[name]) for name in obj._member_names]
+            self.save_reduce(type(obj), (), None, None, items)
+
+        dispatch[enum.Enum] = save_enum_instance
+        dispatch[enum.EnumMeta] = save_enum_subclass
+        dispatch[enum._EnumDict] = save_enum_classdict
 
     """Special functions for Add-on libraries"""
     def inject_addons(self):
