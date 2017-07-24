@@ -627,8 +627,7 @@ class CloudPickler(Pickler):
     dispatch[types.MethodType] = save_instancemethod
 
     def save_inst(self, obj):
-        """Inner logic to save instance. Based off pickle.save_inst
-        Supports __transient__"""
+        """Inner logic to save instance. Based off pickle.save_inst"""
         cls = obj.__class__
 
         # Try the dispatch table (pickle module doesn't do it)
@@ -666,13 +665,6 @@ class CloudPickler(Pickler):
             getstate = obj.__getstate__
         except AttributeError:
             stuff = obj.__dict__
-            #remove items if transient
-            if hasattr(obj, '__transient__'):
-                transient = obj.__transient__
-                stuff = stuff.copy()
-                for k in list(stuff.keys()):
-                    if k in transient:
-                        del stuff[k]
         else:
             stuff = getstate()
             pickle._keep_alive(stuff, memo)
@@ -735,8 +727,6 @@ class CloudPickler(Pickler):
 
     def save_reduce(self, func, args, state=None,
                     listitems=None, dictitems=None, obj=None):
-        """Modified to support __transient__ on new objects
-        Change only affects protocol level 2 (which is always used by PiCloud"""
         # Assert that args is a tuple or None
         if not isinstance(args, tuple):
             raise pickle.PicklingError("args from reduce() should be a tuple")
@@ -750,7 +740,6 @@ class CloudPickler(Pickler):
 
         # Protocol 2 special case: if func's name is __newobj__, use NEWOBJ
         if self.proto >= 2 and getattr(func, "__name__", "") == "__newobj__":
-            #Added fix to allow transient
             cls = args[0]
             if not hasattr(cls, "__new__"):
                 raise pickle.PicklingError(
@@ -760,15 +749,6 @@ class CloudPickler(Pickler):
                     "args[0] from __newobj__ args has the wrong class")
             args = args[1:]
             save(cls)
-
-            #Don't pickle transient entries
-            if hasattr(obj, '__transient__'):
-                transient = obj.__transient__
-                state = state.copy()
-
-                for k in list(state.keys()):
-                    if k in transient:
-                        del state[k]
 
             save(args)
             write(pickle.NEWOBJ)
