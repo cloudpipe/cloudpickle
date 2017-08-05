@@ -408,15 +408,18 @@ class CloudPickler(Pickler):
         from global modules.
         """
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
-        if not isinstance(clsdict.get('__dict__', None), property):
-            # don't extract dict that are properties
-            clsdict.pop('__dict__', None)
-            clsdict.pop('__weakref__', None)
+        clsdict.pop('__weakref__', None)
 
-        # hack as __new__ is stored differently in the __dict__
-        new_override = clsdict.get('__new__', None)
-        if new_override:
-            clsdict['__new__'] = obj.__new__
+        # On PyPy, __doc__ is a readonly attribute, so we need to include it in
+        # the initial skeleton class.  This is safe because we know that the
+        # doc can't participate in a cycle with the original class.
+        type_kwargs = {'__doc__': clsdict.pop('__doc__', None)}
+
+        # If type overrides __dict__ as a property, include it in the type kwargs.
+        # In Python 2, we can't set this attribute after construction.
+        __dict__ = clsdict.pop('__dict__', None)
+        if isinstance(__dict__, property):
+            type_kwargs['__dict__'] = __dict__
 
         save = self.save
         write = self.write
@@ -439,17 +442,12 @@ class CloudPickler(Pickler):
         # Mark the start of the args for the rehydration function.
         write(pickle.MARK)
 
-        # On PyPy, __doc__ is a readonly attribute, so we need to include it in
-        # the initial skeleton class.  This is safe because we know that the
-        # doc can't participate in a cycle with the original class.
-        doc_dict = {'__doc__': clsdict.pop('__doc__', None)}
-
         # Create and memoize an empty class with obj's name and bases.
         save(type(obj))
         save((
             obj.__name__,
             obj.__bases__,
-            doc_dict,
+            type_kwargs,
         ))
         write(pickle.REDUCE)
         self.memoize(obj)
