@@ -1,9 +1,21 @@
+0.4.0
+=====
+
+* Fix functions with empty cells
+* Allow pickling Logger objects
+* Fix crash when pickling dynamic class cycles
+* Ignore "None" mdoules added to sys.modules
+* Support WeakSets and ABCMeta instances
+* Remove non-standard `__transient__` support
+* Catch exception from `pickle.whichmodule()`
+
+
 0.3.1
 =====
 
 * Fix version information and ship a changelog
 
-0.3.0
+ 0.3.0
 =====
 
 * Import submodules accessed by pickled functions
