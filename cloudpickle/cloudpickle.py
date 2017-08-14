@@ -385,7 +385,7 @@ class CloudPickler(Pickler):
         """
         # check if any known dependency is an imported package
         for x in top_level_dependencies:
-            if isinstance(x, types.ModuleType) and x.__package__:
+            if isinstance(x, types.ModuleType) and hasattr(x, '__package__') and x.__package__:
                 # check if the package has any currently loaded sub-imports
                 prefix = x.__name__ + '.'
                 for name, module in sys.modules.items():
