@@ -697,5 +697,9 @@ class CloudPickleTest(unittest.TestCase):
         result = g()
         self.assertEqual(1, result)
 
+    def test_function_module_name(self):
+        func = lambda x: x
+        self.assertEqual(pickle_depickle(func).__module__, func.__module__)
+
 if __name__ == '__main__':
     unittest.main()
