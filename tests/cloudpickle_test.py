@@ -702,13 +702,18 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(func).__module__, func.__module__)
 
     def test_namedtuple(self):
-        MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
 
+        MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
         t = MyTuple(1, 2, 3)
-        depickled_t = pickle_depickle(t)
+
+        depickled_t, depickled_MyTuple = pickle_depickle([t, MyTuple])
+        self.assertIsInstance(depickled_t, depickled_MyTuple)
 
         self.assertEqual((depickled_t.a, depickled_t.b, depickled_t.c), (1, 2, 3))
-        self.assertEqual(vars(t), vars(depickled_t))
+        self.assertEqual((depickled_t[0], depickled_t[1], depickled_t[2]), (1, 2, 3))
+
+        self.assertEqual(depickled_MyTuple.__name__, 'MyTuple')
+        self.assertTrue(issubclass(depickled_MyTuple, tuple))
 
 if __name__ == '__main__':
     unittest.main()
