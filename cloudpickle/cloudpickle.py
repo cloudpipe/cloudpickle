@@ -180,6 +180,32 @@ def _builtin_type(name):
     return getattr(types, name)
 
 
+def _make__new__factory(type_):
+    def _factory():
+        return type_.__new__
+    return _factory
+
+
+# NOTE: These need to be module globals so that they're pickleable as globals.
+_get_dict_new = _make__new__factory(dict)
+_get_frozenset_new = _make__new__factory(frozenset)
+_get_list_new = _make__new__factory(list)
+_get_set_new = _make__new__factory(set)
+_get_tuple_new = _make__new__factory(tuple)
+_get_object_new = _make__new__factory(object)
+
+# Pre-defined set of builtin_function_or_method instances that can be
+# serialized.
+_BUILTIN_TYPE_ATTRS = {
+    dict.__new__: _get_dict_new,
+    frozenset.__new__: _get_frozenset_new,
+    set.__new__: _get_set_new,
+    list.__new__: _get_list_new,
+    tuple.__new__: _get_tuple_new,
+    object.__new__: _get_object_new,
+}
+
+
 if sys.version_info < (3, 4):
     def _walk_global_ops(code):
         """
@@ -579,6 +605,8 @@ class CloudPickler(Pickler):
     def save_builtin_function(self, obj):
         if obj.__module__ == "__builtin__":
             return self.save_global(obj)
+        elif obj in _BUILTIN_TYPE_ATTRS:
+            return self.save_reduce(_BUILTIN_TYPE_ATTRS[obj], (), obj=obj)
         return self.save_function(obj)
     dispatch[types.BuiltinFunctionType] = save_builtin_function
 

@@ -715,5 +715,13 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled_MyTuple.__name__, 'MyTuple')
         self.assertTrue(issubclass(depickled_MyTuple, tuple))
 
+    def test_builtin_type__new__(self):
+        # Functions occasionally take the __new__ of these types as default
+        # parameters for factories.  For example, on Python 3.3,
+        # `tuple.__new__` is a default value for some methods of namedtuple.
+        for t in list, tuple, set, frozenset, dict, object:
+            self.assertIs(pickle_depickle(t.__new__), t.__new__)
+
+
 if __name__ == '__main__':
     unittest.main()
