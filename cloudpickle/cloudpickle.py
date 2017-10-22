@@ -196,7 +196,7 @@ _get_object_new = _make__new__factory(object)
 
 # Pre-defined set of builtin_function_or_method instances that can be
 # serialized.
-_BUILTIN_TYPE_ATTRS = {
+_BUILTIN_TYPE_CONSTRUCTORS = {
     dict.__new__: _get_dict_new,
     frozenset.__new__: _get_frozenset_new,
     set.__new__: _get_set_new,
@@ -332,6 +332,18 @@ class CloudPickler(Pickler):
         Determines what kind of function obj is (e.g. lambda, defined at
         interactive prompt, etc) and handles the pickling appropriately.
         """
+        if obj in _BUILTIN_TYPE_CONSTRUCTORS:
+            # We keep a special-cased cache of built-in type constructors at
+            # global scope, because these functions are structured very
+            # differently in different python versions and implementations (for
+            # example, they're instances of types.BuiltinFunctionType in
+            # CPython, but they're ordinary types.FunctionType instances in
+            # PyPy).
+            #
+            # If the function we've received is in that cache, we just
+            # serialize it as a lookup into the cache.
+            return self.save_reduce(_BUILTIN_TYPE_CONSTRUCTORS[obj], (), obj=obj)
+
         write = self.write
 
         if name is None:
@@ -358,7 +370,7 @@ class CloudPickler(Pickler):
                 return self.save_global(obj, name)
 
         # a builtin_function_or_method which comes in as an attribute of some
-        # object (e.g., object.__new__, itertools.chain.from_iterable) will end
+        # object (e.g., itertools.chain.from_iterable) will end
         # up with modname "__main__" and so end up here. But these functions
         # have no __code__ attribute in CPython, so the handling for
         # user-defined functions below will fail.
@@ -605,8 +617,6 @@ class CloudPickler(Pickler):
     def save_builtin_function(self, obj):
         if obj.__module__ == "__builtin__":
             return self.save_global(obj)
-        elif obj in _BUILTIN_TYPE_ATTRS:
-            return self.save_reduce(_BUILTIN_TYPE_ATTRS[obj], (), obj=obj)
         return self.save_function(obj)
     dispatch[types.BuiltinFunctionType] = save_builtin_function
 
