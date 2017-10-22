@@ -707,7 +707,7 @@ class CloudPickleTest(unittest.TestCase):
         t = MyTuple(1, 2, 3)
 
         depickled_t, depickled_MyTuple = pickle_depickle([t, MyTuple])
-        self.assertIsInstance(depickled_t, depickled_MyTuple)
+        self.assertTrue(isinstance(depickled_t, depickled_MyTuple))
 
         self.assertEqual((depickled_t.a, depickled_t.b, depickled_t.c), (1, 2, 3))
         self.assertEqual((depickled_t[0], depickled_t[1], depickled_t[2]), (1, 2, 3))
