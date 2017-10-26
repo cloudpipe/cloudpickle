@@ -264,15 +264,12 @@ class CloudPickler(Pickler):
                 raise pickle.PicklingError(msg)
 
     def save_memoryview(self, obj):
-        """Fallback to save_string"""
-        Pickler.save_string(self, str(obj))
+        self.save(obj.tobytes())
+    dispatch[memoryview] = save_memoryview
 
-    def save_buffer(self, obj):
-        """Fallback to save_string"""
-        Pickler.save_string(self,str(obj))
-    if PY3:
-        dispatch[memoryview] = save_memoryview
-    else:
+    if not PY3:
+        def save_buffer(self, obj):
+            self.save(str(obj))
         dispatch[buffer] = save_buffer
 
     def save_unsupported(self, obj):
@@ -387,7 +384,7 @@ class CloudPickler(Pickler):
                     rv = (getattr, (obj.__self__, name))
                 else:
                     raise pickle.PicklingError("Can't pickle %r" % obj)
-            return Pickler.save_reduce(self, obj=obj, *rv)
+            return self.save_reduce(obj=obj, *rv)
 
         # if func is lambda, def'ed at prompt, is in main, or is nested, then
         # we'll pickle the actual function object rather than simply saving a
@@ -477,18 +474,12 @@ class CloudPickler(Pickler):
         # Push the rehydration function.
         save(_rehydrate_skeleton_class)
 
-        # Mark the start of the args for the rehydration function.
+        # Mark the start of the args tuple for the rehydration function.
         write(pickle.MARK)
 
-        # Create and memoize an empty class with obj's name and bases.
-        save(type(obj))
-        save((
-            obj.__name__,
-            obj.__bases__,
-            type_kwargs,
-        ))
-        write(pickle.REDUCE)
-        self.memoize(obj)
+        # Create and memoize an skeleton class with obj's name and bases.
+        tp = type(obj)
+        self.save_reduce(tp, (obj.__name__, obj.__bases__, type_kwargs), obj=obj)
 
         # Now save the rest of obj's __dict__. Any references to obj
         # encountered while saving will point to the skeleton class.
@@ -627,37 +618,18 @@ class CloudPickler(Pickler):
         The name of this method is somewhat misleading: all types get
         dispatched here.
         """
-        if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
-            if obj in _BUILTIN_TYPE_NAMES:
-                return self.save_reduce(_builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
+        try:
+            return Pickler.save_global(self, obj, name=name)
+        except Exception:
+            if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
+                if obj in _BUILTIN_TYPE_NAMES:
+                    return self.save_reduce(_builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
 
-        if name is None:
-            name = obj.__name__
+            typ = type(obj)
+            if typ is not obj and isinstance(obj, (type, types.ClassType)):
+                return self.save_dynamic_class(obj)
 
-        modname = getattr(obj, "__module__", None)
-        if modname is None:
-            try:
-                # whichmodule() could fail, see
-                # https://bitbucket.org/gutworth/six/issues/63/importing-six-breaks-pickling
-                modname = pickle.whichmodule(obj, name)
-            except Exception:
-                modname = '__main__'
-
-        if modname == '__main__':
-            themodule = None
-        else:
-            __import__(modname)
-            themodule = sys.modules[modname]
-            self.modules.add(themodule)
-
-        if hasattr(themodule, name) and getattr(themodule, name) is obj:
-            return Pickler.save_global(self, obj, name)
-
-        typ = type(obj)
-        if typ is not obj and isinstance(obj, (type, types.ClassType)):
-            self.save_dynamic_class(obj)
-        else:
-            raise pickle.PicklingError("Can't pickle %r" % obj)
+            raise
 
     dispatch[type] = save_global
     dispatch[types.ClassType] = save_global

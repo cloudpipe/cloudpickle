@@ -130,6 +130,10 @@ class CloudPickleTest(unittest.TestCase):
         except NameError:  # Python 3 does no longer support buffers
             pass
 
+    def test_memoryview(self):
+        buffer_obj = memoryview(b"Hello")
+        self.assertEqual(pickle_depickle(buffer_obj), buffer_obj.tobytes())
+
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
 
