@@ -773,56 +773,6 @@ class CloudPickler(Pickler):
     if type(operator.attrgetter) is type:
         dispatch[operator.attrgetter] = save_attrgetter
 
-    def save_reduce(self, func, args, state=None,
-                    listitems=None, dictitems=None, obj=None):
-        # Assert that args is a tuple or None
-        if not isinstance(args, tuple):
-            raise pickle.PicklingError("args from reduce() should be a tuple")
-
-        # Assert that func is callable
-        if not hasattr(func, '__call__'):
-            raise pickle.PicklingError("func from reduce should be callable")
-
-        save = self.save
-        write = self.write
-
-        # Protocol 2 special case: if func's name is __newobj__, use NEWOBJ
-        if self.proto >= 2 and getattr(func, "__name__", "") == "__newobj__":
-            cls = args[0]
-            if not hasattr(cls, "__new__"):
-                raise pickle.PicklingError(
-                    "args[0] from __newobj__ args has no __new__")
-            if obj is not None and cls is not obj.__class__:
-                raise pickle.PicklingError(
-                    "args[0] from __newobj__ args has the wrong class")
-            args = args[1:]
-            save(cls)
-
-            save(args)
-            write(pickle.NEWOBJ)
-        else:
-            save(func)
-            save(args)
-            write(pickle.REDUCE)
-
-        if obj is not None:
-            self.memoize(obj)
-
-        # More new special cases (that work with older protocols as
-        # well): when __reduce__ returns a tuple with 4 or 5 items,
-        # the 4th and 5th item should be iterators that provide list
-        # items and dict items (as (key, value) tuples), or None.
-
-        if listitems is not None:
-            self._batch_appends(listitems)
-
-        if dictitems is not None:
-            self._batch_setitems(dictitems)
-
-        if state is not None:
-            save(state)
-            write(pickle.BUILD)
-
     def save_partial(self, obj):
         """Partial objects do not serialize correctly in python2.x -- this fixes the bugs"""
         self.save_reduce(_genpartial, (obj.func, obj.args, obj.keywords))
