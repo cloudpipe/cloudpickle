@@ -1,3 +1,13 @@
+0.4.1
+=====
+
+- Fixed a crash when pickling dynamic classes whose `__dict__` attribute was
+  defined as a [`property`](https://docs.python.org/3/library/functions.html#property).
+  Most notably, this affected dynamic [namedtuples](https://docs.python.org/2/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields)
+  in Python 2. (https://github.com/cloudpipe/cloudpickle/pull/113)
+- Cloudpickle now preserves the `__module__` attribute of functions (https://github.com/cloudpipe/cloudpickle/pull/118/).
+- Fixed a crash when pickling modules that don't have a `__package__` attribute (https://github.com/cloudpipe/cloudpickle/pull/116).
+
 0.4.0
 =====
 
