@@ -854,11 +854,12 @@ def dump(obj, file, protocol=2):
 
 def dumps(obj, protocol=2):
     file = StringIO()
-
-    cp = CloudPickler(file,protocol)
-    cp.dump(obj)
-
-    return file.getvalue()
+    try:
+        cp = CloudPickler(file,protocol)
+        cp.dump(obj)
+        return file.getvalue()
+    finally:
+        file.close()
 
 # including pickles unloading functions in this namespace
 load = pickle.load
