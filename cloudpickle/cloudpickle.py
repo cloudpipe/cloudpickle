@@ -375,10 +375,7 @@ class CloudPickler(Pickler):
         # for different python versions.
         if not hasattr(obj, '__code__'):
             if PY3:
-                if sys.version_info < (3, 4):
-                    raise pickle.PicklingError("Can't pickle %r" % obj)
-                else:
-                    rv = obj.__reduce_ex__(self.proto)
+                rv = obj.__reduce_ex__(self.proto)
             else:
                 if hasattr(obj, '__self__'):
                     rv = (getattr, (obj.__self__, name))
@@ -542,7 +539,7 @@ class CloudPickler(Pickler):
 
     _extract_code_globals_cache = (
         weakref.WeakKeyDictionary()
-        if sys.version_info >= (2, 7) and not hasattr(sys, "pypy_version_info")
+        if not hasattr(sys, "pypy_version_info")
         else {})
 
     @classmethod
@@ -700,12 +697,7 @@ class CloudPickler(Pickler):
     dispatch[property] = save_property
 
     def save_classmethod(self, obj):
-        try:
-            orig_func = obj.__func__
-        except AttributeError:  # Python 2.6
-            orig_func = obj.__get__(None, object)
-            if isinstance(obj, classmethod):
-                orig_func = orig_func.__func__  # Unbind
+        orig_func = obj.__func__
         self.save_reduce(type(obj), (orig_func,), obj=obj)
     dispatch[classmethod] = save_classmethod
     dispatch[staticmethod] = save_classmethod
@@ -744,14 +736,6 @@ class CloudPickler(Pickler):
 
     if type(operator.attrgetter) is type:
         dispatch[operator.attrgetter] = save_attrgetter
-
-    def save_partial(self, obj):
-        """Partial objects do not serialize correctly in python2.x -- this fixes the bugs"""
-        self.save_reduce(_genpartial, (obj.func, obj.args, obj.keywords))
-
-    if sys.version_info < (2,7):  # 2.7 supports partial pickling
-        dispatch[partial] = save_partial
-
 
     def save_file(self, obj):
         """Save a file"""
@@ -808,22 +792,20 @@ class CloudPickler(Pickler):
     dispatch[type(Ellipsis)] = save_ellipsis
     dispatch[type(NotImplemented)] = save_not_implemented
 
-    # WeakSet was added in 2.7.
-    if hasattr(weakref, 'WeakSet'):
-        def save_weakset(self, obj):
-            self.save_reduce(weakref.WeakSet, (list(obj),))
+    def save_weakset(self, obj):
+        self.save_reduce(weakref.WeakSet, (list(obj),))
 
-        dispatch[weakref.WeakSet] = save_weakset
-
-    """Special functions for Add-on libraries"""
-    def inject_addons(self):
-        """Plug in system. Register additional pickling functions if modules already loaded"""
-        pass
+    dispatch[weakref.WeakSet] = save_weakset
 
     def save_logger(self, obj):
         self.save_reduce(logging.getLogger, (obj.name,), obj=obj)
 
     dispatch[logging.Logger] = save_logger
+
+    """Special functions for Add-on libraries"""
+    def inject_addons(self):
+        """Plug in system. Register additional pickling functions if modules already loaded"""
+        pass
 
 
 # Tornado support

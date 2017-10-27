@@ -420,8 +420,6 @@ class CloudPickleTest(unittest.TestCase):
     def test_NotImplemented(self):
         self.assertEqual(NotImplemented, pickle_depickle(NotImplemented))
 
-    @pytest.mark.skipif((3, 0) < sys.version_info < (3, 4),
-                        reason="fails due to pickle behavior in Python 3.0-3.3")
     def test_builtin_function_without_module(self):
         on = object.__new__
         on_depickled = pickle_depickle(on)
