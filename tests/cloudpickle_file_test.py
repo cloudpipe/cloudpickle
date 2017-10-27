@@ -4,11 +4,7 @@ import os
 import shutil
 import pickle
 import sys
-try:
-    from io import StringIO
-except ImportError:
-    # compat for Python 2.6
-    from StringIO import StringIO
+from io import StringIO
 
 import pytest
 from mock import patch, mock_open
