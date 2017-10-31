@@ -14,6 +14,9 @@ close to the data.
 Among other things, `cloudpickle` supports pickling for lambda expressions,
 functions and classes defined interactively in the `__main__` module.
 
+`cloudpickle` uses `pickle.HIGHEST_PROTOCOL` by default: it is meant to
+send objects between processes running the same version of Python. It is
+discouraged to use `cloudpickle` for long-term storage.
 
 Installation
 ------------
