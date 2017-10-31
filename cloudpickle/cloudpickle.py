@@ -253,8 +253,10 @@ class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
 
-    def __init__(self, file, protocol=DEFAULT_PROTOCOL):
-        Pickler.__init__(self, file, protocol)
+    def __init__(self, file, protocol=None):
+        if protocol is None:
+            protocol = DEFAULT_PROTOCOL
+        Pickler.__init__(self, file, protocol=protocol)
         # set of modules to unpickle
         self.modules = set()
         # map ids to dictionary. used to ensure that functions can share global env
@@ -842,7 +844,7 @@ def _rebuild_tornado_coroutine(func):
 
 # Shorthands for legacy support
 
-def dump(obj, file, protocol=DEFAULT_PROTOCOL):
+def dump(obj, file, protocol=None):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -852,10 +854,10 @@ def dump(obj, file, protocol=DEFAULT_PROTOCOL):
     Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
     compatibility with older versions of Python.
     """
-    CloudPickler(file, protocol).dump(obj)
+    CloudPickler(file, protocol=protocol).dump(obj)
 
 
-def dumps(obj, protocol=DEFAULT_PROTOCOL):
+def dumps(obj, protocol=None):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -867,7 +869,7 @@ def dumps(obj, protocol=DEFAULT_PROTOCOL):
     """
     file = StringIO()
     try:
-        cp = CloudPickler(file, protocol)
+        cp = CloudPickler(file, protocol=protocol)
         cp.dump(obj)
         return file.getvalue()
     finally:
