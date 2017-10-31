@@ -49,7 +49,7 @@ from .testutils import subprocess_pickle_echo
 HAVE_WEAKSET = hasattr(weakref, 'WeakSet')
 
 
-def pickle_depickle(obj, protocol=pickle.HIGHEST_PROTOCOL):
+def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
     """Helper function to test whether object pickled with cloudpickle can be
     depickled with pickle
     """
@@ -64,7 +64,7 @@ class CloudPicklerTest(unittest.TestCase):
 
 class CloudPickleTest(unittest.TestCase):
 
-    protocol = pickle.HIGHEST_PROTOCOL
+    protocol = cloudpickle.DEFAULT_PROTOCOL
 
     def test_itemgetter(self):
         d = range(10)

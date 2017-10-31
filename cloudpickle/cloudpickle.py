@@ -58,6 +58,12 @@ import types
 import weakref
 
 
+# cloudpickle is meant for inter process communication: we expect all
+# communicating processes to run the same Python version hence we favor
+# communication speed over compatibility:
+DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
+
+
 if sys.version < '3':
     from pickle import Pickler
     try:
@@ -247,7 +253,7 @@ class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
 
-    def __init__(self, file, protocol=pickle.HIGHEST_PROTOCOL):
+    def __init__(self, file, protocol=DEFAULT_PROTOCOL):
         Pickler.__init__(self, file, protocol)
         # set of modules to unpickle
         self.modules = set()
@@ -828,6 +834,7 @@ def is_tornado_coroutine(func):
         return False
     return gen.is_coroutine_function(func)
 
+
 def _rebuild_tornado_coroutine(func):
     from tornado import gen
     return gen.coroutine(func)
@@ -835,11 +842,29 @@ def _rebuild_tornado_coroutine(func):
 
 # Shorthands for legacy support
 
-def dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL):
+def dump(obj, file, protocol=DEFAULT_PROTOCOL):
+    """Serialize obj as bytes streamed into file
+
+    protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
+    pickle.HIGHEST_PROTOCOL. This setting favors maximum communication speed
+    between processes running the same Python version.
+
+    Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
+    compatibility with older versions of Python.
+    """
     CloudPickler(file, protocol).dump(obj)
 
 
-def dumps(obj, protocol=pickle.HIGHEST_PROTOCOL):
+def dumps(obj, protocol=DEFAULT_PROTOCOL):
+    """Serialize obj as a string of bytes allocated in memory
+
+    protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
+    pickle.HIGHEST_PROTOCOL. This setting favors maximum communication speed
+    between processes running the same Python version.
+
+    Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
+    compatibility with older versions of Python.
+    """
     file = StringIO()
     try:
         cp = CloudPickler(file, protocol)
@@ -848,12 +873,13 @@ def dumps(obj, protocol=pickle.HIGHEST_PROTOCOL):
     finally:
         file.close()
 
+
 # including pickles unloading functions in this namespace
 load = pickle.load
 loads = pickle.loads
 
 
-#hack for __import__ not working as desired
+# hack for __import__ not working as desired
 def subimport(name):
     __import__(name)
     return sys.modules[name]
@@ -864,6 +890,7 @@ def dynamic_subimport(name, vars):
     mod.__dict__.update(vars)
     sys.modules[name] = mod
     return mod
+
 
 # restores function attributes
 def _restore_attr(obj, attr):
