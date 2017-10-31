@@ -943,7 +943,17 @@ class _empty_cell_value(object):
         return cls.__name__
 
 
-def _fill_function(func, globals, defaults, dict, module, closure_values):
+def _fill_function(*args):
+    if len(args) == 5:
+        # Backwards compat for cloudpickle v0.4.0, after which the `module`
+        # argument  was introduced
+        updated_args = args[:-1] + (None, args[-1],)
+        return _fill_function_internal(*updated_args)
+    else:
+        return _fill_function_internal(*args)
+
+
+def _fill_function_internal(func, globals, defaults, dict, module, closure_values):
     """ Fills in the rest of function data into the skeleton function object
         that were created via _make_skel_func().
     """

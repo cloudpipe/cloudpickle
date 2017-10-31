@@ -724,6 +724,27 @@ class CloudPickleTest(unittest.TestCase):
         for t in list, tuple, set, frozenset, dict, object:
             self.assertTrue(pickle_depickle(t.__new__) is t.__new__)
 
+    def test_function_pickle_compat_0_4_0(self):
+        # The result of `cloudpickle.dumps(lambda x: x)` in cloudpickle 0.4.0
+        pickled = ('\x80\x02ccloudpickle.cloudpickle\n_fill_function\nq\x00(c'
+            'cloudpickle.cloudpickle\n_make_skel_func\nq\x01ccloudpickle.clou'
+            'dpickle\n_builtin_type\nq\x02U\x08CodeTypeq\x03\x85q\x04Rq\x05(K'
+            '\x01K\x01K\x01KCU\x04|\x00\x00Sq\x06N\x85q\x07)U\x01xq\x08\x85q'
+            '\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
+            '\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13NtR.')
+        self.assertEquals(42, cloudpickle.loads(pickled)(42))
+
+    def test_function_pickle_compat_0_4_1(self):
+        # The result of `cloudpickle.dumps(lambda x: x)` in cloudpickle 0.4.1
+        pickled = ('\x80\x02ccloudpickle.cloudpickle\n_fill_function\nq\x00(c'
+            'cloudpickle.cloudpickle\n_make_skel_func\nq\x01ccloudpickle.clou'
+            'dpickle\n_builtin_type\nq\x02U\x08CodeTypeq\x03\x85q\x04Rq\x05(K'
+            '\x01K\x01K\x01KCU\x04|\x00\x00Sq\x06N\x85q\x07)U\x01xq\x08\x85q'
+            '\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
+            '\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13U\x08__main__q'
+            '\x14NtR.')
+        self.assertEquals(42, cloudpickle.loads(pickled)(42))
+
 
 if __name__ == '__main__':
     unittest.main()
