@@ -247,7 +247,7 @@ class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
 
-    def __init__(self, file, protocol=None):
+    def __init__(self, file, protocol=pickle.HIGHEST_PROTOCOL):
         Pickler.__init__(self, file, protocol)
         # set of modules to unpickle
         self.modules = set()
@@ -835,14 +835,14 @@ def _rebuild_tornado_coroutine(func):
 
 # Shorthands for legacy support
 
-def dump(obj, file, protocol=2):
+def dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL):
     CloudPickler(file, protocol).dump(obj)
 
 
-def dumps(obj, protocol=2):
+def dumps(obj, protocol=pickle.HIGHEST_PROTOCOL):
     file = StringIO()
     try:
-        cp = CloudPickler(file,protocol)
+        cp = CloudPickler(file, protocol)
         cp.dump(obj)
         return file.getvalue()
     finally:
