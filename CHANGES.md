@@ -1,3 +1,9 @@
+0.4.2
+=====
+
+- Restored compatibility with pickles from 0.4.0.
+- Handle the `func.__qualname__` attribute.
+
 0.4.1
 =====
 
