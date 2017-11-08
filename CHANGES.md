@@ -1,3 +1,8 @@
+0.5.0
+=====
+
+- Use `pickle.HIGHEST_PROTOCOL` by default.
+
 0.4.2
 =====
 
