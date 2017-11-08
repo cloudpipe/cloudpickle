@@ -703,6 +703,18 @@ class CloudPickleTest(unittest.TestCase):
         func = lambda x: x
         self.assertEqual(pickle_depickle(func).__module__, func.__module__)
 
+    def test_function_qualname(self):
+        def func(x):
+            return x
+        # Default __qualname__ attribute (Python 3 only)
+        if hasattr(func, '__qualname__'):
+            self.assertEqual(pickle_depickle(func).__qualname__,
+                             func.__qualname__)
+
+        # Mutated __qualname__ attribute
+        func.__qualname__ = '<modifiedlambda>'
+        self.assertEqual(pickle_depickle(func).__qualname__, func.__qualname__)
+
     def test_namedtuple(self):
 
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])

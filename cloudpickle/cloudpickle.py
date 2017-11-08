@@ -529,11 +529,16 @@ class CloudPickler(Pickler):
         self.memoize(func)
 
         # save the rest of the func data needed by _fill_function
-        save(f_globals)
-        save(defaults)
-        save(dct)
-        save(func.__module__)
-        save(closure_values)
+        state = {
+            'globals': f_globals,
+            'defaults': defaults,
+            'dict': dct,
+            'module': func.__module__,
+            'closure_values': closure_values,
+        }
+        if hasattr(func, '__qualname__'):
+            state['qualname'] = func.__qualname__
+        save(state)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
@@ -944,27 +949,39 @@ class _empty_cell_value(object):
 
 
 def _fill_function(*args):
-    if len(args) == 5:
-        # Backwards compat for cloudpickle v0.4.0, after which the `module`
-        # argument  was introduced
-        updated_args = args[:-1] + (None, args[-1],)
-        return _fill_function_internal(*updated_args)
-    else:
-        return _fill_function_internal(*args)
+    """Fills in the rest of function data into the skeleton function object
 
-
-def _fill_function_internal(func, globals, defaults, dict, module, closure_values):
-    """ Fills in the rest of function data into the skeleton function object
-        that were created via _make_skel_func().
+    The skeleton itself is create by _make_skel_func().
     """
-    func.__globals__.update(globals)
-    func.__defaults__ = defaults
-    func.__dict__ = dict
-    func.__module__ = module
+    if len(args) == 2:
+        func = args[0]
+        state = args[1]
+    elif len(args) == 5:
+        # Backwards compat for cloudpickle v0.4.0, after which the `module`
+        # argument was introduced
+        func = args[0]
+        keys = ['globals', 'defaults', 'dict', 'closure_values']
+        state = dict(zip(keys, args[1:]))
+        state['module'] = None
+    elif len(args) == 6:
+        # Backwards compat for cloudpickle v0.4.1, after which the function
+        # state was passed as a dict to the _fill_function it-self.
+        func = args[0]
+        keys = ['globals', 'defaults', 'dict', 'module', 'closure_values']
+        state = dict(zip(keys, args[1:]))
+    else:
+        raise ValueError('Unexpected _fill_value arguments: %r' % (args,))
+
+    func.__globals__.update(state['globals'])
+    func.__defaults__ = state['defaults']
+    func.__dict__ = state['dict']
+    func.__module__ = state['module']
+    if 'qualname' in state:
+        func.__qualname__ = state['qualname']
 
     cells = func.__closure__
     if cells is not None:
-        for cell, value in zip(cells, closure_values):
+        for cell, value in zip(cells, state['closure_values']):
             if value is not _empty_cell_value:
                 cell_set(cell, value)
 
