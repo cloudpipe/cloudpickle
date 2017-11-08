@@ -962,7 +962,6 @@ def _fill_function(*args):
         func = args[0]
         keys = ['globals', 'defaults', 'dict', 'closure_values']
         state = dict(zip(keys, args[1:]))
-        state['module'] = None
     elif len(args) == 6:
         # Backwards compat for cloudpickle v0.4.1, after which the function
         # state was passed as a dict to the _fill_function it-self.
@@ -975,7 +974,8 @@ def _fill_function(*args):
     func.__globals__.update(state['globals'])
     func.__defaults__ = state['defaults']
     func.__dict__ = state['dict']
-    func.__module__ = state['module']
+    if 'module' in state:
+        func.__module__ = state['module']
     if 'qualname' in state:
         func.__qualname__ = state['qualname']
 
