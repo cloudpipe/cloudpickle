@@ -736,6 +736,50 @@ class CloudPickleTest(unittest.TestCase):
         for t in list, tuple, set, frozenset, dict, object:
             self.assertTrue(pickle_depickle(t.__new__) is t.__new__)
 
+    def test_interactively_defined_function(self):
+        # Check that callables defined in the __main__ module of a Python
+        # script (or jupyter kernel) can be pickled / unpickled / executed.
+        code = """\
+        from testutils import subprocess_pickle_echo
+
+        CONSTANT = 42
+
+        class Foo(object):
+
+            def method(self, x):
+                return x
+
+
+        def f1():
+            return Foo
+
+
+        def f2(x):
+            return Foo().method(x)
+
+
+        def f3():
+            return Foo().method(CONSTANT)
+
+
+        cloned = subprocess_pickle_echo(lambda x: x**2, protocol={protocol})
+        assert cloned(3) == 9
+
+        cloned = subprocess_pickle_echo(Foo, protocol={protocol})
+        assert cloned().method(2) == Foo().method(2)
+
+        cloned = subprocess_pickle_echo(f1, protocol={protocol})
+        assert cloned()().method('a') == f1()().method('a')
+
+        cloned = subprocess_pickle_echo(f2, protocol={protocol})
+        assert cloned(2) == f2(2)
+
+        cloned = subprocess_pickle_echo(f3, protocol={protocol})
+        assert cloned() == f3()
+        """.format(protocol=self.protocol)
+        code = "\n".join(line[8:] for line in code.splitlines())
+        assert_run_python_script(code)
+
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
     def test_function_pickle_compat_0_4_0(self):
