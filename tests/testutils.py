@@ -1,7 +1,8 @@
 import sys
 import os
-from subprocess import Popen
-from subprocess import PIPE
+import os.path as op
+import tempfile
+from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 
 from cloudpickle import dumps
 from pickle import loads
@@ -66,6 +67,44 @@ def pickle_echo(stream_in=None, stream_out=None):
     unpickled_content = loads(input_bytes)
     stream_out.write(dumps(unpickled_content))
     stream_out.close()
+
+
+def assert_run_python_script(source_code, timeout=5):
+    """Utility to help check pickleability of objects defined in __main__
+
+    The script provided in the source code should return 0 and not print
+    anything on stderr or stdout.
+    """
+    fd, source_file = tempfile.mkstemp(suffix='_src_test_cloudpickle.py')
+    os.close(fd)
+    try:
+        with open(source_file, 'wb') as f:
+            f.write(source_code.encode('utf-8'))
+        cloudpickle_repo_folder = op.normpath(
+            op.join(op.dirname(__file__), '..'))
+
+        cmd = [sys.executable, source_file]
+        pythonpath = "{src}/tests:{src}".format(src=cloudpickle_repo_folder)
+        kwargs = {
+            'cwd': cloudpickle_repo_folder,
+            'stderr': STDOUT,
+            'env': {'PYTHONPATH': pythonpath},
+        }
+        if timeout_supported:
+            kwargs['timeout'] = timeout
+        try:
+            try:
+                out = check_output(cmd, **kwargs)
+            except CalledProcessError as e:
+                raise RuntimeError(u"script errored with output:\n%s"
+                                   % e.output.decode('utf-8'))
+            if out != b"":
+                raise AssertionError(out.decode('utf-8'))
+        except TimeoutExpired as e:
+            raise RuntimeError(u"script timeout, output so far:\n%s"
+                               % e.output.decode('utf-8'))
+    finally:
+        os.unlink(source_file)
 
 
 if __name__ == '__main__':
