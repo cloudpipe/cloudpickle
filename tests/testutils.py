@@ -1,11 +1,8 @@
 import sys
 import os
+import os.path as op
 import tempfile
-from subprocess import Popen
-from subprocess import check_output
-from subprocess import PIPE
-from subprocess import STDOUT
-from subprocess import CalledProcessError
+from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 
 from cloudpickle import dumps
 from pickle import loads
@@ -79,14 +76,17 @@ def assert_run_python_script(source_code, timeout=5):
     anything on stderr or stdout.
     """
     fd, source_file = tempfile.mkstemp(suffix='_src_test_cloudpickle.py')
+    os.close(fd)
     try:
-        with open(fd, 'wb') as f:
+        with open(source_file, 'wb') as f:
             f.write(source_code.encode('utf-8'))
+        cloudpickle_repo_folder = op.normpath(
+            op.join(op.dirname(__file__), '..'))
 
         cmd = [sys.executable, source_file]
-        pythonpath = "{cwd}/tests:{cwd}".format(cwd=os.getcwd())
+        pythonpath = "{src}/tests:{src}".format(src=cloudpickle_repo_folder)
         kwargs = {
-            'cwd': os.getcwd(),
+            'cwd': cloudpickle_repo_folder,
             'stderr': STDOUT,
             'env': {'PYTHONPATH': pythonpath},
         }
