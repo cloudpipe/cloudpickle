@@ -30,7 +30,6 @@ def subprocess_pickle_echo(input_data, protocol=None):
     """
     pickled_input_data = dumps(input_data, protocol=protocol)
     cmd = [sys.executable, __file__]  # run then pickle_echo() in __main__
-    # cwd = os.getcwd()
     cloudpickle_repo_folder = op.normpath(
         op.join(op.dirname(__file__), '..'))
     cwd = cloudpickle_repo_folder
