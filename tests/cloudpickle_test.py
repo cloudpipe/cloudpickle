@@ -44,6 +44,7 @@ import cloudpickle
 from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
+from .testutils import assert_run_python_script
 
 
 def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
@@ -297,19 +298,21 @@ class CloudPickleTest(unittest.TestCase):
         clone_class = pickle_depickle(SomeClass, protocol=self.protocol)
         self.assertEqual(clone_class(1).one(), 1)
         self.assertEqual(clone_class(5).some_method(41), 7)
-        clone_class = subprocess_pickle_echo(SomeClass)
+        clone_class = subprocess_pickle_echo(SomeClass, protocol=self.protocol)
         self.assertEqual(clone_class(5).some_method(41), 7)
 
         # pickle the class instances
         self.assertEqual(pickle_depickle(SomeClass(1)).one(), 1)
         self.assertEqual(pickle_depickle(SomeClass(5)).some_method(41), 7)
-        new_instance = subprocess_pickle_echo(SomeClass(5))
+        new_instance = subprocess_pickle_echo(SomeClass(5),
+                                              protocol=self.protocol)
         self.assertEqual(new_instance.some_method(41), 7)
 
         # pickle the method instances
         self.assertEqual(pickle_depickle(SomeClass(1).one)(), 1)
         self.assertEqual(pickle_depickle(SomeClass(5).some_method)(41), 7)
-        new_method = subprocess_pickle_echo(SomeClass(5).some_method)
+        new_method = subprocess_pickle_echo(SomeClass(5).some_method,
+                                            protocol=self.protocol)
         self.assertEqual(new_method(41), 7)
 
     def test_partial(self):
@@ -756,6 +759,49 @@ class CloudPickleTest(unittest.TestCase):
         # `tuple.__new__` is a default value for some methods of namedtuple.
         for t in list, tuple, set, frozenset, dict, object:
             self.assertTrue(pickle_depickle(t.__new__) is t.__new__)
+
+    def test_interactively_defined_function(self):
+        # Check that callables defined in the __main__ module of a Python
+        # script (or jupyter kernel) can be pickled / unpickled / executed.
+        code = """\
+from testutils import subprocess_pickle_echo
+
+CONSTANT = 42
+
+class Foo(object):
+
+    def method(self, x):
+        return x
+
+
+def f1():
+    return Foo
+
+
+def f2(x):
+    return Foo().method(x)
+
+
+def f3():
+    return Foo().method(CONSTANT)
+
+
+cloned = subprocess_pickle_echo(lambda x: x**2, protocol={protocol})
+assert cloned(3) == 9
+
+cloned = subprocess_pickle_echo(Foo, protocol={protocol})
+assert cloned().method(2) == Foo().method(2)
+
+cloned = subprocess_pickle_echo(f1, protocol={protocol})
+assert cloned()().method('a') == f1()().method('a')
+
+cloned = subprocess_pickle_echo(f2, protocol={protocol})
+assert cloned(2) == f2(2)
+
+cloned = subprocess_pickle_echo(f3, protocol={protocol})
+assert cloned() == f3()
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")

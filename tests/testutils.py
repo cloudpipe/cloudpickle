@@ -1,7 +1,11 @@
 import sys
 import os
+import tempfile
 from subprocess import Popen
+from subprocess import check_output
 from subprocess import PIPE
+from subprocess import STDOUT
+from subprocess import CalledProcessError
 
 from cloudpickle import dumps
 from pickle import loads
@@ -16,7 +20,7 @@ except ImportError:
     timeout_supported = False
 
 
-def subprocess_pickle_echo(input_data):
+def subprocess_pickle_echo(input_data, protocol=None):
     """Echo function with a child Python process
 
     Pickle the input data into a buffer, send it to a subprocess via
@@ -27,8 +31,8 @@ def subprocess_pickle_echo(input_data):
     [1, 'a', None]
 
     """
-    pickled_input_data = dumps(input_data)
-    cmd = [sys.executable, __file__]
+    pickled_input_data = dumps(input_data, protocol=protocol)
+    cmd = [sys.executable, __file__]  # run then pickle_echo() in __main__
     cwd = os.getcwd()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd)
     try:
@@ -48,7 +52,7 @@ def subprocess_pickle_echo(input_data):
         raise RuntimeError(message)
 
 
-def pickle_echo(stream_in=None, stream_out=None):
+def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     """Read a pickle from stdin and pickle it back to stdout"""
     if stream_in is None:
         stream_in = sys.stdin
@@ -64,8 +68,43 @@ def pickle_echo(stream_in=None, stream_out=None):
     input_bytes = stream_in.read()
     stream_in.close()
     unpickled_content = loads(input_bytes)
-    stream_out.write(dumps(unpickled_content))
+    stream_out.write(dumps(unpickled_content, protocol=protocol))
     stream_out.close()
+
+
+def assert_run_python_script(source_code, timeout=5):
+    """Utility to help check pickleability of objects defined in __main__
+
+    The script provided in the source code should return 0 and not print
+    anything on stderr or stdout.
+    """
+    fd, source_file = tempfile.mkstemp(suffix='_src_test_cloudpickle.py')
+    try:
+        with open(fd, 'wb') as f:
+            f.write(source_code.encode('utf-8'))
+
+        cmd = [sys.executable, source_file]
+        pythonpath = "{cwd}/tests:{cwd}".format(cwd=os.getcwd())
+        kwargs = {
+            'cwd': os.getcwd(),
+            'stderr': STDOUT,
+            'env': {'PYTHONPATH': pythonpath},
+        }
+        if timeout_supported:
+            kwargs['timeout'] = timeout
+        try:
+            try:
+                out = check_output(cmd, **kwargs)
+            except CalledProcessError as e:
+                raise RuntimeError(u"script errored with output:\n%s"
+                                   % e.output.decode('utf-8'))
+            if out != b"":
+                raise AssertionError(out.decode('utf-8'))
+        except TimeoutExpired as e:
+            raise RuntimeError(u"script timeout, output so far:\n%s"
+                               % e.output.decode('utf-8'))
+    finally:
+        os.unlink(source_file)
 
 
 if __name__ == '__main__':
