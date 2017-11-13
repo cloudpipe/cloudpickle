@@ -46,9 +46,6 @@ from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 from .testutils import subprocess_pickle_echo
 
 
-HAVE_WEAKSET = hasattr(weakref, 'WeakSet')
-
-
 def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
     """Helper function to test whether object pickled with cloudpickle can be
     depickled with pickle
@@ -654,7 +651,6 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(DepickledBaseSubclass().foo(), 'it works for realz!')
 
-    @pytest.mark.skipif(not HAVE_WEAKSET, reason="WeakSet doesn't exist")
     def test_weakset_identity_preservation(self):
         # Test that weaksets don't lose all their inhabitants if they're
         # pickled in a larger data structure that includes other references to
