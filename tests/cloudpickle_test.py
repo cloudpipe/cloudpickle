@@ -139,6 +139,19 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
+    @pytest.mark.skipif(sys.version_info < (3, 4),
+                        reason="non-contiguous memoryview not implemented in "
+                               "old Python versions")
+    def test_sliced_and_non_contiguous_memoryview(self):
+        buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
+        self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
+                         buffer_obj.tobytes())
+
+    def test_large_memoryview(self):
+        buffer_obj = memoryview(b"Hello!" * int(1e7))
+        self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
+                         buffer_obj.tobytes())
+
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
 
