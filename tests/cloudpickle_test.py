@@ -773,24 +773,29 @@ class CloudPickleTest(unittest.TestCase):
             def method(self, x):
                 return x
 
+        def f0(x):
+            return x ** 2
 
         def f1():
             return Foo
 
-
         def f2(x):
             return Foo().method(x)
-
 
         def f3():
             return Foo().method(CONSTANT)
 
-
         cloned = subprocess_pickle_echo(lambda x: x**2, protocol={protocol})
+        assert cloned(3) == 9
+
+        cloned = subprocess_pickle_echo(f0, protocol={protocol})
         assert cloned(3) == 9
 
         cloned = subprocess_pickle_echo(Foo, protocol={protocol})
         assert cloned().method(2) == Foo().method(2)
+
+        cloned = subprocess_pickle_echo(Foo(), protocol={protocol})
+        assert cloned.method(2) == Foo().method(2)
 
         cloned = subprocess_pickle_echo(f1, protocol={protocol})
         assert cloned()().method('a') == f1()().method('a')
@@ -801,8 +806,7 @@ class CloudPickleTest(unittest.TestCase):
         cloned = subprocess_pickle_echo(f3, protocol={protocol})
         assert cloned() == f3()
         """.format(protocol=self.protocol)
-        code = "\n".join(line[8:] for line in code.splitlines())
-        assert_run_python_script(code)
+        assert_run_python_script(textwrap.dedent(code))
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
