@@ -749,6 +749,8 @@ class CloudPickleTest(unittest.TestCase):
             def method(self, x):
                 return x
 
+        foo = Foo()
+
         def f0(x):
             return x ** 2
 
@@ -760,6 +762,9 @@ class CloudPickleTest(unittest.TestCase):
 
         def f3():
             return Foo().method(CONSTANT)
+
+        def f4(x):
+            return foo.method(x)
 
         cloned = subprocess_pickle_echo(lambda x: x**2, protocol={protocol})
         assert cloned(3) == 9
@@ -781,6 +786,9 @@ class CloudPickleTest(unittest.TestCase):
 
         cloned = subprocess_pickle_echo(f3, protocol={protocol})
         assert cloned() == f3()
+
+        cloned = subprocess_pickle_echo(f4, protocol={protocol})
+        assert cloned(2) == f4(2)
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
