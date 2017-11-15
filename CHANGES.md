@@ -1,3 +1,11 @@
+0.5.2
+=====
+
+- Fixed a regression: `AttributeError` when loading pickles that hold a
+  reference to a dynamically defined class from the `__main__` module.
+  ([issue #131]( https://github.com/cloudpipe/cloudpickle/issues/131)).
+
+
 0.5.1
 =====
 
