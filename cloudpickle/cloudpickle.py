@@ -639,7 +639,11 @@ class CloudPickler(Pickler):
                     return self.save_reduce(
                         _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
 
-            return self.save_dynamic_class(obj)
+            typ = type(obj)
+            if typ is not obj and isinstance(obj, (type, types.ClassType)):
+                return self.save_dynamic_class(obj)
+
+            raise
 
     dispatch[type] = save_global
     dispatch[types.ClassType] = save_global
