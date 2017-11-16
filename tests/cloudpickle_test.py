@@ -714,10 +714,10 @@ class CloudPickleTest(unittest.TestCase):
             s = py.builtin.set([1])
             return s.pop()
 
-        # some setup is required to allow pytest apimodules to be correctly serializable.
+        # some setup is required to allow pytest apimodules to be correctly
+        # serializable.
         from cloudpickle import CloudPickler
-        from py._apipkg import ApiModule
-        CloudPickler.dispatch[ApiModule] = CloudPickler.save_module
+        CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
         g = cloudpickle.loads(cloudpickle.dumps(f))
 
         result = g()
