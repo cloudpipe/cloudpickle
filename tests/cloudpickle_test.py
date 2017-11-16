@@ -677,15 +677,15 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(set(weakset), set([depickled1, depickled2]))
 
-    def test_ignoring_whichmodule_exception(self):
+    def test_faulty_module(self):
         class FakeModule(object):
             def __getattr__(self, name):
                 # This throws an exception while looking up within
-                # pickle.whichimodule.
+                # pickle.whichmodule or getattr(module, name, None)
                 raise Exception()
 
         class Foo(object):
-            __module__ = None
+            __module__ = '_fake_module'
 
             def foo(self):
                 return "it works!"
@@ -693,7 +693,7 @@ class CloudPickleTest(unittest.TestCase):
         def foo():
             return "it works!"
 
-        foo.__module__ = None
+        foo.__module__ = '_fake_module'
 
         sys.modules["_fake_module"] = FakeModule()
         try:
