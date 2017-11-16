@@ -5,6 +5,10 @@
   reference to a dynamically defined class from the `__main__` module.
   ([issue #131]( https://github.com/cloudpipe/cloudpickle/issues/131)).
 
+- Make it possible to pickle classes and functions defined in faulty
+  modules that raise an exception when trying to look-up their attributes
+  by name.
+
 
 0.5.1
 =====
