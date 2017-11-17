@@ -369,9 +369,14 @@ class CloudPickler(Pickler):
         if modname == '__main__':
             themodule = None
 
+        try:
+            lookedup_by_name = getattr(themodule, name, None)
+        except Exception:
+            lookedup_by_name = None
+
         if themodule:
             self.modules.add(themodule)
-            if getattr(themodule, name, None) is obj:
+            if lookedup_by_name is obj:
                 return self.save_global(obj, name)
 
         # a builtin_function_or_method which comes in as an attribute of some
@@ -401,8 +406,7 @@ class CloudPickler(Pickler):
             return
         else:
             # func is nested
-            klass = getattr(themodule, name, None)
-            if klass is None or klass is not obj:
+            if lookedup_by_name is None or lookedup_by_name is not obj:
                 self.save_function_tuple(obj)
                 return
 

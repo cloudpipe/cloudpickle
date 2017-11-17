@@ -414,11 +414,23 @@ class CloudPickleTest(unittest.TestCase):
         x = 1
         def f(y):
             return x + y
+
+        class Foo:
+            def method(self, x):
+                return f(x)
         '''
         exec(textwrap.dedent(code), mod.__dict__)
         mod2 = pickle_depickle(mod, protocol=self.protocol)
         self.assertEqual(mod.x, mod2.x)
         self.assertEqual(mod.f(5), mod2.f(5))
+        self.assertEqual(mod.Foo().method(5), mod2.Foo().method(5))
+
+        if platform.python_implementation() != 'PyPy':
+            # XXX: this fails with excessive recursion on PyPy.
+            mod3 = subprocess_pickle_echo(mod, protocol=self.protocol)
+            self.assertEqual(mod.x, mod3.x)
+            self.assertEqual(mod.f(5), mod3.f(5))
+            self.assertEqual(mod.Foo().method(5), mod3.Foo().method(5))
 
         # Test dynamic modules when imported back are singletons
         mod1, mod2 = pickle_depickle([mod, mod])
@@ -677,34 +689,35 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(set(weakset), set([depickled1, depickled2]))
 
-    def test_ignoring_whichmodule_exception(self):
-        class FakeModule(object):
-            def __getattr__(self, name):
-                # This throws an exception while looking up within
-                # pickle.whichimodule.
-                raise Exception()
+    def test_faulty_module(self):
+        for module_name in ['_faulty_module', '_missing_module', None]:
+            class FaultyModule(object):
+                def __getattr__(self, name):
+                    # This throws an exception while looking up within
+                    # pickle.whichmodule or getattr(module, name, None)
+                    raise Exception()
 
-        class Foo(object):
-            __module__ = None
+            class Foo(object):
+                __module__ = module_name
 
-            def foo(self):
+                def foo(self):
+                    return "it works!"
+
+            def foo():
                 return "it works!"
 
-        def foo():
-            return "it works!"
+            foo.__module__ = module_name
 
-        foo.__module__ = None
+            sys.modules["_faulty_module"] = FaultyModule()
+            try:
+                # Test whichmodule in save_global.
+                self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
 
-        sys.modules["_fake_module"] = FakeModule()
-        try:
-            # Test whichmodule in save_global.
-            self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
-
-            # Test whichmodule in save_function.
-            self.assertEqual(pickle_depickle(foo, protocol=self.protocol)(),
-                             "it works!")
-        finally:
-            sys.modules.pop("_fake_module", None)
+                # Test whichmodule in save_function.
+                cloned = pickle_depickle(foo, protocol=self.protocol)
+                self.assertEqual(cloned(), "it works!")
+            finally:
+                sys.modules.pop("_faulty_module", None)
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
@@ -725,30 +738,35 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_function_module_name(self):
         func = lambda x: x
-        self.assertEqual(pickle_depickle(func, protocol=self.protocol).__module__, func.__module__)
+        cloned = pickle_depickle(func, protocol=self.protocol)
+        self.assertEqual(cloned.__module__, func.__module__)
 
     def test_function_qualname(self):
         def func(x):
             return x
         # Default __qualname__ attribute (Python 3 only)
         if hasattr(func, '__qualname__'):
-            self.assertEqual(pickle_depickle(func).__qualname__,
-                             func.__qualname__)
+            cloned = pickle_depickle(func, protocol=self.protocol)
+            self.assertEqual(cloned.__qualname__, func.__qualname__)
 
         # Mutated __qualname__ attribute
         func.__qualname__ = '<modifiedlambda>'
-        self.assertEqual(pickle_depickle(func).__qualname__, func.__qualname__)
+        cloned = pickle_depickle(func, protocol=self.protocol)
+        self.assertEqual(cloned.__qualname__, func.__qualname__)
 
     def test_namedtuple(self):
 
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
         t = MyTuple(1, 2, 3)
 
-        depickled_t, depickled_MyTuple = pickle_depickle([t, MyTuple])
+        depickled_t, depickled_MyTuple = pickle_depickle(
+            [t, MyTuple], protocol=self.protocol)
         self.assertTrue(isinstance(depickled_t, depickled_MyTuple))
 
-        self.assertEqual((depickled_t.a, depickled_t.b, depickled_t.c), (1, 2, 3))
-        self.assertEqual((depickled_t[0], depickled_t[1], depickled_t[2]), (1, 2, 3))
+        self.assertEqual((depickled_t.a, depickled_t.b, depickled_t.c),
+                         (1, 2, 3))
+        self.assertEqual((depickled_t[0], depickled_t[1], depickled_t[2]),
+                         (1, 2, 3))
 
         self.assertEqual(depickled_MyTuple.__name__, 'MyTuple')
         self.assertTrue(issubclass(depickled_MyTuple, tuple))
@@ -758,7 +776,8 @@ class CloudPickleTest(unittest.TestCase):
         # parameters for factories.  For example, on Python 3.3,
         # `tuple.__new__` is a default value for some methods of namedtuple.
         for t in list, tuple, set, frozenset, dict, object:
-            self.assertTrue(pickle_depickle(t.__new__) is t.__new__)
+            cloned = pickle_depickle(t.__new__, protocol=self.protocol)
+            self.assertTrue(cloned is t.__new__)
 
     def test_interactively_defined_function(self):
         # Check that callables defined in the __main__ module of a Python
