@@ -678,33 +678,34 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(set(weakset), set([depickled1, depickled2]))
 
     def test_faulty_module(self):
-        class FakeModule(object):
-            def __getattr__(self, name):
-                # This throws an exception while looking up within
-                # pickle.whichmodule or getattr(module, name, None)
-                raise Exception()
+        for module_name in ['_faulty_module', '_missing_module', None]:
+            class FaultyModule(object):
+                def __getattr__(self, name):
+                    # This throws an exception while looking up within
+                    # pickle.whichmodule or getattr(module, name, None)
+                    raise Exception()
 
-        class Foo(object):
-            __module__ = '_fake_module'
+            class Foo(object):
+                __module__ = module_name
 
-            def foo(self):
+                def foo(self):
+                    return "it works!"
+
+            def foo():
                 return "it works!"
 
-        def foo():
-            return "it works!"
+            foo.__module__ = module_name
 
-        foo.__module__ = '_fake_module'
+            sys.modules["_faulty_module"] = FaultyModule()
+            try:
+                # Test whichmodule in save_global.
+                self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
 
-        sys.modules["_fake_module"] = FakeModule()
-        try:
-            # Test whichmodule in save_global.
-            self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
-
-            # Test whichmodule in save_function.
-            self.assertEqual(pickle_depickle(foo, protocol=self.protocol)(),
-                             "it works!")
-        finally:
-            sys.modules.pop("_fake_module", None)
+                # Test whichmodule in save_function.
+                cloned = pickle_depickle(foo, protocol=self.protocol)
+                self.assertEqual(cloned(), "it works!")
+            finally:
+                sys.modules.pop("_faulty_module", None)
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
