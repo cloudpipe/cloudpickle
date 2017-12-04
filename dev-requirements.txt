@@ -2,5 +2,6 @@
 pytest
 pytest-cov
 mock
+psutil
 # Code coverage uploader for Travis:
 codecov

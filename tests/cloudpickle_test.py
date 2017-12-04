@@ -9,6 +9,7 @@ from io import BytesIO
 import itertools
 import logging
 from operator import itemgetter, attrgetter
+import os
 import pickle
 import platform
 import random
@@ -45,6 +46,7 @@ from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
+from .testutils import CountingByteSink, PeakMemoryMonitor
 
 
 def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
@@ -861,6 +863,20 @@ class CloudPickleTest(unittest.TestCase):
             b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13U\x08__main__q'
             b'\x14NtR.')
         self.assertEquals(42, cloudpickle.loads(pickled)(42))
+
+    def test_nocopy_bytes(self):
+        sink = CountingByteSink()
+        biggish_data = b'0' * int(2e8)  # 200 MB
+        pickler = cloudpickle.CloudPickler(sink, protocol=self.protocol)
+        with PeakMemoryMonitor() as monitor:
+            pickler.dump(biggish_data)
+
+        # Check that temporary datastructures used when dumping are no larger
+        # than 100 MB which is much smaller than the bytes to be pickled.
+        assert monitor.base_mem > len(biggish_data)
+        assert (monitor.peak_mem - monitor.base_mem) < 100e6
+
+        assert sink.written > len(biggish_data)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
