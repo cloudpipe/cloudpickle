@@ -340,28 +340,35 @@ class CloudPickler(Pickler):
                 msg = """Could not pickle object as excessively deep recursion required."""
                 raise pickle.PicklingError(msg)
 
-    def save_bytes(self, obj):
-        if self.proto < 3:
-            if not obj:  # bytes object is empty
-                self.save_reduce(bytes, (), obj=obj)
+    if PY3:
+        def save_bytes(self, obj):
+            if self.proto < 3:
+                if not obj:  # bytes object is empty
+                    self.save_reduce(bytes, (), obj=obj)
+                else:
+                    self.save_reduce(codecs.encode,
+                                    (str(obj, 'latin1'), 'latin1'), obj=obj)
+                return
+            n = len(obj)
+            if n <= 0xff:
+                self.write(pickle.SHORT_BINBYTES + struct.pack("<B", n) + obj)
+            elif n > 0xffffffff and self.proto >= 4:
+                self._write_large_bytes(pickle.BINBYTES8 + struct.pack("<Q", n), obj)
+            elif n >= self.framer._FRAME_SIZE_TARGET:
+                self._write_large_bytes(pickle.BINBYTES + struct.pack("<I", n), obj)
             else:
-                self.save_reduce(codecs.encode,
-                                 (str(obj, 'latin1'), 'latin1'), obj=obj)
-            return
-        n = len(obj)
-        if n <= 0xff:
-            self.write(pickle.SHORT_BINBYTES + struct.pack("<B", n) + obj)
-        elif n > 0xffffffff and self.proto >= 4:
-            self._write_large_bytes(pickle.BINBYTES8 + struct.pack("<Q", n), obj)
-        elif n >= self.framer._FRAME_SIZE_TARGET:
-            self._write_large_bytes(pickle.BINBYTES + struct.pack("<I", n), obj)
-        else:
-            self.write(pickle.BINBYTES + struct.pack("<I", n) + obj)
-        self.memoize(obj)
-    dispatch[bytes] = save_bytes
+                self.write(pickle.BINBYTES + struct.pack("<I", n) + obj)
+            self.memoize(obj)
+        dispatch[bytes] = save_bytes
 
     def save_memoryview(self, obj):
-        self.save(obj.tobytes())
+        n = len(obj)
+        if n <= 0xff or self.proto < 3 or not obj.c_contiguous:
+            self.save(obj.tobytes())
+        else:
+            # Large contiguous views can benefit from nocopy semantics with
+            # recent versions of the pickle protocol
+            self.save_bytes(obj)
     dispatch[memoryview] = save_memoryview
 
     if not PY3:

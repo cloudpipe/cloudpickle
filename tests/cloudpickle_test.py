@@ -139,16 +139,22 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
+    def test_large_memoryview(self):
+        buffer_obj = memoryview(b"Hello!" * int(1e7))
+        self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
+                         buffer_obj.tobytes())
+
     @pytest.mark.skipif(sys.version_info < (3, 4),
                         reason="non-contiguous memoryview not implemented in "
                                "old Python versions")
     def test_sliced_and_non_contiguous_memoryview(self):
+        # Small view
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
-    def test_large_memoryview(self):
-        buffer_obj = memoryview(b"Hello!" * int(1e7))
+        # Large view
+        buffer_obj = memoryview(b"Hello!" * int(1e7))[2:int(1e7):2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
@@ -868,17 +874,20 @@ class CloudPickleTest(unittest.TestCase):
         if self.protocol < 3:
             pytest.skip("test_nocopy_bytes requires protocol 3 or more")
         sink = CountingByteSink()
-        biggish_data = b'0' * int(2e8)  # 200 MB
-        pickler = cloudpickle.CloudPickler(sink, protocol=self.protocol)
-        with PeakMemoryMonitor() as monitor:
-            pickler.dump(biggish_data)
+        biggish_data_bytes = b'0' * int(2e8)  # 200 MB
+        biggish_data_view = memoryview(biggish_data_bytes)
+        for biggish_data in [biggish_data_bytes, biggish_data_view]:
+            pickler = cloudpickle.CloudPickler(sink, protocol=self.protocol)
+            with PeakMemoryMonitor() as monitor:
+                pickler.dump(biggish_data)
 
-        # Check that temporary datastructures used when dumping are no larger
-        # than 100 MB which is much smaller than the bytes to be pickled.
-        assert monitor.base_mem > len(biggish_data)
-        assert (monitor.peak_mem - monitor.base_mem) < 100e6
+            # Check that temporary datastructures used when dumping are no
+            # larger than 100 MB which is much smaller than the bytes to be
+            # pickled.
+            assert monitor.base_mem > len(biggish_data)
+            assert (monitor.peak_mem - monitor.base_mem) < 100e6
 
-        assert sink.written > len(biggish_data)
+            assert sink.written > len(biggish_data)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
