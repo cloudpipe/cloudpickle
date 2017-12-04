@@ -865,6 +865,8 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEquals(42, cloudpickle.loads(pickled)(42))
 
     def test_nocopy_bytes(self):
+        if self.protocol < 3:
+            pytest.skip("test_nocopy_bytes requires protocol 3 or more")
         sink = CountingByteSink()
         biggish_data = b'0' * int(2e8)  # 200 MB
         pickler = cloudpickle.CloudPickler(sink, protocol=self.protocol)

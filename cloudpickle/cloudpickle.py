@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
+import codecs
 import dis
 from functools import partial
 import imp
@@ -249,6 +250,68 @@ else:
                 yield op, instr.arg
 
 
+class _Framer:
+    """Backport of Python 3.7 framer"""
+
+    _FRAME_SIZE_TARGET = 64 * 1024
+
+    def __init__(self, file_write):
+        self.file_write = file_write
+        self.current_frame = None
+
+    def start_framing(self):
+        self.current_frame = io.BytesIO()
+
+    def end_framing(self):
+        if self.current_frame and self.current_frame.tell() > 0:
+            self.commit_frame(force=True)
+            self.current_frame = None
+
+    def commit_frame(self, force=False):
+        if self.current_frame:
+            f = self.current_frame
+            if f.tell() >= self._FRAME_SIZE_TARGET or force:
+                data = f.getbuffer()
+                write = self.file_write
+                # Issue a single call to the write nethod of the underlying
+                # file object for the frame opcode with the size of the
+                # frame. The concatenation is expected to be less expensive
+                # than issuing an additional call to write.
+                write(pickle.FRAME + struct.pack("<Q", len(data)))
+
+                # Issue a separate call to write to append the frame
+                # contents without concatenation to the above to avoid a
+                # memory copy.
+                write(data)
+
+                # Start the new frame with a new io.BytesIO instance so that
+                # the file object can have delayed access to the previous frame
+                # contents via an unreleased memoryview of the previous
+                # io.BytesIO instance.
+                self.current_frame = io.BytesIO()
+
+    def write(self, data):
+        if self.current_frame:
+            return self.current_frame.write(data)
+        else:
+            return self.file_write(data)
+
+    def write_large_bytes(self, header, payload):
+        write = self.file_write
+        if self.current_frame:
+            # Terminate the current frame and flush it to the file.
+            self.commit_frame(force=True)
+
+        # Perform direct write of the header and payload of the large binary
+        # object. Be careful not to concatenate the header and the payload
+        # prior to calling 'write' as we do not want to allocate a large
+        # temporary bytes object.
+        # We intentionally do not insert a protocol 4 frame opcode to make
+        # it possible to optimize file.read calls in the loader.
+        write(header)
+        write(payload)
+
+
 class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
@@ -262,6 +325,12 @@ class CloudPickler(Pickler):
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
+        # Override the framer backport support for no-copy write of large
+        # binary data
+        self.framer = _Framer(file.write)
+        self.write = self.framer.write
+        self._write_large_bytes = self.framer.write_large_bytes
+
     def dump(self, obj):
         self.inject_addons()
         try:
@@ -270,6 +339,26 @@ class CloudPickler(Pickler):
             if 'recursion' in e.args[0]:
                 msg = """Could not pickle object as excessively deep recursion required."""
                 raise pickle.PicklingError(msg)
+
+    def save_bytes(self, obj):
+        if self.proto < 3:
+            if not obj:  # bytes object is empty
+                self.save_reduce(bytes, (), obj=obj)
+            else:
+                self.save_reduce(codecs.encode,
+                                 (str(obj, 'latin1'), 'latin1'), obj=obj)
+            return
+        n = len(obj)
+        if n <= 0xff:
+            self.write(pickle.SHORT_BINBYTES + struct.pack("<B", n) + obj)
+        elif n > 0xffffffff and self.proto >= 4:
+            self._write_large_bytes(pickle.BINBYTES8 + struct.pack("<Q", n), obj)
+        elif n >= self.framer._FRAME_SIZE_TARGET:
+            self._write_large_bytes(pickle.BINBYTES + struct.pack("<I", n), obj)
+        else:
+            self.write(pickle.BINBYTES + struct.pack("<I", n) + obj)
+        self.memoize(obj)
+    dispatch[bytes] = save_bytes
 
     def save_memoryview(self, obj):
         self.save(obj.tobytes())
