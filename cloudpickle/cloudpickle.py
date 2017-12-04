@@ -52,7 +52,7 @@ import logging
 import opcode
 import operator
 import pickle
-import struct
+from struct import pack
 import sys
 import traceback
 import types
@@ -277,7 +277,7 @@ class _Framer:
                 # file object for the frame opcode with the size of the
                 # frame. The concatenation is expected to be less expensive
                 # than issuing an additional call to write.
-                write(pickle.FRAME + struct.pack("<Q", len(data)))
+                write(pickle.FRAME + pack("<Q", len(data)))
 
                 # Issue a separate call to write to append the frame
                 # contents without concatenation to the above to avoid a
@@ -347,17 +347,17 @@ class CloudPickler(Pickler):
                     self.save_reduce(bytes, (), obj=obj)
                 else:
                     self.save_reduce(codecs.encode,
-                                    (str(obj, 'latin1'), 'latin1'), obj=obj)
+                                     (str(obj, 'latin1'), 'latin1'), obj=obj)
                 return
             n = len(obj)
             if n <= 0xff:
-                self.write(pickle.SHORT_BINBYTES + struct.pack("<B", n) + obj)
+                self.write(pickle.SHORT_BINBYTES + pack("<B", n) + obj)
             elif n > 0xffffffff and self.proto >= 4:
-                self._write_large_bytes(pickle.BINBYTES8 + struct.pack("<Q", n), obj)
+                self._write_large_bytes(pickle.BINBYTES8 + pack("<Q", n), obj)
             elif n >= self.framer._FRAME_SIZE_TARGET:
-                self._write_large_bytes(pickle.BINBYTES + struct.pack("<I", n), obj)
+                self._write_large_bytes(pickle.BINBYTES + pack("<I", n), obj)
             else:
-                self.write(pickle.BINBYTES + struct.pack("<I", n) + obj)
+                self.write(pickle.BINBYTES + pack("<I", n) + obj)
             self.memoize(obj)
         dispatch[bytes] = save_bytes
 
@@ -721,7 +721,7 @@ class CloudPickler(Pickler):
         return self.save_function(obj)
     dispatch[types.BuiltinFunctionType] = save_builtin_function
 
-    def save_global(self, obj, name=None, pack=struct.pack):
+    def save_global(self, obj, name=None, pack=pack):
         """
         Save a "global".
 
