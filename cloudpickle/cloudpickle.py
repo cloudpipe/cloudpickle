@@ -65,8 +65,9 @@ import weakref
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
+PY_MAJOR_MINOR = sys.version_info[:2]
 
-if sys.version < '3':
+if PY_MAJOR_MINOR[0] < 3:
     from pickle import Pickler
     try:
         from cStringIO import StringIO
@@ -264,9 +265,11 @@ def _memoryview_from_bytes(data, format, readonly):
         view = memoryview(array)
     else:
         view = memoryview(data)
-    if hasattr(view, 'cast'):
+    if PY_MAJOR_MINOR >= (3, 5) or (PY_MAJOR_MINOR == (3, 4) and readonly):
         return view.cast('B').cast(format)
     else:
+        # Python 2.7 does not support casting and Python 3.4 has a bug when
+        # casting buffers from ctypes: # https://bugs.python.org/issue19803
         return view
 
 
@@ -386,11 +389,15 @@ class CloudPickler(Pickler):
         n = len(obj)
         self.save(_memoryview_from_bytes)
         self.write(pickle.MARK)
-        if n <= 0xff or self.proto < 3 or not obj.c_contiguous:
+        # PyPy3 does not implement the 'c_contiguous' attribute at this time.
+        c_contiguous = getattr(obj, 'c_contiguous', False)
+        if n <= 0xff or self.proto < 3 or not c_contiguous:
+            # Make a contiguous copy prior as a bytes object prior to
+            # serialization.
             self.save(obj.tobytes())
         else:
             # Large contiguous views can benefit from nocopy semantics with
-            # recent versions of the pickle protocol
+            # recent versions of the pickle protocol.
             self.save_bytes(obj, skip_memoize=True)
         self.save(obj.format)
         self.save(obj.readonly)

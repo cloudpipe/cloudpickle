@@ -148,8 +148,11 @@ class CloudPickleTest(unittest.TestCase):
         assert buffer_obj.format == 'l'
         cloned = pickle_depickle(buffer_obj, protocol=self.protocol)
         self.assertEqual(cloned.tobytes(), buffer_obj.tobytes())
-        assert cloned.format == 'l'
         assert not cloned.readonly
+
+        if sys.version_info >= (3, 5):
+            # Python 3.4 is affected by https://bugs.python.org/issue19803
+            assert cloned.format == 'l'
 
     def test_large_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * int(1e7))
