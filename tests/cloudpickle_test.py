@@ -891,11 +891,11 @@ class Protocol2CloudPickleTest(CloudPickleTest):
     protocol = 2
 
 
-@pytest.mark.skipif(sys.version_info[:2] < (3, 5),
-                    reason="nocopy memoryview only supprted on Python 3.5+")
+@pytest.mark.skipif(sys.version_info[:2] < (3, 4),
+                    reason="nocopy memoryview only supported on Python 3.4+")
 @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
                     reason="memoryview.c_contiguous is missing")
-def test_nocopy_bytes(tmpdir):
+def test_nocopy_readonly_bytes(tmpdir):
     tmpfile = str(tmpdir.join('biggish.pkl'))
     size = int(2e8)  # 200 MB
     biggish_data_bytes = b'0' * size
