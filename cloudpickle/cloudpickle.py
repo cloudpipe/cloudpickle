@@ -265,7 +265,7 @@ def _memoryview_from_bytes(data, format, readonly):
     else:
         view = memoryview(data)
     if hasattr(view, 'cast'):
-        return view.cast(format)
+        return view.cast('B').cast(format)
     else:
         return view
 

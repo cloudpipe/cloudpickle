@@ -1,5 +1,6 @@
 from __future__ import division
 
+import array
 import abc
 import collections
 import base64
@@ -9,7 +10,6 @@ from io import BytesIO
 import itertools
 import logging
 from operator import itemgetter, attrgetter
-import os
 import pickle
 import platform
 import random
@@ -136,8 +136,20 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_memoryview(self):
         buffer_obj = memoryview(b"Hello")
-        self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
-                         buffer_obj.tobytes())
+        assert buffer_obj.readonly
+        cloned = pickle_depickle(buffer_obj, protocol=self.protocol)
+        self.assertEqual(cloned.tobytes(), buffer_obj.tobytes())
+        assert cloned.readonly
+
+    @pytest.mark.skipif(sys.version_info < (3, 4),
+                        reason="array does not implement the buffer protocol")
+    def test_memoryview_from_integer_array(self):
+        buffer_obj = memoryview(array.array('l', range(12)))
+        assert buffer_obj.format == 'l'
+        cloned = pickle_depickle(buffer_obj, protocol=self.protocol)
+        self.assertEqual(cloned.tobytes(), buffer_obj.tobytes())
+        assert cloned.format == 'l'
+        assert not cloned.readonly
 
     def test_large_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * int(1e7))
