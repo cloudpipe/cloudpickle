@@ -920,7 +920,7 @@ def test_nocopy_readonly_bytes(tmpdir):
         # a single binary buffer
         # XXX: the 'newly_allocated < 2 * size' check is too lax
         newly_allocated = monitor.peak_mem - monitor.base_mem
-        assert size <= newly_allocated < 2 * size
+        assert 0.9 * size < newly_allocated < 2 * size
 
         assert len(reconstructed) == len(biggish_data)
         if biggish_data is biggish_data_bytes:

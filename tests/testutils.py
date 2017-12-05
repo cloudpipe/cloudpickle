@@ -113,7 +113,7 @@ def assert_run_python_script(source_code, timeout=5):
         os.unlink(source_file)
 
 
-def monitor_worker(pid, queue, stop_event, delay=0.05):
+def monitor_worker(pid, queue, stop_event, delay=0.010):
     import psutil
     p = psutil.Process(pid)
     peak = 0
