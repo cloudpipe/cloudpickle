@@ -157,14 +157,5 @@ class PeakMemoryMonitor:
             return True
 
 
-class CountingByteSink(object):
-
-    def __init__(self):
-        self.written = 0
-
-    def write(self, data):
-        self.written += len(data)
-
-
 if __name__ == '__main__':
     pickle_echo()

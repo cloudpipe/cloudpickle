@@ -46,7 +46,7 @@ from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
-from .testutils import CountingByteSink, PeakMemoryMonitor
+from .testutils import PeakMemoryMonitor
 
 
 def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
@@ -885,14 +885,24 @@ class CloudPickleTest(unittest.TestCase):
             b'\x14NtR.')
         self.assertEquals(42, cloudpickle.loads(pickled)(42))
 
-    def test_nocopy_bytes(self):
-        if self.protocol < 3:
-            pytest.skip("test_nocopy_bytes requires protocol 3 or more")
-        sink = CountingByteSink()
-        biggish_data_bytes = b'0' * int(2e8)  # 200 MB
-        biggish_data_view = memoryview(biggish_data_bytes)
-        for biggish_data in [biggish_data_bytes, biggish_data_view]:
-            pickler = cloudpickle.CloudPickler(sink, protocol=self.protocol)
+
+class Protocol2CloudPickleTest(CloudPickleTest):
+
+    protocol = 2
+
+
+@pytest.mark.skipif(sys.version_info[:2] < (3, 5),
+                    reason="nocopy memoryview only supprted on Python 3.5+")
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                    reason="memoryview.c_contiguous is missing")
+def test_nocopy_bytes(tmpdir):
+    tmpfile = str(tmpdir.join('biggish.pkl'))
+    size = int(2e8)  # 200 MB
+    biggish_data_bytes = b'0' * size
+    biggish_data_view = memoryview(biggish_data_bytes)
+    for biggish_data in [biggish_data_bytes, biggish_data_view]:
+        with open(tmpfile, 'wb') as f:
+            pickler = cloudpickle.CloudPickler(f)
             with PeakMemoryMonitor() as monitor:
                 pickler.dump(biggish_data)
 
@@ -902,12 +912,23 @@ class CloudPickleTest(unittest.TestCase):
             assert monitor.base_mem > len(biggish_data)
             assert (monitor.peak_mem - monitor.base_mem) < 100e6
 
-            assert sink.written > len(biggish_data)
+        with open(tmpfile, 'rb') as f:
+            with PeakMemoryMonitor() as monitor:
+                reconstructed = cloudpickle.load(f)
 
+        # Check that loading does not make a memory copy (it allocates)
+        # a single binary buffer
+        # XXX: the 'newly_allocated < 2 * size' check is too lax
+        newly_allocated = monitor.peak_mem - monitor.base_mem
+        assert size <= newly_allocated < 2 * size
 
-class Protocol2CloudPickleTest(CloudPickleTest):
-
-    protocol = 2
+        assert len(reconstructed) == len(biggish_data)
+        if biggish_data is biggish_data_bytes:
+            assert reconstructed == biggish_data_bytes
+        else:
+            assert reconstructed.readonly
+            assert reconstructed.format == biggish_data_view.format
+            assert reconstructed.tobytes() == biggish_data_bytes
 
 
 if __name__ == '__main__':

@@ -254,16 +254,19 @@ else:
 
 def _memoryview_from_bytes(data, format, readonly):
     if not readonly:
-        # Force the memory buffer writable: this is a violation of the
-        # immutability of Python bytes object but this should be safe because:
-        # - data has just been allocated from reading from the pickle stream
-        #   and will never be used outside of the scope of this reducer.
-        # - bytes objects are not interned.
+        # Forcibly render the recently unpickled bytes buffer writable:
+        # this is a violation of the immutability of a Python bytes object but
+        # this should be safe because:
+        # - data is a temporary variable that has just been allocated from
+        #   reading from the pickle stream and will never be used outside of
+        #   the scope of this reducer.
+        # - bytes objects are not subject to interning.
         buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
         addr = ctypes.addressof(buffer.contents)
         array = (ctypes.c_char * len(data)).from_address(addr)
         view = memoryview(array)
     else:
+        # A memoryview of a bytes object is readonly by default.
         view = memoryview(data)
     if PY_MAJOR_MINOR >= (3, 5) or (PY_MAJOR_MINOR == (3, 4) and readonly):
         return view.cast('B').cast(format)
