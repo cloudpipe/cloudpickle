@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import print_function
 
 import codecs
+import ctypes
 import dis
 from functools import partial
 import imp
@@ -250,6 +251,25 @@ else:
                 yield op, instr.arg
 
 
+def _memoryview_from_bytes(data, format, readonly):
+    if not readonly:
+        # Force the memory buffer writable: this is a violation of the
+        # immutability of Python bytes object but this should be safe because:
+        # - data has just been allocated from reading from the pickle stream
+        #   and will never be used outside of the scope of this reducer.
+        # - bytes objects are not interned.
+        buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
+        addr = ctypes.addressof(buffer.contents)
+        array = (ctypes.c_char * len(data)).from_address(addr)
+        view = memoryview(array)
+    else:
+        view = memoryview(data)
+    if hasattr(view, 'cast'):
+        return view.cast(format)
+    else:
+        return view
+
+
 class _Framer:
     """Backport of Python 3.7 framer"""
 
@@ -341,7 +361,7 @@ class CloudPickler(Pickler):
                 raise pickle.PicklingError(msg)
 
     if PY3:
-        def save_bytes(self, obj):
+        def save_bytes(self, obj, skip_memoize=False):
             if self.proto < 3:
                 if not obj:  # bytes object is empty
                     self.save_reduce(bytes, (), obj=obj)
@@ -358,17 +378,25 @@ class CloudPickler(Pickler):
                 self._write_large_bytes(pickle.BINBYTES + pack("<I", n), obj)
             else:
                 self.write(pickle.BINBYTES + pack("<I", n) + obj)
-            self.memoize(obj)
+            if not skip_memoize:
+                self.memoize(obj)
         dispatch[bytes] = save_bytes
 
     def save_memoryview(self, obj):
         n = len(obj)
+        self.save(_memoryview_from_bytes)
+        self.write(pickle.MARK)
         if n <= 0xff or self.proto < 3 or not obj.c_contiguous:
             self.save(obj.tobytes())
         else:
             # Large contiguous views can benefit from nocopy semantics with
             # recent versions of the pickle protocol
-            self.save_bytes(obj)
+            self.save_bytes(obj, skip_memoize=True)
+        self.save(obj.format)
+        self.save(obj.readonly)
+        self.write(pickle.TUPLE)
+        self.write(pickle.REDUCE)
+        self.memoize(obj)
     dispatch[memoryview] = save_memoryview
 
     if not PY3:
