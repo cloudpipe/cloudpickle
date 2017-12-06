@@ -897,6 +897,7 @@ class Protocol2CloudPickleTest(CloudPickleTest):
                     reason="memoryview.c_contiguous is missing")
 def test_nocopy_readonly_bytes(tmpdir):
     tmpfile = str(tmpdir.join('biggish.pkl'))
+    mem_tol = int(5e7)  # 50 MB
     size = int(2e8)  # 200 MB
     biggish_data_bytes = b'0' * size
     biggish_data_view = memoryview(biggish_data_bytes)
@@ -909,16 +910,18 @@ def test_nocopy_readonly_bytes(tmpdir):
         # larger than 100 MB which is much smaller than the bytes to be
         # pickled.
         assert monitor.base_mem > size
-        assert monitor.newly_allocated < 100e6
+        assert monitor.newly_allocated < mem_tol
 
         with open(tmpfile, 'rb') as f:
             with PeakMemoryMonitor() as monitor:
-                reconstructed = cloudpickle.load(f)
+                # C-based pickle.load allocates a temporary variable on Python
+                # 3.5 and 3.6 while the Python-based pickle._load
+                # implementation does not have this problem
+                reconstructed = pickle._load(f)
 
         # Check that loading does not make a memory copy (it allocates)
         # a single binary buffer
-        # XXX: the 'newly_allocated < 2 * size' check is too lax
-        assert 0.9 * size < monitor.newly_allocated < 2 * size
+        assert size - mem_tol < monitor.newly_allocated < size + mem_tol
 
         assert len(reconstructed) == size
         if biggish_data is biggish_data_bytes:
@@ -936,6 +939,7 @@ def test_nocopy_readonly_bytes(tmpdir):
                     reason="memoryview.c_contiguous is missing")
 def test_nocopy_writable_memoryview(tmpdir):
     tmpfile = str(tmpdir.join('biggish.pkl'))
+    mem_tol = int(5e7)  # 50 MB
     size = int(2e8)  # 200 MB
     biggish_array = array.array('l', range(size // 8))
     biggish_array_view = memoryview(biggish_array)
@@ -947,16 +951,18 @@ def test_nocopy_writable_memoryview(tmpdir):
     # larger than 100 MB which is much smaller than the bytes to be
     # pickled.
     assert monitor.base_mem > size
-    assert monitor.newly_allocated < 100e6
+    assert monitor.newly_allocated < mem_tol
 
     with open(tmpfile, 'rb') as f:
         with PeakMemoryMonitor() as monitor:
-            reconstructed = cloudpickle.load(f)
+            # C-based pickle.load allocates a temporary variable on Python 3.5
+            # and 3.6 while the Python-based pickle._load implementation does
+            # not have this problem
+            reconstructed = pickle._load(f)
 
     # Check that loading does not make a memory copy (it allocates)
     # a single binary buffer
-    # XXX: the 'newly_allocated < 2 * size' check is too lax
-    assert 0.9 * size < monitor.newly_allocated < 2 * size
+    assert size - mem_tol < monitor.newly_allocated < size + mem_tol
 
     assert reconstructed.nbytes == size
     assert not reconstructed.readonly
