@@ -898,7 +898,7 @@ class Protocol2CloudPickleTest(CloudPickleTest):
 def test_nocopy_readonly_bytes(tmpdir):
     tmpfile = str(tmpdir.join('biggish.pkl'))
     mem_tol = int(5e7)  # 50 MB
-    size = int(2e8)  # 200 MB
+    size = int(5e8)  # 500 MB
     biggish_data_bytes = b'0' * size
     biggish_data_view = memoryview(biggish_data_bytes)
     for biggish_data in [biggish_data_bytes, biggish_data_view]:
@@ -940,9 +940,11 @@ def test_nocopy_readonly_bytes(tmpdir):
 def test_nocopy_writable_memoryview(tmpdir):
     tmpfile = str(tmpdir.join('biggish.pkl'))
     mem_tol = int(5e7)  # 50 MB
-    size = int(2e8)  # 200 MB
+    size = int(5e8)  # 500 MB
     biggish_array = array.array('l', range(size // 8))
     biggish_array_view = memoryview(biggish_array)
+    assert not biggish_array_view.readonly
+
     with open(tmpfile, 'wb') as f:
         with PeakMemoryMonitor() as monitor:
             cloudpickle.dump(biggish_array_view, f)
@@ -967,5 +969,4 @@ def test_nocopy_writable_memoryview(tmpdir):
     assert reconstructed.nbytes == size
     assert not reconstructed.readonly
     assert reconstructed.format == biggish_array_view.format
-    for a, b in zip(reconstructed, range(size // 8)):
-        assert a == b
+    assert reconstructed == biggish_array_view

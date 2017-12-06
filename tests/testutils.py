@@ -113,7 +113,7 @@ def assert_run_python_script(source_code, timeout=5):
         os.unlink(source_file)
 
 
-def monitor_worker(pid, queue, stop_event, delay=0.010):
+def monitor_worker(pid, queue, started_event, stop_event, delay=0.010):
     import psutil
     p = psutil.Process(pid)
     peak = 0
@@ -123,6 +123,9 @@ def monitor_worker(pid, queue, stop_event, delay=0.010):
         if mem > peak:
             peak = mem
         return peak
+
+    peak = make_measurement(peak)
+    started_event.set()
 
     # Make measurements every 'delay' seconds until we receive the stop event:
     while not stop_event.wait(timeout=delay):
@@ -140,11 +143,14 @@ class PeakMemoryMonitor:
         psutil = pytest.importorskip("psutil")
         pid = os.getpid()
         gc.collect()
-        self.base_mem = psutil.Process(pid).memory_info().rss
         self.queue = q = mp.Queue()
-        self.stop_event = e = mp.Event()
-        self.worker = mp.Process(target=monitor_worker, args=(pid, q, e))
+        e_started = mp.Event()
+        self.stop_event = e_stop = mp.Event()
+        self.worker = mp.Process(target=monitor_worker,
+                                 args=(pid, q, e_started, e_stop))
         self.worker.start()
+        e_started.wait()
+        self.base_mem = psutil.Process(pid).memory_info().rss
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
