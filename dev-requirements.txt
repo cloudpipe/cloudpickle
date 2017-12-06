@@ -5,3 +5,6 @@ mock
 psutil
 # Code coverage uploader for Travis:
 codecov
+
+# nocopy tests with pydata libraries
+numpy

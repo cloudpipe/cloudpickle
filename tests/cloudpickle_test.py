@@ -970,3 +970,70 @@ def test_nocopy_writable_memoryview(tmpdir):
     assert not reconstructed.readonly
     assert reconstructed.format == biggish_array_view.format
     assert reconstructed == biggish_array_view
+
+
+@pytest.mark.skipif(sys.version_info[:2] < (3, 5),
+                    reason="nocopy writable memoryview only supported on "
+                           "Python 3.5+")
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                    reason="memoryview.c_contiguous is missing")
+def test_nocopy_numpy_array():
+    np = pytest.importorskip("numpy")
+
+    shape = (int(1e5), 1000)
+    data = np.arange(np.prod(shape)).reshape(shape)
+    mem_tol = int(5e7)  # 50 MB
+    size = data.nbytes  # 800 MB
+
+    def array_builder(buffer, dtype, shape, strides):
+        return np.lib.stride_tricks.as_strided(
+            np.frombuffer(buffer, dtype), shape=shape, strides=strides)
+
+    def reduce_ndarray(a):
+        """Memoryview based reducer for numpy arrays"""
+        return array_builder, (memoryview(a), a.dtype, a.shape, a.strides)
+
+    class ChunksAppender:
+
+        def __init__(self):
+            self.raw_chunks = []
+
+        def write(self, data):
+            # Append reference to raw chunks without triggering any memory
+            # copy. The bytes will be consumed in a delayed manner after the
+            # end of the pickling process by the call to materialize.
+            self.raw_chunks.append(data)
+
+        def materialize(self):
+            # Concatenate all memoryview and bytes chunks into a single
+            # bytes object make many memory copies along the way.
+            return b"".join([c.tobytes() if hasattr(c, 'tobytes') else c
+                             for c in self.raw_chunks])
+
+    appender = ChunksAppender()
+    pickler = cloudpickle.CloudPickler(appender)
+    pickler.dispatch_table = pickle.dispatch_table.copy()
+    pickler.dispatch_table[np.ndarray] = reduce_ndarray
+
+    # Check that pickling does not make any memory copy of the large data
+    # buffer of the pandas dataframe:
+    with PeakMemoryMonitor() as monitor:
+        pickler.dump(data)
+
+    assert monitor.newly_allocated < mem_tol
+
+    pickled = appender.materialize()
+    assert size - mem_tol < len(pickled) < size + mem_tol
+
+    with PeakMemoryMonitor() as monitor:
+        reconstructed_array = pickle._loads(pickled)
+
+    # Check that loading does not make a memory copy (it allocates)
+    # a single binary buffer
+    assert size - mem_tol < monitor.newly_allocated < size + mem_tol
+    np.testing.assert_array_equal(data, reconstructed_array)
+
+    # Reconstructed array is writable
+    reconstructed_array[:] = 1
+    data[:] = 2
+    assert data[0, 0] != reconstructed_array[0, 0]
