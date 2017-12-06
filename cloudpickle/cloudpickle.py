@@ -264,6 +264,7 @@ def _memoryview_from_bytes(data, format, readonly):
         buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
         addr = ctypes.addressof(buffer.contents)
         array = (ctypes.c_char * len(data)).from_address(addr)
+        array._base = data  # keep a reference to bytes obj to avoid early GC
         view = memoryview(array)
     else:
         # A memoryview of a bytes object is readonly by default.
@@ -375,7 +376,7 @@ class CloudPickler(Pickler):
                     self.save_reduce(codecs.encode,
                                      (str(obj, 'latin1'), 'latin1'), obj=obj)
                 return
-            n = len(obj)
+            n = getattr(obj, 'nbytes', len(obj))
             if n <= 0xff:
                 self.write(pickle.SHORT_BINBYTES + pack("<B", n) + obj)
             elif n > 0xffffffff and self.proto >= 4:

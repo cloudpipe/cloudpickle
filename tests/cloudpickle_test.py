@@ -902,15 +902,14 @@ def test_nocopy_readonly_bytes(tmpdir):
     biggish_data_view = memoryview(biggish_data_bytes)
     for biggish_data in [biggish_data_bytes, biggish_data_view]:
         with open(tmpfile, 'wb') as f:
-            pickler = cloudpickle.CloudPickler(f)
             with PeakMemoryMonitor() as monitor:
-                pickler.dump(biggish_data)
+                cloudpickle.dump(biggish_data, f)
 
-            # Check that temporary datastructures used when dumping are no
-            # larger than 100 MB which is much smaller than the bytes to be
-            # pickled.
-            assert monitor.base_mem > len(biggish_data)
-            assert (monitor.peak_mem - monitor.base_mem) < 100e6
+        # Check that temporary datastructures used when dumping are no
+        # larger than 100 MB which is much smaller than the bytes to be
+        # pickled.
+        assert monitor.base_mem > size
+        assert monitor.newly_allocated < 100e6
 
         with open(tmpfile, 'rb') as f:
             with PeakMemoryMonitor() as monitor:
@@ -919,10 +918,9 @@ def test_nocopy_readonly_bytes(tmpdir):
         # Check that loading does not make a memory copy (it allocates)
         # a single binary buffer
         # XXX: the 'newly_allocated < 2 * size' check is too lax
-        newly_allocated = monitor.peak_mem - monitor.base_mem
-        assert 0.9 * size < newly_allocated < 2 * size
+        assert 0.9 * size < monitor.newly_allocated < 2 * size
 
-        assert len(reconstructed) == len(biggish_data)
+        assert len(reconstructed) == size
         if biggish_data is biggish_data_bytes:
             assert reconstructed == biggish_data_bytes
         else:
@@ -931,5 +929,37 @@ def test_nocopy_readonly_bytes(tmpdir):
             assert reconstructed.tobytes() == biggish_data_bytes
 
 
-if __name__ == '__main__':
-    unittest.main()
+@pytest.mark.skipif(sys.version_info[:2] < (3, 5),
+                    reason="nocopy writable memoryview only supported on "
+                           "Python 3.5+")
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                    reason="memoryview.c_contiguous is missing")
+def test_nocopy_writable_memoryview(tmpdir):
+    tmpfile = str(tmpdir.join('biggish.pkl'))
+    size = int(2e8)  # 200 MB
+    biggish_array = array.array('l', range(size // 8))
+    biggish_array_view = memoryview(biggish_array)
+    with open(tmpfile, 'wb') as f:
+        with PeakMemoryMonitor() as monitor:
+            cloudpickle.dump(biggish_array_view, f)
+
+    # Check that temporary datastructures used when dumping are no
+    # larger than 100 MB which is much smaller than the bytes to be
+    # pickled.
+    assert monitor.base_mem > size
+    assert monitor.newly_allocated < 100e6
+
+    with open(tmpfile, 'rb') as f:
+        with PeakMemoryMonitor() as monitor:
+            reconstructed = cloudpickle.load(f)
+
+    # Check that loading does not make a memory copy (it allocates)
+    # a single binary buffer
+    # XXX: the 'newly_allocated < 2 * size' check is too lax
+    assert 0.9 * size < monitor.newly_allocated < 2 * size
+
+    assert reconstructed.nbytes == size
+    assert not reconstructed.readonly
+    assert reconstructed.format == biggish_array_view.format
+    for a, b in zip(reconstructed, range(size // 8)):
+        assert a == b

@@ -154,6 +154,7 @@ class PeakMemoryMonitor:
             return False
         else:
             self.peak_mem = self.queue.get()
+            self.newly_allocated = self.peak_mem - self.base_mem
             return True
 
 
