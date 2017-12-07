@@ -1029,21 +1029,39 @@ def test_nocopy_writable_memoryview(tmpdir):
                            "Python 3.5+")
 @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
                     reason="memoryview.c_contiguous is missing")
-def test_nocopy_numpy_array():
+def test_nocopy_pydata():
     np = pytest.importorskip("numpy")
+    pd = pytest.importorskip("pandas")
+    sp = pytest.importorskip("scipy.sparse")
 
+    mem_tol = 30e6
     shape = (int(1e5), 1000)
     data = np.arange(np.prod(shape)).reshape(shape)
-    mem_tol = int(5e7)  # 50 MB
-    size = data.nbytes  # 800 MB
+    data_with_zeros = data.copy()
+    data_with_zeros[::2] = 0
+    csr = sp.csr_matrix(data_with_zeros)
 
-    def array_builder(buffer, dtype, shape, strides):
-        return np.lib.stride_tricks.as_strided(
-            np.frombuffer(buffer, dtype), shape=shape, strides=strides)
+    large_pydata_objects = [
+        (data, data.nbytes),
+        (data.T, data.nbytes),
+        (pd.DataFrame(data), data.nbytes),
+        (csr, csr.indptr.nbytes + csr.indices.nbytes + csr.data.nbytes),
+    ]
+
+    def array_builder(buffer, dtype, shape, transpose):
+        a = np.lib.stride_tricks.as_strided(
+            np.frombuffer(buffer, dtype), shape=shape)
+        return a.T if transpose else a
 
     def reduce_ndarray(a):
         """Memoryview based reducer for numpy arrays"""
-        return array_builder, (memoryview(a), a.dtype, a.shape, a.strides)
+        if a.flags.f_contiguous:
+            # convert to c-contiguous to benefit from nocopy semantics.
+            a = a.T
+            transpose = True
+        else:
+            transpose = False
+        return array_builder, (memoryview(a), a.dtype, a.shape, transpose)
 
     class ChunksAppender:
 
@@ -1062,30 +1080,31 @@ def test_nocopy_numpy_array():
             return b"".join([c.tobytes() if hasattr(c, 'tobytes') else c
                              for c in self.raw_chunks])
 
-    appender = ChunksAppender()
-    pickler = cloudpickle.CloudPickler(appender)
-    pickler.dispatch_table = pickle.dispatch_table.copy()
-    pickler.dispatch_table[np.ndarray] = reduce_ndarray
+    for obj, size in large_pydata_objects:
+        appender = ChunksAppender()
+        pickler = cloudpickle.CloudPickler(appender)
+        pickler.dispatch_table = pickle.dispatch_table.copy()
+        pickler.dispatch_table[np.ndarray] = reduce_ndarray
 
-    # Check that pickling does not make any memory copy of the large data
-    # buffer of the pandas dataframe:
-    with PeakMemoryMonitor() as monitor:
-        pickler.dump(data)
+        # Check that pickling does not make any memory copy of the large data
+        # buffer of the pandas dataframe:
+        with PeakMemoryMonitor() as monitor:
+            pickler.dump(obj)
 
-    assert monitor.newly_allocated < mem_tol
+        assert monitor.newly_allocated < mem_tol
 
-    pickled = appender.materialize()
-    assert size - mem_tol < len(pickled) < size + mem_tol
+        pickled = appender.materialize()
+        assert size - mem_tol < len(pickled) < size + mem_tol
 
-    with PeakMemoryMonitor() as monitor:
-        reconstructed_array = pickle._loads(pickled)
+        with PeakMemoryMonitor() as monitor:
+            cloned_obj = pickle._loads(pickled)
 
-    # Check that loading does not make a memory copy (it allocates)
-    # a single binary buffer
-    assert size - mem_tol < monitor.newly_allocated < size + mem_tol
-    np.testing.assert_array_equal(data, reconstructed_array)
-
-    # Reconstructed array is writable
-    reconstructed_array[:] = 1
-    data[:] = 2
-    assert data[0, 0] != reconstructed_array[0, 0]
+        # Check that loading does not make a memory copy (it allocates)
+        # a single binary buffer
+        assert size - mem_tol < monitor.newly_allocated < size + mem_tol
+        if sp.issparse(obj):
+            np.testing.assert_array_equal(obj.toarray(), cloned_obj.toarray())
+        elif isinstance(obj, pd.DataFrame):
+            np.testing.assert_array_equal(obj.values, cloned_obj.values)
+        else:
+            np.testing.assert_array_equal(obj, cloned_obj)
