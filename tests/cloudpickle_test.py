@@ -173,6 +173,58 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
+    def test_complex_memoryviews(self):
+        # Use numpy to generate complex memory layouts to be able to test the
+        # preservation of all memoryview attributes. Note that cloudpickle
+        # does not guarantee nocopy semantics for all of those cases but
+        # it should reconstruct the same memory layout in any-case.
+        # np = pytest.importorskip("numpy")
+        import numpy as np
+        arrays = [
+            np.arange(12).reshape(3, 4),
+            np.arange(12).reshape(3, 4).astype(np.float32),
+        ]
+        if cloudpickle.PY3:
+            # There is a bug when calling .tobytes() on non-c-contiguous numpy
+            # memoryviews under Python 2.7.
+            arrays += [
+                np.asfortranarray(np.arange(12).reshape(3, 4)),
+                np.arange(12).reshape(3, 4)[:, 1:-1],
+                np.arange(12).reshape(3, 4)[1:-1, :],
+                np.asfortranarray(np.arange(12).reshape(3, 4))[:, 1:-1],
+                np.asfortranarray(np.arange(12).reshape(3, 4))[1:-1, :],
+            ]
+        readonly_arrays = []
+        for a in arrays:
+            a = a.copy()
+            a.flags.writeable = False
+            readonly_arrays.append(a)
+        arrays += readonly_arrays
+
+        for a in arrays:
+            readonly = not a.flags.writeable
+            original_view = memoryview(a)
+            cloned_view = pickle_depickle(original_view,
+                                          protocol=self.protocol)
+            assert original_view.readonly == readonly
+            assert original_view.readonly == cloned_view.readonly
+
+            if (cloudpickle.PY_MAJOR_MINOR > (3, 4)
+                    or (cloudpickle.PY_MAJOR_MINOR == (3, 4) and readonly)):
+                # Python 2.7 does not support casting memoryviews.
+                # Python 3.4 has a bug that prevents casting when the buffer
+                # is backed by a ctypes array.
+                assert original_view.format == cloned_view.format
+                assert original_view.shape == cloned_view.shape
+
+            assert original_view.tobytes() == cloned_view.tobytes()
+
+            if (cloudpickle.PY_MAJOR_MINOR >= (3, 4)
+                    and platform.python_implementation() != 'PyPy'):
+                # Cloned view is always C contiguous irrespective of
+                # the original view contiguity and layout (C vs Fortran).
+                assert cloned_view.c_contiguous
+
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
 

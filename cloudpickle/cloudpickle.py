@@ -252,7 +252,7 @@ else:
                 yield op, instr.arg
 
 
-def _memoryview_from_bytes(data, format, readonly):
+def _memoryview_from_bytes(data, format, readonly, shape):
     if not readonly:
         # Forcibly render the recently unpickled bytes buffer writable:
         # this is a violation of the immutability of a Python bytes object but
@@ -270,7 +270,7 @@ def _memoryview_from_bytes(data, format, readonly):
         # A memoryview of a bytes object is readonly by default.
         view = memoryview(data)
     if PY_MAJOR_MINOR >= (3, 5) or (PY_MAJOR_MINOR == (3, 4) and readonly):
-        return view.cast('B').cast(format)
+        return view.cast('B').cast(format, shape)
     else:
         # Python 2.7 does not support casting and Python 3.4 has a bug when
         # casting buffers from ctypes: # https://bugs.python.org/issue19803
@@ -405,6 +405,7 @@ class CloudPickler(Pickler):
             self.save_bytes(obj, skip_memoize=True)
         self.save(obj.format)
         self.save(obj.readonly)
+        self.save(obj.shape)
         self.write(pickle.TUPLE)
         self.write(pickle.REDUCE)
         self.memoize(obj)
