@@ -173,6 +173,8 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                        reason="cast is broken on PyPy < 5.9.0")
     def test_complex_memoryviews(self):
         # Use numpy to generate complex memory layouts to be able to test the
         # preservation of all memoryview attributes. Note that cloudpickle
@@ -1034,15 +1036,15 @@ def test_nocopy_pydata():
     pd = pytest.importorskip("pandas")
     sp = pytest.importorskip("scipy.sparse")
 
-    mem_tol = 30e6
-    shape = (int(1e5), 1000)
+    mem_tol = 50e6  # 50 MB
+    shape = (int(2e5), 100)
     data = np.arange(np.prod(shape)).reshape(shape)
     data_with_zeros = data.copy()
     data_with_zeros[::2] = 0
     csr = sp.csr_matrix(data_with_zeros)
 
     large_pydata_objects = [
-        (data, data.nbytes),
+        (data, data.nbytes),  # 160 MB
         (data.T, data.nbytes),
         (pd.DataFrame(data), data.nbytes),
         (csr, csr.indptr.nbytes + csr.indices.nbytes + csr.data.nbytes),
