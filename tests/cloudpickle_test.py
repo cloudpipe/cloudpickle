@@ -180,11 +180,10 @@ class CloudPickleTest(unittest.TestCase):
         # preservation of all memoryview attributes. Note that cloudpickle
         # does not guarantee nocopy semantics for all of those cases but
         # it should reconstruct the same memory layout in any-case.
-        # np = pytest.importorskip("numpy")
-        import numpy as np
+        np = pytest.importorskip("numpy")
         arrays = [
             np.arange(12).reshape(3, 4),
-            np.arange(12).reshape(3, 4).astype(np.float32),
+            np.arange(12000).reshape(3000, 4).astype(np.float32),
         ]
         if cloudpickle.PY3:
             # There is a bug when calling .tobytes() on non-c-contiguous numpy

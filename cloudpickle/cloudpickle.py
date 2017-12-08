@@ -252,20 +252,65 @@ else:
                 yield op, instr.arg
 
 
-def _memoryview_from_bytes(data, format, readonly, shape):
+def _memoryview_from_bytes(data_holder, format, readonly, shape):
+    """Build a memoryview from raw bytes read from the pickle stream
+
+    This function tries its best not to allocate any extra memory when not
+    necessary.
+
+    The actual data is provided in a data_holder which is expected to be a
+    single item list holding the actual bytes object. This makes it easier
+    to use sys.getrefcount to detect whether or not the bytes are referenced
+    elsewhere or not.
+
+    If readonly is False and the backing bytes in data_holder are referenced
+    from other objects, then the bytes contents are copied into a newly
+    allocated mutable buffer. Otherwise the memory allocated for the bytes
+    object is directly reused by the new memoryview.
+
+    Python 2 memoryviews doe not support being cast so that the
+    format and shape parameters are ignored.
+
+    Reference counting cannot be used in PyPy to detect if it is safe to mutate
+    the bytes object. If readonly is False, a new mutable buffer is always
+    allocated.
+    """
+    # If the following call to sys.getrefcount returns 2 it means that there is
+    # one reference from data_holder and one from the temporary arguments
+    # datastructure of the sys.getrefcount call. It is therefore safe to reuse
+    # the memory buffer of the bytes object as writeable buffer to back the
+    # memoryview: this buffer is no longer unreachable from anywhere else.
+    if hasattr(sys, 'getrefcount'):
+        safe_to_mutate = sys.getrefcount(data_holder[0]) <= 2
+    else:
+        # PyPy does not use reference counting. Is there a way to detect if
+        # a bytes objects can be mutated safely?
+        safe_to_mutate = False
+    data = data_holder[0]
+    del data_holder[:]
     if not readonly:
-        # Forcibly render the recently unpickled bytes buffer writable:
-        # this is a violation of the immutability of a Python bytes object but
-        # this should be safe because:
-        # - data is a temporary variable that has just been allocated from
-        #   reading from the pickle stream and will never be used outside of
-        #   the scope of this reducer.
-        # - bytes objects are not subject to interning.
-        buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
-        addr = ctypes.addressof(buffer.contents)
-        array = (ctypes.c_char * len(data)).from_address(addr)
-        array._base = data  # keep a reference to bytes obj to avoid early GC
-        view = memoryview(array)
+        if safe_to_mutate:
+            buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
+            addr = ctypes.addressof(buffer.contents)
+            array = (ctypes.c_char * len(data)).from_address(addr)
+            # Store a reference to the backing bytes object to make GC work
+            # correctly. We hide the object itself in a closure to hide
+            # it from the unsuspecting users.
+
+            @property
+            def _hidden_buffer_ref():
+                raise AttributeError("Access to buffer with id %d is unsafe"
+                                     % id(data))
+            array._hidden_buffer_ref = _hidden_buffer_ref
+
+            view = memoryview(array)
+        else:
+            # This buffer is referenced by external objects: for instance empty
+            # and single bytes objects are interned under Python 3. Longer
+            # bytes objects in Python (from the str type) can also be interned.
+            # Force a copy into a new mutable buffer to avoid a violation of
+            # the unmutability of bytes.
+            view = memoryview(bytearray(data))
     else:
         # A memoryview of a bytes object is readonly by default.
         view = memoryview(data)
@@ -390,19 +435,25 @@ class CloudPickler(Pickler):
         dispatch[bytes] = save_bytes
 
     def save_memoryview(self, obj):
-        n = len(obj)
+        # Python 2 views doe not have nbytes
+        n = getattr(obj, 'nbytes', len(obj))
         self.save(_memoryview_from_bytes)
         self.write(pickle.MARK)
-        # PyPy3 does not implement the 'c_contiguous' attribute at this time.
+        # wrap bytes buffer in a singleton list that is expected to hold
+        # the only reference to the bytes obj when unpickling.
+        self.write(pickle.MARK)
         c_contiguous = getattr(obj, 'c_contiguous', False)
         if n <= 0xff or self.proto < 3 or not c_contiguous:
-            # Make a contiguous copy prior as a bytes object prior to
-            # serialization.
+            # Make a contiguous copy as a bytes object prior to serialization.
+            # TODO: find a way to disable memoization in this case. Memoization
+            # will prevent _memoryview_from_bytes to ensure safe mutability
+            # via reference counting.
             self.save(obj.tobytes())
         else:
             # Large contiguous views can benefit from nocopy semantics with
             # recent versions of the pickle protocol.
             self.save_bytes(obj, skip_memoize=True)
+        self.write(pickle.LIST)  # data_holder
         self.save(obj.format)
         self.save(obj.readonly)
         self.save(obj.shape)
