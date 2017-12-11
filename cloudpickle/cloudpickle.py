@@ -323,7 +323,10 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     safe_to_mutate = _safe_to_mutate(data_holder)
     data = data_holder[0]
     del data_holder[:]
-    if not readonly:
+    if readonly:
+        # A memoryview of a bytes object is readonly by default.
+        view = memoryview(data)
+    else:
         # Python 3.4 implementation of memoryviews backed by ctypes buffers
         # has a bug: # https://bugs.python.org/issue19803
         if safe_to_mutate and PY_MAJOR_MINOR != (3, 4):
@@ -340,15 +343,13 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
             array._hidden_buffer_ref = _hidden_buffer_ref
             view = memoryview(array)
         else:
-            # This buffer is referenced by external objects: for instance empty
-            # and single bytes objects are interned under Python 3. Longer
-            # bytes objects in Python (from the str type) can also be interned.
-            # Force a copy into a new mutable buffer to avoid a violation of
-            # the imnmutability of bytes.
+            # This buffer can be referenced by external objects: for instance
+            # empty and single bytes objects are interned under Python 3.
+            # Longer bytes objects in Python (from the str type) can also be
+            # interned. Force a copy into a new mutable buffer to avoid a
+            # violation of the imnmutability of bytes.
             view = memoryview(bytearray(data))
-    else:
-        # A memoryview of a bytes object is readonly by default.
-        view = memoryview(data)
+
     if PY_MAJOR_MINOR >= (3, 4):
         return view.cast('B').cast(format, shape)
     else:
