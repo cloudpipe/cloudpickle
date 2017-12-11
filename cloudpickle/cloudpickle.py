@@ -61,6 +61,8 @@ import types
 import weakref
 
 
+RUNNING_CPYTHON = platform.python_implementation() == 'CPython'
+
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
@@ -270,7 +272,7 @@ class _Py2StrStruct(ctypes.Structure):
 
 def _is_safe_to_mutate(data_holder):
     """Helper function, see _memoryview_from_bytes for details."""
-    if platform.python_implementation() != 'CPython':
+    if not RUNNING_CPYTHON:
         # sys.getrefcount and ob_sstate are not always available on other
         # platforms (e.g. PyPy): better be conservative.
         return False

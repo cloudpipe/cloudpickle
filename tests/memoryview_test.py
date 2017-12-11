@@ -6,6 +6,9 @@ from cloudpickle.cloudpickle import _Py2StrStruct
 import pytest
 
 
+RUNNING_CPYTHON = platform.python_implementation() == 'CPython'
+
+
 @pytest.mark.skipif(sys.version_info[:2] == (3, 4),
                     reason="https://bugs.python.org/issue19803")
 def test_safe_mutable_bytes():
@@ -23,14 +26,17 @@ def test_safe_mutable_bytes():
     # There are no external reference to the bytes object in buffer_holder,
     # the _memoryview_from_bytes function can safely reuse the memory
     # allocated for the bytes object to expose it as a mutable buffer to back
-    # the memoryview.
-    assert _is_safe_to_mutate(buffer_holder)
+    # the memoryview when running CPython.
+    if RUNNING_CPYTHON:
+        assert _is_safe_to_mutate(buffer_holder)
+    else:
+        assert not _is_safe_to_mutate(buffer_holder)
     view = _memoryview_from_bytes(buffer_holder, 'B', False, (buffer_size,))
     assert not view.readonly
     assert len(buffer_holder) == 0
 
     # CPython 2 and PyPy do not expose the obj attribute.
-    if hasattr(view, 'obj'):
+    if hasattr(view, 'obj') and RUNNING_CPYTHON:
         # The last reference to the original bytes object is hold in a closure
         # to discourage direct access by the user:
         with pytest.raises(TypeError) as exc_info:
