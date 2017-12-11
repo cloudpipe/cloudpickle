@@ -52,6 +52,7 @@ import itertools
 import logging
 import opcode
 import operator
+import platform
 import pickle
 from struct import pack
 import sys
@@ -253,6 +254,7 @@ else:
 
 
 class _Py2StrStruct(ctypes.Structure):
+    """Map the memory layout of a CPython 2 str to access its interned state"""
     _fields_ = [
         ("ob_refcnt", ctypes.c_long),
         ("ob_type", ctypes.c_void_p),
@@ -264,6 +266,32 @@ class _Py2StrStruct(ctypes.Structure):
 
     def is_interned(self):
         return self.ob_sstate != 0
+
+
+def _safe_to_mutate(data_holder):
+    if platform.python_implementation() != 'CPython':
+        # sys.getrefcount and ob_sstate are not always available on other
+        # platforms (e.g. PyPy): better be conservative.
+        return False
+
+    if len(data_holder[0]) <= 1:
+        # Under CPython 3, single byte bytes can be mapped to singletons which
+        # are not safe to mutate.
+        return False
+
+    # If the following call to sys.getrefcount returns 2 it means that
+    # there is one reference from data_holder and one from the temporary
+    # arguments datastructure of the sys.getrefcount call. It is therefore
+    # safe to reuse the memory buffer of the bytes object as writeable
+    # buffer to back the memoryview: this buffer is no longer reachable
+    # from anywhere else.
+    safe_to_mutate = sys.getrefcount(data_holder[0]) <= 2
+    data = data_holder[0]
+    if safe_to_mutate and isinstance(data, str):
+        # Python 2 str instances are bytes that can be interned, make sure
+        # that this is not the case.
+        safe_to_mutate = not _Py2StrStruct.from_address(id(data)).is_interned()
+    return safe_to_mutate
 
 
 def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
@@ -292,25 +320,8 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     **kwargs are left ignored. Those are used to add flexibility to implement
     backward compatible changes in future versions of cloudpickle.
     """
-    # If the following call to sys.getrefcount returns 2 it means that there is
-    # one reference from data_holder and one from the temporary arguments
-    # datastructure of the sys.getrefcount call. It is therefore safe to reuse
-    # the memory buffer of the bytes object as writeable buffer to back the
-    # memoryview: this buffer is no longer unreachable from anywhere else.
-    # Note under Python 3, single byte bytes can be mapped to singletons
-    # which are not safe to mutate.
-    if hasattr(sys, 'getrefcount'):
-        safe_to_mutate = (sys.getrefcount(data_holder[0]) <= 2
-                          and len(data_holder[0]) > 1)
-    else:
-        # PyPy does not use reference counting. Is there a way to detect if
-        # a bytes objects can be mutated safely?
-        safe_to_mutate = False
+    safe_to_mutate = _safe_to_mutate(data_holder)
     data = data_holder[0]
-    if safe_to_mutate and isinstance(data, str):
-        # Python 2 str instances are bytes that can be interned, make sure
-        # that this is not the case.
-        safe_to_mutate = not _Py2StrStruct.from_address(id(data)).is_interned()
     del data_holder[:]
     if not readonly:
         # Python 3.4 implementation of memoryviews backed by ctypes buffers
@@ -333,7 +344,7 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
             # and single bytes objects are interned under Python 3. Longer
             # bytes objects in Python (from the str type) can also be interned.
             # Force a copy into a new mutable buffer to avoid a violation of
-            # the unmutability of bytes.
+            # the imnmutability of bytes.
             view = memoryview(bytearray(data))
     else:
         # A memoryview of a bytes object is readonly by default.
