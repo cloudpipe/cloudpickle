@@ -331,8 +331,8 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
             addr = ctypes.addressof(buffer.contents)
             array = (ctypes.c_char * len(data)).from_address(addr)
             # Store a reference to the backing bytes object to make GC work
-            # correctly. We hide the object itself in a closure to hide
-            # it from the unsuspecting users.
+            # correctly. We hide the object itself in a closure to prevent
+            # unsuspecting users to access it.
 
             def _hidden_buffer_ref():
                 raise TypeError("Access to mutable buffer with id %d is unsafe"
