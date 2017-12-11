@@ -1,6 +1,6 @@
 import sys
 import platform
-from cloudpickle.cloudpickle import _safe_to_mutate
+from cloudpickle.cloudpickle import _is_safe_to_mutate
 from cloudpickle.cloudpickle import _memoryview_from_bytes
 from cloudpickle.cloudpickle import _Py2StrStruct
 import pytest
@@ -24,7 +24,7 @@ def test_safe_mutable_bytes():
     # the _memoryview_from_bytes function can safely reuse the memory
     # allocated for the bytes object to expose it as a mutable buffer to back
     # the memoryview.
-    assert _safe_to_mutate(buffer_holder)
+    assert _is_safe_to_mutate(buffer_holder)
     view = _memoryview_from_bytes(buffer_holder, 'B', False, (buffer_size,))
     assert not view.readonly
     assert len(buffer_holder) == 0
@@ -48,7 +48,7 @@ def test_never_mutate_singleton_bytes():
             buffer_holder = [bytes([i])]
         else:
             buffer_holder = [chr(i)]
-        assert not _safe_to_mutate(buffer_holder)
+        assert not _is_safe_to_mutate(buffer_holder)
 
         # In this case, a new read-write buffer is allocated to back the
         # memoryview.
@@ -64,7 +64,7 @@ def test_unsafe_mutable_bytes_with_external_references():
 
     # The local 'buffer' variable still holds a reference to the bytes object
     # instance: _memoryview_from_bytes cannot safely reuse the same buffer.
-    assert not _safe_to_mutate(buffer_holder)
+    assert not _is_safe_to_mutate(buffer_holder)
 
     # Instead new mutable memory is allocated to back the buffer:
     view = _memoryview_from_bytes(buffer_holder, 'B', False, (3,))
@@ -101,12 +101,12 @@ def test_py2_interned_string_detection():
     # Interned CPython str buffers are never safe to mutate even without
     # external references.
     buffer_holder = [intern(process_str('other python 2 str'))]
-    assert not _safe_to_mutate(buffer_holder)
+    assert not _is_safe_to_mutate(buffer_holder)
 
     # Non-interned CPython str buffers without any external references are
     # safe to mutate:
     buffer_holder = [process_str('other python 2 str')]
-    assert _safe_to_mutate(buffer_holder)
+    assert _is_safe_to_mutate(buffer_holder)
 
 
 @pytest.mark.skipif(sys.version_info[0] != 2,
@@ -114,7 +114,7 @@ def test_py2_interned_string_detection():
 def test_unsafe_mutable_bytes_with_python_2_interning():
     buffer_holder = [intern(u"\x01\x02\x03".encode('ascii'))]
 
-    assert not _safe_to_mutate(buffer_holder)
+    assert not _is_safe_to_mutate(buffer_holder)
     view = _memoryview_from_bytes(buffer_holder, 'B', False, (3,))
     assert not view.readonly
     assert len(buffer_holder) == 0

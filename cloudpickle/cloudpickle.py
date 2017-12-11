@@ -268,7 +268,8 @@ class _Py2StrStruct(ctypes.Structure):
         return self.ob_sstate != 0
 
 
-def _safe_to_mutate(data_holder):
+def _is_safe_to_mutate(data_holder):
+    """Helper function, see _memoryview_from_bytes for details."""
     if platform.python_implementation() != 'CPython':
         # sys.getrefcount and ob_sstate are not always available on other
         # platforms (e.g. PyPy): better be conservative.
@@ -320,7 +321,7 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     **kwargs are left ignored. Those are used to add flexibility to implement
     backward compatible changes in future versions of cloudpickle.
     """
-    safe_to_mutate = _safe_to_mutate(data_holder)
+    safe_to_mutate = _is_safe_to_mutate(data_holder)
     data = data_holder[0]
     del data_holder[:]
     if readonly:
