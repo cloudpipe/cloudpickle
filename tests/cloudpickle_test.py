@@ -1057,7 +1057,10 @@ def test_nocopy_pydata():
     def reduce_ndarray(a):
         """Memoryview based reducer for numpy arrays"""
         if a.flags.f_contiguous:
-            # convert to c-contiguous to benefit from nocopy semantics.
+            # Transposing a F-contiguous array makes it possible to take
+            # a C-contiguous memoryview of it so as to benefit from nocopy
+            # semantics. The array will be transposed by to its original layout
+            # at unpickling time by array_builder.
             a = a.T
             transpose = True
         else:
