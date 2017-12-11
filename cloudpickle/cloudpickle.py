@@ -297,8 +297,11 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     # datastructure of the sys.getrefcount call. It is therefore safe to reuse
     # the memory buffer of the bytes object as writeable buffer to back the
     # memoryview: this buffer is no longer unreachable from anywhere else.
+    # Note under Python 3, single byte bytes can be mapped to singletons
+    # which are not safe to mutate.
     if hasattr(sys, 'getrefcount'):
-        safe_to_mutate = sys.getrefcount(data_holder[0]) <= 2
+        safe_to_mutate = (sys.getrefcount(data_holder[0]) <= 2
+                          and len(data_holder[0]) > 1)
     else:
         # PyPy does not use reference counting. Is there a way to detect if
         # a bytes objects can be mutated safely?
