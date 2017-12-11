@@ -252,7 +252,21 @@ else:
                 yield op, instr.arg
 
 
-def _memoryview_from_bytes(data_holder, format, readonly, shape):
+class _Py2StrStruct(ctypes.Structure):
+    _fields_ = [
+        ("ob_refcnt", ctypes.c_long),
+        ("ob_type", ctypes.c_void_p),
+        ("ob_size", ctypes.c_ulong),
+        ('ob_shash', ctypes.c_long),
+        ('ob_sstate', ctypes.c_int),
+        ('ob_sval', ctypes.c_char),
+    ]
+
+    def is_interned(self):
+        return self.ob_sstate != 0
+
+
+def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     """Build a memoryview from raw bytes read from the pickle stream
 
     This function tries its best not to allocate any extra memory when not
@@ -274,6 +288,9 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape):
     Reference counting cannot be used in PyPy to detect if it is safe to mutate
     the bytes object. If readonly is False, a new mutable buffer is always
     allocated.
+
+    **kwargs are left ignored. Those are used to add flexibility to implement
+    backward compatible changes in future versions of cloudpickle.
     """
     # If the following call to sys.getrefcount returns 2 it means that there is
     # one reference from data_holder and one from the temporary arguments
@@ -287,9 +304,15 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape):
         # a bytes objects can be mutated safely?
         safe_to_mutate = False
     data = data_holder[0]
+    if safe_to_mutate and isinstance(data, str):
+        # Python 2 str instances are bytes that can be interned, make sure
+        # that this is not the case.
+        safe_to_mutate = not _Py2StrStruct.from_address(id(data)).is_interned()
     del data_holder[:]
     if not readonly:
-        if safe_to_mutate:
+        # Python 3.4 implementation of memoryviews backed by ctypes buffers
+        # has a bug: # https://bugs.python.org/issue19803
+        if safe_to_mutate and PY_MAJOR_MINOR != (3, 4):
             buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
             addr = ctypes.addressof(buffer.contents)
             array = (ctypes.c_char * len(data)).from_address(addr)
@@ -297,12 +320,10 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape):
             # correctly. We hide the object itself in a closure to hide
             # it from the unsuspecting users.
 
-            @property
             def _hidden_buffer_ref():
-                raise AttributeError("Access to buffer with id %d is unsafe"
-                                     % id(data))
+                raise TypeError("Access to mutable buffer with id %d is unsafe"
+                                % id(data))
             array._hidden_buffer_ref = _hidden_buffer_ref
-
             view = memoryview(array)
         else:
             # This buffer is referenced by external objects: for instance empty
@@ -314,11 +335,10 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape):
     else:
         # A memoryview of a bytes object is readonly by default.
         view = memoryview(data)
-    if PY_MAJOR_MINOR >= (3, 5) or (PY_MAJOR_MINOR == (3, 4) and readonly):
+    if PY_MAJOR_MINOR >= (3, 4):
         return view.cast('B').cast(format, shape)
     else:
-        # Python 2.7 does not support casting and Python 3.4 has a bug when
-        # casting buffers from ctypes: # https://bugs.python.org/issue19803
+        # Python 2.7 does not support casting.
         return view
 
 

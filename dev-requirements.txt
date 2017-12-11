@@ -8,5 +8,5 @@ codecov
 
 # nocopy tests with pydata libraries
 numpy
-pandas; platform_python_implementation != "PyPy" and python_version >= '3.5'
+pandas; platform_python_implementation != "PyPy"
 scipy; platform_python_implementation != "PyPy" and python_version >= '3.5'
