@@ -277,11 +277,6 @@ def _is_safe_to_mutate(data_holder):
         # platforms (e.g. PyPy): better be conservative.
         return False
 
-    if len(data_holder[0]) <= 1:
-        # Under CPython 3, single byte bytes can be mapped to singletons which
-        # are not safe to mutate.
-        return False
-
     # If the following call to sys.getrefcount returns 2 it means that
     # there is one reference from data_holder and one from the temporary
     # arguments datastructure of the sys.getrefcount call. It is therefore
@@ -304,8 +299,8 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     necessary.
 
     The actual data is provided in a data_holder which is expected to be a
-    single item list holding the actual bytes object. This makes it easier
-    to use sys.getrefcount to detect whether or not the bytes are referenced
+    single item list holding the actual bytes object. This makes it easier to
+    use sys.getrefcount to detect whether or not the bytes are referenced
     elsewhere or not.
 
     If readonly is False and the backing bytes in data_holder are referenced
@@ -313,8 +308,12 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
     allocated mutable buffer. Otherwise the memory allocated for the bytes
     object is directly reused by the new memoryview.
 
-    Python 2 memoryviews doe not support being cast so that the
-    format and shape parameters are ignored.
+    CPython 2 str buffers can be interned. This method introspect the ob_sstate
+    field to check if it is the case or not. If the buffer is interned a new
+    read-write buffer is allocated to ensure safety.
+
+    Python 2 memoryviews doe not support being cast so that the format and
+    shape parameters are ignored.
 
     Reference counting cannot be used in PyPy to detect if it is safe to mutate
     the bytes object. If readonly is False, a new mutable buffer is always

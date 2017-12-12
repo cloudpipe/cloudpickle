@@ -48,20 +48,63 @@ def test_safe_mutable_bytes():
     view[:] = b'\x00' * buffer_size
 
 
-def test_never_mutate_singleton_bytes():
+@pytest.mark.skipif(sys.version_info[0] < 3 or not RUNNING_CPYTHON,
+                    reason="Test relies on CPython 3 implementation details")
+def test_mutate_py3_single_element_bytes():
+    """Check the safety of mutating a single element bytes instance.
+
+    The _memoryview_from_bytes relies on implementation details of the
+    CPython 3 interpreter when deciding whether it is safe to mutate the
+    existing buffer or not.
+
+    In particular it assumes that when a singleton bytes instance is implicitly
+    interned, it has always at least one external reference somewhere else in
+    the interpreter and the _safe_to_mutate will therefore always return False.
+
+    If this assumption is ever violated in some future version of CPython,
+    this test will fail and will tell the cloudpickle maintainers that safety
+    of mutating singleton bytes is no longer guaranteed.
+
+    This test is therefore a canary test for future Python 3 versions
+    """
+    # Single element bytes can be singleton (implicitly interned), for instance
+    # when they are sliced from a larger bytes object or when encoding a
+    # single symbol unicode string.
+    joined_bytes = bytes(range(256))
+    implicitly_interned_bytes = []
     for i in range(256):
-        if sys.version_info[0] >= 3:
-            buffer_holder = [bytes([i])]
-        else:
-            buffer_holder = [chr(i)]
+        assert sys.getrefcount(joined_bytes[i:i + 1]) >= 2
+        buffer_holder = [joined_bytes[i:i + 1]]
         assert not _is_safe_to_mutate(buffer_holder)
+        implicitly_interned_bytes.append(buffer_holder[0])
+        assert chr(i).encode('latin1') is implicitly_interned_bytes[i]
+        assert joined_bytes[i:i + 1] is implicitly_interned_bytes[i]
 
         # In this case, a new read-write buffer is allocated to back the
         # memoryview.
         view = _memoryview_from_bytes(buffer_holder, 'B', False, (1,))
         assert not view.readonly
-        if hasattr(view, 'obj'):
+        if sys.version_info[:2] != (3, 4):
             assert not hasattr(view.obj, '_hidden_buffer_ref')
+
+    # Single item bytes instances are not interned when using the bytes([i])
+    # constructor and this case, they can be mutated safely, they will not
+    # impact the implicitly interned bytes singleton instances.
+    for i in range(256):
+        buffer_holder = [bytes([i])]
+        assert buffer_holder[0] is not implicitly_interned_bytes[i]
+        assert _is_safe_to_mutate(buffer_holder)
+        view = _memoryview_from_bytes(buffer_holder, 'B', False, (1,))
+        if sys.version_info[:2] != (3, 4):
+            with pytest.raises(TypeError):
+                view.obj._hidden_buffer_ref()
+        view[:] = b'\x00'
+        assert view.tobytes() == b'\x00'
+
+    # The singleton are not impacted by the changes in the views
+    for i in range(256):
+        assert implicitly_interned_bytes[i] is not bytes([i])
+        assert implicitly_interned_bytes[i] == bytes([i])
 
 
 def test_unsafe_mutable_bytes_with_external_references():
