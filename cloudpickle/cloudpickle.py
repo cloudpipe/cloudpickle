@@ -277,12 +277,11 @@ def _is_safe_to_mutate(data_holder):
         # platforms (e.g. PyPy): better be conservative.
         return False
 
-    # If the following call to sys.getrefcount returns 2 it means that
-    # there is one reference from data_holder and one from the temporary
-    # arguments datastructure of the sys.getrefcount call. It is therefore
-    # safe to reuse the memory buffer of the bytes object as writeable
-    # buffer to back the memoryview: this buffer is no longer reachable
-    # from anywhere else.
+    # If the following call to sys.getrefcount returns 2, it means that there
+    # is one reference from data_holder and one from the temporary arguments
+    # datastructure of the sys.getrefcount call. It is therefore safe to reuse
+    # the memory buffer of the bytes object as writeable buffer to back the
+    # memoryview: this buffer is no longer reachable from anywhere else.
     safe_to_mutate = sys.getrefcount(data_holder[0]) <= 2
     data = data_holder[0]
     if safe_to_mutate and isinstance(data, str):
@@ -415,8 +414,10 @@ class _Framer:
         # object. Be careful not to concatenate the header and the payload
         # prior to calling 'write' as we do not want to allocate a large
         # temporary bytes object.
-        # We intentionally do not insert a protocol 4 frame opcode to make
-        # it possible to optimize file.read calls in the loader.
+        # We intentionally do not insert a protocol 4 frame opcode to make it
+        # possible to optimize file.read calls in the loader and pass the
+        # resulting bytes as a preallocated data buffer for more complex
+        # datastructures such as memoryviews or numpy arrays.
         write(header)
         write(payload)
 

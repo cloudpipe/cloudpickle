@@ -23,10 +23,10 @@ def test_safe_mutable_bytes():
     # Delete the local direct reference to the buffer
     del buffer
 
-    # There are no external reference to the bytes object in buffer_holder,
-    # the _memoryview_from_bytes function can safely reuse the memory
-    # allocated for the bytes object to expose it as a mutable buffer to back
-    # the memoryview when running CPython.
+    # There are no external reference to the bytes object in buffer_holder, the
+    # _memoryview_from_bytes function can safely reuse the memory allocated for
+    # the bytes object to expose it as a mutable buffer to back the memoryview
+    # when running CPython.
     if RUNNING_CPYTHON:
         assert _is_safe_to_mutate(buffer_holder)
     else:
@@ -88,7 +88,7 @@ def test_mutate_py3_single_element_bytes():
             assert not hasattr(view.obj, '_hidden_buffer_ref')
 
     # Single item bytes instances are not interned when using the bytes([i])
-    # constructor and this case, they can be mutated safely, they will not
+    # constructor and in this case, they can be mutated safely, they will not
     # impact the implicitly interned bytes singleton instances.
     for i in range(256):
         buffer_holder = [bytes([i])]
