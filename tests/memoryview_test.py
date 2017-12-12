@@ -92,6 +92,7 @@ def test_mutate_py3_single_element_bytes():
     # impact the implicitly interned bytes singleton instances.
     for i in range(256):
         buffer_holder = [bytes([i])]
+        assert buffer_holder[0] == implicitly_interned_bytes[i]
         assert buffer_holder[0] is not implicitly_interned_bytes[i]
         assert _is_safe_to_mutate(buffer_holder)
         view = _memoryview_from_bytes(buffer_holder, 'B', False, (1,))
@@ -101,10 +102,28 @@ def test_mutate_py3_single_element_bytes():
         view[:] = b'\x00'
         assert view.tobytes() == b'\x00'
 
-    # The singleton are not impacted by the changes in the views
+    # The singleton are not impacted by the changes in the views.
     for i in range(256):
-        assert implicitly_interned_bytes[i] is not bytes([i])
         assert implicitly_interned_bytes[i] == bytes([i])
+        assert implicitly_interned_bytes[i] is not bytes([i])
+
+
+@pytest.mark.skipif(sys.version_info[0] < 3,
+                    reason="Test checks assumption on Python 3 implementation")
+def test_check_no_explicit_py3_bytes_interning():
+    """Ensure that Python 3+ does not allow explicit interning for bytes.
+
+    The _memoryview_from_bytes function makes the assumption that it is not
+    possible to explicitly intern bytes objects. If this assumption is ever
+    violated in future versions of Python, the implementation of
+    _memoryview_from_bytes will have to be updated accordingly to preserve the
+    safety of directly reusing a bytes buffer to a mutable memoryview.
+
+    This is a canary test: this does not actually test anything in cloudpickle
+    besides assumptions made on the language implementation.
+    """
+    with pytest.raises(TypeError):
+        sys.intern(b'some bytes instance')
 
 
 def test_unsafe_mutable_bytes_with_external_references():
