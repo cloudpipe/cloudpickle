@@ -60,6 +60,11 @@ import traceback
 import types
 import weakref
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 
 RUNNING_CPYTHON = platform.python_implementation() == 'CPython'
 
@@ -352,10 +357,50 @@ def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
             view = memoryview(bytearray(data))
 
     if PY_MAJOR_MINOR >= (3, 4):
-        return view.cast('B').cast(format, shape)
+        if len(data) > 0:
+            return view.cast('B').cast(format, shape)
+        else:
+            return view.cast('B').cast(format)
     else:
         # Python 2.7 does not support casting.
         return view
+
+
+def _np_array_builder(buffer, dtype, shape, transpose, writeable, **kwargs):
+    """Rebuild a numpy array from raw bytes & metadata
+
+    kwargs is ignored. It gives flexibility to implement backward compatible
+    changes in future versions of cloudpickle.
+    """
+    a = np.lib.stride_tricks.as_strided(
+        np.frombuffer(buffer, dtype), shape=shape)
+    if writeable is False:
+        # buffer is expected to be reconstructed by _memoryview_from_bytes
+        # which can be a mutable buffer even if the original numpy array
+        # was readonly.
+        a.flags.writeable = False
+    return a.T if transpose else a
+
+
+def _reduce_ndarray(a):
+    """Memoryview based reducer for numpy arrays
+
+    Note that this reducer is only used under Python 3 as it is not possible
+    to rebuild a numpy array from a memoryview under Python 2.
+    """
+    transpose = False
+    if a.flags.f_contiguous:
+        # Transposing a F-contiguous array makes it possible to take
+        # a C-contiguous memoryview of it so as to benefit from nocopy
+        # semantics. The array will be transposed by to its original layout
+        # at unpickling time by array_builder.
+        a = a.T
+        transpose = True
+    elif not a.flags.c_contiguous:
+        # Make a copy to be able to extract a contiguous memoryview.
+        a = np.ascontiguousarray(a)
+    return _np_array_builder, (memoryview(a), a.dtype, a.shape, transpose,
+                               a.flags.writeable)
 
 
 class _Framer:
@@ -424,7 +469,15 @@ class _Framer:
 
 class CloudPickler(Pickler):
 
+    # Lookup table for save_*(self, obj) methods with access to the pickler.
     dispatch = Pickler.dispatch.copy()
+
+    # Custom reducers (without access to the pickler): only used in Python 3
+    dispatch_table = pickle.dispatch_table.copy()
+
+    # Register a reducer for numpy arrays by default.
+    if np is not None:
+        dispatch_table[np.ndarray] = _reduce_ndarray
 
     def __init__(self, file, protocol=None):
         if protocol is None:

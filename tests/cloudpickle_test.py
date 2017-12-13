@@ -141,6 +141,15 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(cloned.tobytes(), buffer_obj.tobytes())
         assert cloned.readonly
 
+    def test_empty_memoryview(self):
+        for view in [memoryview(b""), memoryview(b"hello")[1:1]]:
+            assert view.readonly
+            cloned = pickle_depickle(view, protocol=self.protocol)
+            self.assertEqual(cloned.tobytes(), view.tobytes())
+            assert cloned.readonly
+            assert cloned.shape == (0,)
+            assert cloned.format == 'B'
+
     @pytest.mark.skipif(sys.version_info < (3, 4),
                         reason="array does not implement the buffer protocol")
     def test_memoryview_from_integer_array(self):
@@ -225,6 +234,53 @@ class CloudPickleTest(unittest.TestCase):
                 # Cloned view is always C contiguous irrespective of
                 # the original view contiguity and layout (C vs Fortran).
                 assert cloned_view.c_contiguous
+
+    def test_numpy_arrays(self):
+        # Check that numpy arrays with various memory layouts are properly
+        # handled. Note that the fact that this can be done without additional
+        # memory copies depends on the Python version, implementation and
+        # contiguity of the original aray. Checking nocopy semantics are not
+        # the goal of this test but are instead addressed in separate,
+        # implementation specific tests.
+        np = pytest.importorskip("numpy")
+        arrays = [
+            np.arange(12).reshape(3, 4),
+            np.arange(12).reshape(3, 2, 2),
+            np.arange(12000).reshape(3000, 4).astype(np.float32),
+            np.asfortranarray(np.arange(12).reshape(3, 4)),
+            np.arange(12).reshape(3, 4)[:, 1:-1],
+            np.arange(12).reshape(3, 4)[1:-1, :],
+            np.asfortranarray(np.arange(12).reshape(3, 4))[:, 1:-1],
+            np.asfortranarray(np.arange(12).reshape(3, 4))[1:-1, :],
+            np.array([]),
+            np.array(1),
+            np.array(1)[()],
+        ]
+        readonly_arrays = []
+        for a in arrays:
+            try:
+                a = a.copy()
+                a.flags.writeable = False
+                readonly_arrays.append(a)
+            except ValueError:
+                # Cannot set flags on array scalars.
+                pass
+        arrays += readonly_arrays
+
+        for original in arrays:
+            cloned = pickle_depickle(original, protocol=self.protocol)
+            assert original.dtype == cloned.dtype
+            assert original.shape == cloned.shape
+            np.testing.assert_array_equal(original, cloned)
+
+            if original.flags.f_contiguous:
+                assert cloned.flags.f_contiguous
+            else:
+                assert cloned.flags.c_contiguous
+            if sys.version_info[0] > 2:
+                # Under Python 2, the non-optimized reducer of numpy is used
+                # and it does not preserve the writeable flag.
+                assert original.flags.writeable == cloned.flags.writeable
 
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
@@ -1049,24 +1105,6 @@ def test_nocopy_pydata():
         (csr, csr.indptr.nbytes + csr.indices.nbytes + csr.data.nbytes),
     ]
 
-    def array_builder(buffer, dtype, shape, transpose):
-        a = np.lib.stride_tricks.as_strided(
-            np.frombuffer(buffer, dtype), shape=shape)
-        return a.T if transpose else a
-
-    def reduce_ndarray(a):
-        """Memoryview based reducer for numpy arrays"""
-        if a.flags.f_contiguous:
-            # Transposing a F-contiguous array makes it possible to take
-            # a C-contiguous memoryview of it so as to benefit from nocopy
-            # semantics. The array will be transposed by to its original layout
-            # at unpickling time by array_builder.
-            a = a.T
-            transpose = True
-        else:
-            transpose = False
-        return array_builder, (memoryview(a), a.dtype, a.shape, transpose)
-
     class ChunksAppender:
 
         def __init__(self):
@@ -1086,14 +1124,11 @@ def test_nocopy_pydata():
 
     for obj, size in large_pydata_objects:
         appender = ChunksAppender()
-        pickler = cloudpickle.CloudPickler(appender)
-        pickler.dispatch_table = pickle.dispatch_table.copy()
-        pickler.dispatch_table[np.ndarray] = reduce_ndarray
 
         # Check that pickling does not make any memory copy of the large data
         # buffer of the pandas dataframe:
         with PeakMemoryMonitor() as monitor:
-            pickler.dump(obj)
+            cloudpickle.dump(obj, appender)
 
         assert monitor.newly_allocated < mem_tol
 
