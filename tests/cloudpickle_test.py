@@ -47,6 +47,15 @@ from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
 
 
+class RaiserOnPickle(object):
+
+    def __init__(self, exc):
+        self.exc = exc
+
+    def __reduce__(self):
+        raise self.exc
+
+
 def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
     """Helper function to test whether object pickled with cloudpickle can be
     depickled with pickle
@@ -861,6 +870,12 @@ class CloudPickleTest(unittest.TestCase):
             b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13U\x08__main__q'
             b'\x14NtR.')
         self.assertEquals(42, cloudpickle.loads(pickled)(42))
+
+    def test_pickle_reraise(self):
+        for exc_type in [Exception, ValueError, TypeError, RuntimeError]:
+            obj = RaiserOnPickle(exc_type("foo"))
+            with pytest.raises((exc_type, pickle.PicklingError)):
+                cloudpickle.dumps(obj)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
