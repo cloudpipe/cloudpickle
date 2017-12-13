@@ -434,7 +434,10 @@ class CloudPickler(Pickler):
             if isinstance(x, types.ModuleType) and hasattr(x, '__package__') and x.__package__:
                 # check if the package has any currently loaded sub-imports
                 prefix = x.__name__ + '.'
-                for name, module in sys.modules.items():
+                # A concurrent thread could mutate sys.modules,
+                # make sure we iterate over a copy to avoid exceptions
+                modules = sys.modules.copy()
+                for name, module in modules.items():
                     # Older versions of pytest will add a "None" module to sys.modules.
                     if name is not None and name.startswith(prefix):
                         # check whether the function can address the sub-module
