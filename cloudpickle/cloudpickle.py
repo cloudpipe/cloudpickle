@@ -436,15 +436,14 @@ class CloudPickler(Pickler):
                 prefix = x.__name__ + '.'
                 # A concurrent thread could mutate sys.modules,
                 # make sure we iterate over a copy to avoid exceptions
-                modules = sys.modules.copy()
-                for name, module in modules.items():
+                for name in list(sys.modules):
                     # Older versions of pytest will add a "None" module to sys.modules.
                     if name is not None and name.startswith(prefix):
                         # check whether the function can address the sub-module
                         tokens = set(name[len(prefix):].split('.'))
                         if not tokens - set(code.co_names):
                             # ensure unpickler executes this import
-                            self.save(module)
+                            self.save(sys.modules[name])
                             # then discards the reference to it
                             self.write(pickle.POP)
 
