@@ -835,6 +835,12 @@ class CloudPickleTest(unittest.TestCase):
             with pytest.raises((exc_type, pickle.PicklingError)):
                 cloudpickle.dumps(obj)
 
+    def test_unhashable_function(self):
+        d = {'a': 1}
+        depickled_method = pickle_depickle(d.get)
+        self.assertEquals(depickled_method('a'), 1)
+        self.assertEquals(depickled_method('b'), None)
+
 
 if __name__ == '__main__':
     unittest.main()
