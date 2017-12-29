@@ -1,5 +1,6 @@
 from __future__ import division
 
+import array
 import abc
 import collections
 import base64
@@ -45,6 +46,7 @@ from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
+from .testutils import PeakMemoryMonitor
 
 
 class RaiserOnPickle(object):
@@ -143,6 +145,35 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_memoryview(self):
         buffer_obj = memoryview(b"Hello")
+        assert buffer_obj.readonly
+        cloned = pickle_depickle(buffer_obj, protocol=self.protocol)
+        self.assertEqual(cloned.tobytes(), buffer_obj.tobytes())
+        assert cloned.readonly
+
+    def test_empty_memoryview(self):
+        for view in [memoryview(b""), memoryview(b"hello")[1:1]]:
+            assert view.readonly
+            cloned = pickle_depickle(view, protocol=self.protocol)
+            self.assertEqual(cloned.tobytes(), view.tobytes())
+            assert cloned.readonly
+            assert cloned.shape == (0,)
+            assert cloned.format == 'B'
+
+    @pytest.mark.skipif(sys.version_info < (3, 4),
+                        reason="array does not implement the buffer protocol")
+    def test_memoryview_from_integer_array(self):
+        buffer_obj = memoryview(array.array('l', range(12)))
+        assert buffer_obj.format == 'l'
+        cloned = pickle_depickle(buffer_obj, protocol=self.protocol)
+        self.assertEqual(cloned.tobytes(), buffer_obj.tobytes())
+        assert not cloned.readonly
+
+        if sys.version_info >= (3, 5):
+            # Python 3.4 is affected by https://bugs.python.org/issue19803
+            assert cloned.format == 'l'
+
+    def test_large_memoryview(self):
+        buffer_obj = memoryview(b"Hello!" * int(1e7))
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
@@ -150,14 +181,115 @@ class CloudPickleTest(unittest.TestCase):
                         reason="non-contiguous memoryview not implemented in "
                                "old Python versions")
     def test_sliced_and_non_contiguous_memoryview(self):
+        # Small view
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
-    def test_large_memoryview(self):
-        buffer_obj = memoryview(b"Hello!" * int(1e7))
+        # Large view
+        buffer_obj = memoryview(b"Hello!" * int(1e7))[2:int(1e7):2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
+
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                        reason="cast is broken on PyPy < 5.9.0")
+    def test_complex_memoryviews(self):
+        # Use numpy to generate complex memory layouts to be able to test the
+        # preservation of all memoryview attributes. Note that cloudpickle
+        # does not guarantee nocopy semantics for all of those cases but
+        # it should reconstruct the same memory layout in any-case.
+        np = pytest.importorskip("numpy")
+        arrays = [
+            np.arange(12).reshape(3, 4),
+            np.arange(12000).reshape(3000, 4).astype(np.float32),
+        ]
+        if cloudpickle.PY3:
+            # There is a bug when calling .tobytes() on non-c-contiguous numpy
+            # memoryviews under Python 2.7.
+            arrays += [
+                np.asfortranarray(np.arange(12).reshape(3, 4)),
+                np.arange(12).reshape(3, 4)[:, 1:-1],
+                np.arange(12).reshape(3, 4)[1:-1, :],
+                np.asfortranarray(np.arange(12).reshape(3, 4))[:, 1:-1],
+                np.asfortranarray(np.arange(12).reshape(3, 4))[1:-1, :],
+            ]
+        readonly_arrays = []
+        for a in arrays:
+            a = a.copy()
+            a.flags.writeable = False
+            readonly_arrays.append(a)
+        arrays += readonly_arrays
+
+        for a in arrays:
+            readonly = not a.flags.writeable
+            original_view = memoryview(a)
+            cloned_view = pickle_depickle(original_view,
+                                          protocol=self.protocol)
+            assert original_view.readonly == readonly
+            assert original_view.readonly == cloned_view.readonly
+
+            if (cloudpickle.PY_MAJOR_MINOR > (3, 4)
+                    or (cloudpickle.PY_MAJOR_MINOR == (3, 4) and readonly)):
+                # Python 2.7 does not support casting memoryviews.
+                # Python 3.4 has a bug that prevents casting when the buffer
+                # is backed by a ctypes array.
+                assert original_view.format == cloned_view.format
+                assert original_view.shape == cloned_view.shape
+
+            assert original_view.tobytes() == cloned_view.tobytes()
+
+            if (cloudpickle.PY_MAJOR_MINOR >= (3, 4)
+                    and platform.python_implementation() != 'PyPy'):
+                # Cloned view is always C contiguous irrespective of
+                # the original view contiguity and layout (C vs Fortran).
+                assert cloned_view.c_contiguous
+
+    def test_numpy_arrays(self):
+        # Check that numpy arrays with various memory layouts are properly
+        # handled. Note that the fact that this can be done without additional
+        # memory copies depends on the Python version, implementation and
+        # contiguity of the original aray. Checking nocopy semantics are not
+        # the goal of this test but are instead addressed in separate,
+        # implementation specific tests.
+        np = pytest.importorskip("numpy")
+        arrays = [
+            np.arange(12).reshape(3, 4),
+            np.arange(12).reshape(3, 2, 2),
+            np.arange(12000).reshape(3000, 4).astype(np.float32),
+            np.asfortranarray(np.arange(12).reshape(3, 4)),
+            np.arange(12).reshape(3, 4)[:, 1:-1],
+            np.arange(12).reshape(3, 4)[1:-1, :],
+            np.asfortranarray(np.arange(12).reshape(3, 4))[:, 1:-1],
+            np.asfortranarray(np.arange(12).reshape(3, 4))[1:-1, :],
+            np.array([]),
+            np.array(1),
+            np.array(1)[()],
+        ]
+        readonly_arrays = []
+        for a in arrays:
+            try:
+                a = a.copy()
+                a.flags.writeable = False
+                readonly_arrays.append(a)
+            except ValueError:
+                # Cannot set flags on array scalars.
+                pass
+        arrays += readonly_arrays
+
+        for original in arrays:
+            cloned = pickle_depickle(original, protocol=self.protocol)
+            assert original.dtype == cloned.dtype
+            assert original.shape == cloned.shape
+            np.testing.assert_array_equal(original, cloned)
+
+            if original.flags.f_contiguous:
+                assert cloned.flags.f_contiguous
+            else:
+                assert cloned.flags.c_contiguous
+            if sys.version_info[0] > 2:
+                # Under Python 2, the non-optimized reducer of numpy is used
+                # and it does not preserve the writeable flag.
+                assert original.flags.writeable == cloned.flags.writeable
 
     def test_lambda(self):
         self.assertEqual(pickle_depickle(lambda: 1)(), 1)
@@ -889,5 +1021,150 @@ class Protocol2CloudPickleTest(CloudPickleTest):
     protocol = 2
 
 
-if __name__ == '__main__':
-    unittest.main()
+@pytest.mark.skipif(sys.version_info[:2] < (3, 4),
+                    reason="nocopy memoryview only supported on Python 3.4+")
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                    reason="memoryview.c_contiguous is missing")
+def test_nocopy_readonly_bytes(tmpdir):
+    tmpfile = str(tmpdir.join('biggish.pkl'))
+    mem_tol = int(5e7)  # 50 MB
+    size = int(5e8)  # 500 MB
+    biggish_data_bytes = b'0' * size
+    biggish_data_view = memoryview(biggish_data_bytes)
+    for biggish_data in [biggish_data_bytes, biggish_data_view]:
+        with open(tmpfile, 'wb') as f:
+            with PeakMemoryMonitor() as monitor:
+                cloudpickle.dump(biggish_data, f)
+
+        # Check that temporary datastructures used when dumping are no
+        # larger than 100 MB which is much smaller than the bytes to be
+        # pickled.
+        assert monitor.base_mem > size
+        assert monitor.newly_allocated < mem_tol
+
+        with open(tmpfile, 'rb') as f:
+            with PeakMemoryMonitor() as monitor:
+                # C-based pickle.load allocates a temporary variable on Python
+                # 3.5 and 3.6 while the Python-based pickle._load
+                # implementation does not have this problem
+                reconstructed = pickle._load(f)
+
+        # Check that loading does not make a memory copy (it allocates)
+        # a single binary buffer
+        assert size - mem_tol < monitor.newly_allocated < size + mem_tol
+
+        assert len(reconstructed) == size
+        if biggish_data is biggish_data_bytes:
+            assert reconstructed == biggish_data_bytes
+        else:
+            assert reconstructed.readonly
+            assert reconstructed.format == biggish_data_view.format
+            assert reconstructed.tobytes() == biggish_data_bytes
+
+
+@pytest.mark.skipif(sys.version_info[:2] < (3, 5),
+                    reason="nocopy writable memoryview only supported on "
+                           "Python 3.5+")
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                    reason="memoryview.c_contiguous is missing")
+def test_nocopy_writable_memoryview(tmpdir):
+    tmpfile = str(tmpdir.join('biggish.pkl'))
+    mem_tol = int(5e7)  # 50 MB
+    size = int(5e8)  # 500 MB
+    biggish_array = array.array('l', range(size // 8))
+    biggish_array_view = memoryview(biggish_array)
+    assert not biggish_array_view.readonly
+
+    with open(tmpfile, 'wb') as f:
+        with PeakMemoryMonitor() as monitor:
+            cloudpickle.dump(biggish_array_view, f)
+
+    # Check that temporary datastructures used when dumping are no
+    # larger than 100 MB which is much smaller than the bytes to be
+    # pickled.
+    assert monitor.base_mem > size
+    assert monitor.newly_allocated < mem_tol
+
+    with open(tmpfile, 'rb') as f:
+        with PeakMemoryMonitor() as monitor:
+            # C-based pickle.load allocates a temporary variable on Python 3.5
+            # and 3.6 while the Python-based pickle._load implementation does
+            # not have this problem
+            reconstructed = pickle._load(f)
+
+    # Check that loading does not make a memory copy (it allocates)
+    # a single binary buffer
+    assert size - mem_tol < monitor.newly_allocated < size + mem_tol
+
+    assert reconstructed.nbytes == size
+    assert not reconstructed.readonly
+    assert reconstructed.format == biggish_array_view.format
+    assert reconstructed == biggish_array_view
+
+
+@pytest.mark.skipif(sys.version_info[:2] < (3, 5),
+                    reason="nocopy writable memoryview only supported on "
+                           "Python 3.5+")
+@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                    reason="memoryview.c_contiguous is missing")
+def test_nocopy_pydata():
+    np = pytest.importorskip("numpy")
+    pd = pytest.importorskip("pandas")
+    sp = pytest.importorskip("scipy.sparse")
+
+    mem_tol = 50e6  # 50 MB
+    shape = (int(2e5), 100)
+    data = np.arange(np.prod(shape)).reshape(shape)
+    data_with_zeros = data.copy()
+    data_with_zeros[::2] = 0
+    csr = sp.csr_matrix(data_with_zeros)
+
+    large_pydata_objects = [
+        (data, data.nbytes),  # 160 MB
+        (data.T, data.nbytes),
+        (pd.DataFrame(data), data.nbytes),
+        (csr, csr.indptr.nbytes + csr.indices.nbytes + csr.data.nbytes),
+    ]
+
+    class ChunksAppender:
+
+        def __init__(self):
+            self.raw_chunks = []
+
+        def write(self, data):
+            # Append reference to raw chunks without triggering any memory
+            # copy. The bytes will be consumed in a delayed manner after the
+            # end of the pickling process by the call to materialize.
+            self.raw_chunks.append(data)
+
+        def materialize(self):
+            # Concatenate all memoryview and bytes chunks into a single
+            # bytes object make many memory copies along the way.
+            return b"".join([c.tobytes() if hasattr(c, 'tobytes') else c
+                             for c in self.raw_chunks])
+
+    for obj, size in large_pydata_objects:
+        appender = ChunksAppender()
+
+        # Check that pickling does not make any memory copy of the large data
+        # buffer of the pandas dataframe:
+        with PeakMemoryMonitor() as monitor:
+            cloudpickle.dump(obj, appender)
+
+        assert monitor.newly_allocated < mem_tol
+
+        pickled = appender.materialize()
+        assert size - mem_tol < len(pickled) < size + mem_tol
+
+        with PeakMemoryMonitor() as monitor:
+            cloned_obj = pickle._loads(pickled)
+
+        # Check that loading does not make a memory copy (it allocates)
+        # a single binary buffer
+        assert size - mem_tol < monitor.newly_allocated < size + mem_tol
+        if sp.issparse(obj):
+            np.testing.assert_array_equal(obj.toarray(), cloned_obj.toarray())
+        elif isinstance(obj, pd.DataFrame):
+            np.testing.assert_array_equal(obj.values, cloned_obj.values)
+        else:
+            np.testing.assert_array_equal(obj, cloned_obj)

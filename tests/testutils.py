@@ -3,9 +3,12 @@ import os
 import os.path as op
 import tempfile
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
+import gc
+import multiprocessing as mp
 
 from cloudpickle import dumps
 from pickle import loads
+import pytest
 
 try:
     from suprocess import TimeoutExpired
@@ -108,6 +111,57 @@ def assert_run_python_script(source_code, timeout=5):
                                % e.output.decode('utf-8'))
     finally:
         os.unlink(source_file)
+
+
+def monitor_worker(pid, queue, started_event, stop_event, delay=0.010):
+    import psutil
+    p = psutil.Process(pid)
+    peak = 0
+
+    def make_measurement(peak):
+        mem = p.memory_info().rss
+        if mem > peak:
+            peak = mem
+        return peak
+
+    peak = make_measurement(peak)
+    started_event.set()
+
+    # Make measurements every 'delay' seconds until we receive the stop event:
+    while not stop_event.wait(timeout=delay):
+        peak = make_measurement(peak)
+
+    # Make one last measurement in case memory has increased just before
+    # receiving the stop event:
+    peak = make_measurement(peak)
+    queue.put(peak)
+
+
+class PeakMemoryMonitor:
+
+    def __enter__(self):
+        psutil = pytest.importorskip("psutil")
+        pid = os.getpid()
+        gc.collect()
+        self.queue = q = mp.Queue()
+        e_started = mp.Event()
+        self.stop_event = e_stop = mp.Event()
+        self.worker = mp.Process(target=monitor_worker,
+                                 args=(pid, q, e_started, e_stop))
+        self.worker.start()
+        e_started.wait()
+        self.base_mem = psutil.Process(pid).memory_info().rss
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.stop_event.set()
+        if exc_type is not None:
+            self.worker.terminate()
+            return False
+        else:
+            self.peak_mem = self.queue.get()
+            self.newly_allocated = self.peak_mem - self.base_mem
+            return True
 
 
 if __name__ == '__main__':

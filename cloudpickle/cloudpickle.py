@@ -42,6 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
+import codecs
+import ctypes
 import dis
 from functools import partial
 import imp
@@ -50,21 +52,30 @@ import itertools
 import logging
 import opcode
 import operator
+import platform
 import pickle
-import struct
+from struct import pack
 import sys
 import traceback
 import types
 import weakref
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+
+RUNNING_CPYTHON = platform.python_implementation() == 'CPython'
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
+PY_MAJOR_MINOR = sys.version_info[:2]
 
-if sys.version < '3':
+if PY_MAJOR_MINOR[0] < 3:
     from pickle import Pickler
     try:
         from cStringIO import StringIO
@@ -249,9 +260,224 @@ else:
                 yield op, instr.arg
 
 
+class _Py2StrStruct(ctypes.Structure):
+    """Map the memory layout of a CPython 2 str to access its interned state"""
+    _fields_ = [
+        ("ob_refcnt", ctypes.c_long),
+        ("ob_type", ctypes.c_void_p),
+        ("ob_size", ctypes.c_ulong),
+        ('ob_shash', ctypes.c_long),
+        ('ob_sstate', ctypes.c_int),
+        ('ob_sval', ctypes.c_char),
+    ]
+
+    def is_interned(self):
+        return self.ob_sstate != 0
+
+
+def _is_safe_to_mutate(data_holder):
+    """Helper function, see _memoryview_from_bytes for details."""
+    if not RUNNING_CPYTHON:
+        # sys.getrefcount and ob_sstate are not always available on other
+        # platforms (e.g. PyPy): better be conservative.
+        return False
+
+    # If the following call to sys.getrefcount returns 2, it means that there
+    # is one reference from data_holder and one from the temporary arguments
+    # datastructure of the sys.getrefcount call. It is therefore safe to reuse
+    # the memory buffer of the bytes object as writeable buffer to back the
+    # memoryview: this buffer is no longer reachable from anywhere else.
+    safe_to_mutate = sys.getrefcount(data_holder[0]) <= 2
+    data = data_holder[0]
+    if safe_to_mutate and isinstance(data, str):
+        # Python 2 str instances are bytes that can be interned, make sure
+        # that this is not the case.
+        safe_to_mutate = not _Py2StrStruct.from_address(id(data)).is_interned()
+    return safe_to_mutate
+
+
+def _memoryview_from_bytes(data_holder, format, readonly, shape, **kwargs):
+    """Build a memoryview from raw bytes read from the pickle stream
+
+    This function tries its best not to allocate any extra memory when not
+    necessary.
+
+    The actual data is provided in a data_holder which is expected to be a
+    single item list holding the actual bytes object. This makes it easier to
+    use sys.getrefcount to detect whether or not the bytes are referenced
+    elsewhere or not.
+
+    If readonly is False and the backing bytes in data_holder are referenced
+    from other objects, then the bytes contents are copied into a newly
+    allocated mutable buffer. Otherwise the memory allocated for the bytes
+    object is directly reused by the new memoryview.
+
+    CPython 2 str buffers can be interned. This method introspect the ob_sstate
+    field to check if it is the case or not. If the buffer is interned a new
+    read-write buffer is allocated to ensure safety.
+
+    Python 2 memoryviews doe not support being cast so that the format and
+    shape parameters are ignored.
+
+    Reference counting cannot be used in PyPy to detect if it is safe to mutate
+    the bytes object. If readonly is False, a new mutable buffer is always
+    allocated.
+
+    **kwargs are left ignored. Those are used to add flexibility to implement
+    backward compatible changes in future versions of cloudpickle.
+    """
+    safe_to_mutate = _is_safe_to_mutate(data_holder)
+    data = data_holder[0]
+    del data_holder[:]
+    if readonly:
+        # A memoryview of a bytes object is readonly by default.
+        view = memoryview(data)
+    else:
+        # Python 3.4 implementation of memoryviews backed by ctypes buffers
+        # has a bug: # https://bugs.python.org/issue19803
+        if safe_to_mutate and PY_MAJOR_MINOR != (3, 4):
+            buffer = ctypes.cast(data, ctypes.POINTER(ctypes.c_char))
+            addr = ctypes.addressof(buffer.contents)
+            array = (ctypes.c_char * len(data)).from_address(addr)
+            # Store a reference to the backing bytes object to make GC work
+            # correctly. We hide the object itself in a closure to prevent
+            # unsuspecting users to access it.
+
+            def _hidden_buffer_ref():
+                raise TypeError("Access to mutable buffer with id %d is unsafe"
+                                % id(data))
+            array._hidden_buffer_ref = _hidden_buffer_ref
+            view = memoryview(array)
+        else:
+            # This buffer can be referenced by external objects: for instance
+            # empty and single bytes objects are interned under Python 3.
+            # Longer bytes objects in Python (from the str type) can also be
+            # interned. Force a copy into a new mutable buffer to avoid a
+            # violation of the imnmutability of bytes.
+            view = memoryview(bytearray(data))
+
+    if PY_MAJOR_MINOR >= (3, 4):
+        if len(data) > 0:
+            return view.cast('B').cast(format, shape)
+        else:
+            return view.cast('B').cast(format)
+    else:
+        # Python 2.7 does not support casting.
+        return view
+
+
+def _np_array_builder(buffer, dtype, shape, transpose, writeable, **kwargs):
+    """Rebuild a numpy array from raw bytes & metadata
+
+    kwargs is ignored. It gives flexibility to implement backward compatible
+    changes in future versions of cloudpickle.
+    """
+    a = np.lib.stride_tricks.as_strided(
+        np.frombuffer(buffer, dtype), shape=shape)
+    if writeable is False:
+        # buffer is expected to be reconstructed by _memoryview_from_bytes
+        # which can be a mutable buffer even if the original numpy array
+        # was readonly.
+        a.flags.writeable = False
+    return a.T if transpose else a
+
+
+def _reduce_ndarray(a):
+    """Memoryview based reducer for numpy arrays
+
+    Note that this reducer is only used under Python 3 as it is not possible
+    to rebuild a numpy array from a memoryview under Python 2.
+    """
+    transpose = False
+    if a.flags.f_contiguous:
+        # Transposing a F-contiguous array makes it possible to take
+        # a C-contiguous memoryview of it so as to benefit from nocopy
+        # semantics. The array will be transposed by to its original layout
+        # at unpickling time by array_builder.
+        a = a.T
+        transpose = True
+    elif not a.flags.c_contiguous:
+        # Make a copy to be able to extract a contiguous memoryview.
+        a = np.ascontiguousarray(a)
+    return _np_array_builder, (memoryview(a), a.dtype, a.shape, transpose,
+                               a.flags.writeable)
+
+
+class _Framer:
+    """Backport of Python 3.7 framer"""
+
+    _FRAME_SIZE_TARGET = 64 * 1024
+
+    def __init__(self, file_write):
+        self.file_write = file_write
+        self.current_frame = None
+
+    def start_framing(self):
+        self.current_frame = io.BytesIO()
+
+    def end_framing(self):
+        if self.current_frame and self.current_frame.tell() > 0:
+            self.commit_frame(force=True)
+            self.current_frame = None
+
+    def commit_frame(self, force=False):
+        if self.current_frame:
+            f = self.current_frame
+            if f.tell() >= self._FRAME_SIZE_TARGET or force:
+                data = f.getbuffer()
+                write = self.file_write
+                # Issue a single call to the write nethod of the underlying
+                # file object for the frame opcode with the size of the
+                # frame. The concatenation is expected to be less expensive
+                # than issuing an additional call to write.
+                write(pickle.FRAME + pack("<Q", len(data)))
+
+                # Issue a separate call to write to append the frame
+                # contents without concatenation to the above to avoid a
+                # memory copy.
+                write(data)
+
+                # Start the new frame with a new io.BytesIO instance so that
+                # the file object can have delayed access to the previous frame
+                # contents via an unreleased memoryview of the previous
+                # io.BytesIO instance.
+                self.current_frame = io.BytesIO()
+
+    def write(self, data):
+        if self.current_frame:
+            return self.current_frame.write(data)
+        else:
+            return self.file_write(data)
+
+    def write_large_bytes(self, header, payload):
+        write = self.file_write
+        if self.current_frame:
+            # Terminate the current frame and flush it to the file.
+            self.commit_frame(force=True)
+
+        # Perform direct write of the header and payload of the large binary
+        # object. Be careful not to concatenate the header and the payload
+        # prior to calling 'write' as we do not want to allocate a large
+        # temporary bytes object.
+        # We intentionally do not insert a protocol 4 frame opcode to make it
+        # possible to optimize file.read calls in the loader and pass the
+        # resulting bytes as a preallocated data buffer for more complex
+        # datastructures such as memoryviews or numpy arrays.
+        write(header)
+        write(payload)
+
+
 class CloudPickler(Pickler):
 
+    # Lookup table for save_*(self, obj) methods with access to the pickler.
     dispatch = Pickler.dispatch.copy()
+
+    # Custom reducers (without access to the pickler): only used in Python 3
+    dispatch_table = pickle.dispatch_table.copy()
+
+    # Register a reducer for numpy arrays by default.
+    if np is not None:
+        dispatch_table[np.ndarray] = _reduce_ndarray
 
     def __init__(self, file, protocol=None):
         if protocol is None:
@@ -261,6 +487,12 @@ class CloudPickler(Pickler):
         self.modules = set()
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
+
+        # Override the framer backport support for no-copy write of large
+        # binary data
+        self.framer = _Framer(file.write)
+        self.write = self.framer.write
+        self._write_large_bytes = self.framer.write_large_bytes
 
     def dump(self, obj):
         self.inject_addons()
@@ -273,8 +505,54 @@ class CloudPickler(Pickler):
             else:
                 raise
 
+    if PY3:
+        def save_bytes(self, obj, skip_memoize=False):
+            if self.proto < 3:
+                if not obj:  # bytes object is empty
+                    self.save_reduce(bytes, (), obj=obj)
+                else:
+                    self.save_reduce(codecs.encode,
+                                     (str(obj, 'latin1'), 'latin1'), obj=obj)
+                return
+            n = getattr(obj, 'nbytes', len(obj))
+            if n <= 0xff:
+                self.write(pickle.SHORT_BINBYTES + pack("<B", n) + obj)
+            elif n > 0xffffffff and self.proto >= 4:
+                self._write_large_bytes(pickle.BINBYTES8 + pack("<Q", n), obj)
+            elif n >= self.framer._FRAME_SIZE_TARGET:
+                self._write_large_bytes(pickle.BINBYTES + pack("<I", n), obj)
+            else:
+                self.write(pickle.BINBYTES + pack("<I", n) + obj)
+            if not skip_memoize:
+                self.memoize(obj)
+        dispatch[bytes] = save_bytes
+
     def save_memoryview(self, obj):
-        self.save(obj.tobytes())
+        # Python 2 views doe not have nbytes
+        n = getattr(obj, 'nbytes', len(obj))
+        self.save(_memoryview_from_bytes)
+        self.write(pickle.MARK)
+        # wrap bytes buffer in a singleton list that is expected to hold
+        # the only reference to the bytes obj when unpickling.
+        self.write(pickle.MARK)
+        c_contiguous = getattr(obj, 'c_contiguous', False)
+        if n <= 0xff or self.proto < 3 or not c_contiguous:
+            # Make a contiguous copy as a bytes object prior to serialization.
+            # TODO: find a way to disable memoization in this case. Memoization
+            # will prevent _memoryview_from_bytes to ensure safe mutability
+            # via reference counting.
+            self.save(obj.tobytes())
+        else:
+            # Large contiguous views can benefit from nocopy semantics with
+            # recent versions of the pickle protocol.
+            self.save_bytes(obj, skip_memoize=True)
+        self.write(pickle.LIST)  # data_holder
+        self.save(obj.format)
+        self.save(obj.readonly)
+        self.save(obj.shape)
+        self.write(pickle.TUPLE)
+        self.write(pickle.REDUCE)
+        self.memoize(obj)
     dispatch[memoryview] = save_memoryview
 
     if not PY3:
@@ -635,7 +913,7 @@ class CloudPickler(Pickler):
         return self.save_function(obj)
     dispatch[types.BuiltinFunctionType] = save_builtin_function
 
-    def save_global(self, obj, name=None, pack=struct.pack):
+    def save_global(self, obj, name=None, pack=pack):
         """
         Save a "global".
 

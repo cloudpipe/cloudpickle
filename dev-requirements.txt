@@ -2,5 +2,11 @@
 pytest
 pytest-cov
 mock
+psutil
 # Code coverage uploader for Travis:
 codecov
+
+# nocopy tests with pydata libraries
+numpy
+pandas; platform_python_implementation != "PyPy" and python_version >= '3.5'
+scipy; platform_python_implementation != "PyPy" and python_version >= '3.5'
