@@ -163,7 +163,7 @@ def cell_set(cell, value):
     )(value)
 
 
-#relevant opcodes
+# relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
 DELETE_GLOBAL = opcode.opmap['DELETE_GLOBAL']
 LOAD_GLOBAL = opcode.opmap['LOAD_GLOBAL']
@@ -173,7 +173,7 @@ EXTENDED_ARG = dis.EXTENDED_ARG
 
 
 def islambda(func):
-    return getattr(func,'__name__') == '<lambda>'
+    return getattr(func, '__name__') == '<lambda>'
 
 
 _BUILTIN_TYPE_NAMES = {}
@@ -275,15 +275,18 @@ class CloudPickler(Pickler):
 
     def save_memoryview(self, obj):
         self.save(obj.tobytes())
+
     dispatch[memoryview] = save_memoryview
 
     if not PY3:
         def save_buffer(self, obj):
             self.save(str(obj))
+
         dispatch[buffer] = save_buffer
 
     def save_unsupported(self, obj):
         raise pickle.PicklingError("Cannot pickle objects of type %s" % type(obj))
+
     dispatch[types.GeneratorType] = save_unsupported
 
     # itertools objects do not pickle!
@@ -311,6 +314,7 @@ class CloudPickler(Pickler):
             self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)), obj=obj)
         else:
             self.save_reduce(subimport, (obj.__name__,), obj=obj)
+
     dispatch[types.ModuleType] = save_module
 
     def save_codeobject(self, obj):
@@ -331,6 +335,7 @@ class CloudPickler(Pickler):
                 obj.co_firstlineno, obj.co_lnotab, obj.co_freevars, obj.co_cellvars
             )
         self.save_reduce(types.CodeType, args, obj=obj)
+
     dispatch[types.CodeType] = save_codeobject
 
     def save_function(self, obj, name=None):
@@ -428,6 +433,7 @@ class CloudPickler(Pickler):
         else:
             write(pickle.GLOBAL + modname + '\n' + name + '\n')
             self.memoize(obj)
+
     dispatch[types.FunctionType] = save_function
 
     def _save_subimports(self, code, top_level_dependencies):
@@ -633,6 +639,7 @@ class CloudPickler(Pickler):
         if obj.__module__ == "__builtin__":
             return self.save_global(obj)
         return self.save_function(obj)
+
     dispatch[types.BuiltinFunctionType] = save_builtin_function
 
     def save_global(self, obj, name=None, pack=struct.pack):
@@ -671,7 +678,8 @@ class CloudPickler(Pickler):
                 self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
             else:
                 self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
-                         obj=obj)
+                                 obj=obj)
+
     dispatch[types.MethodType] = save_instancemethod
 
     def save_inst(self, obj):
@@ -725,11 +733,13 @@ class CloudPickler(Pickler):
     def save_property(self, obj):
         # properties not correctly saved in python
         self.save_reduce(property, (obj.fget, obj.fset, obj.fdel, obj.__doc__), obj=obj)
+
     dispatch[property] = save_property
 
     def save_classmethod(self, obj):
         orig_func = obj.__func__
         self.save_reduce(type(obj), (orig_func,), obj=obj)
+
     dispatch[classmethod] = save_classmethod
     dispatch[staticmethod] = save_classmethod
 
@@ -740,7 +750,7 @@ class CloudPickler(Pickler):
                 return item
         items = obj(Dummy())
         if not isinstance(items, tuple):
-            items = (items, )
+            items = (items,)
         return self.save_reduce(operator.itemgetter, items)
 
     if type(operator.itemgetter) is type:
@@ -771,16 +781,16 @@ class CloudPickler(Pickler):
     def save_file(self, obj):
         """Save a file"""
         try:
-            import StringIO as pystringIO #we can't use cStringIO as it lacks the name attribute
+            import StringIO as pystringIO  # we can't use cStringIO as it lacks the name attribute
         except ImportError:
             import io as pystringIO
 
-        if not hasattr(obj, 'name') or  not hasattr(obj, 'mode'):
+        if not hasattr(obj, 'name') or not hasattr(obj, 'mode'):
             raise pickle.PicklingError("Cannot pickle files that do not map to an actual file")
         if obj is sys.stdout:
-            return self.save_reduce(getattr, (sys,'stdout'), obj=obj)
+            return self.save_reduce(getattr, (sys, 'stdout'), obj=obj)
         if obj is sys.stderr:
-            return self.save_reduce(getattr, (sys,'stderr'), obj=obj)
+            return self.save_reduce(getattr, (sys, 'stderr'), obj=obj)
         if obj is sys.stdin:
             raise pickle.PicklingError("Cannot pickle standard input")
         if obj.closed:
@@ -938,7 +948,7 @@ def _modules_to_main(modList):
         if type(modname) is str:
             try:
                 mod = __import__(modname)
-            except Exception as e:
+            except Exception:
                 sys.stderr.write('warning: could not import %s\n.  '
                                  'Your function may unexpectedly error due to this import failing;'
                                  'A version mismatch is likely.  Specific error was:\n' % modname)
@@ -947,7 +957,7 @@ def _modules_to_main(modList):
                 setattr(main, mod.__name__, mod)
 
 
-#object generators:
+# object generators:
 def _genpartial(func, args, kwds):
     if not args:
         args = ()
@@ -955,8 +965,10 @@ def _genpartial(func, args, kwds):
         kwds = {}
     return partial(func, *args, **kwds)
 
+
 def _gen_ellipsis():
     return Ellipsis
+
 
 def _gen_not_implemented():
     return NotImplemented
@@ -1074,7 +1086,7 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
 def _find_module(mod_name):
     """
     Iterate over each part instead of calling imp.find_module directly.
-    This function is able to find submodules (e.g. sickit.tree)
+    This function is able to find submodules (e.g. scikit.tree)
     """
     path = None
     for part in mod_name.split('.'):
@@ -1085,8 +1097,10 @@ def _find_module(mod_name):
             file.close()
     return path, description
 
+
 """Constructors for 3rd party libraries
 Note: These can never be renamed due to client compatibility issues"""
+
 
 def _getobject(modname, attribute):
     mod = __import__(modname, fromlist=[attribute])
