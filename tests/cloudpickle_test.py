@@ -44,6 +44,7 @@ import cloudpickle
 from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
+from .testutils import assert_run_python_script
 
 
 HAVE_WEAKSET = hasattr(weakref, 'WeakSet')
@@ -766,30 +767,30 @@ class CloudPickleTest(unittest.TestCase):
         def f4(x):
             return foo.method(x)
 
-        cloned = subprocess_pickle_echo(lambda x: x**2, protocol={protocol})
+        cloned = subprocess_pickle_echo(lambda x: x**2)
         assert cloned(3) == 9
 
-        cloned = subprocess_pickle_echo(f0, protocol={protocol})
+        cloned = subprocess_pickle_echo(f0)
         assert cloned(3) == 9
 
-        cloned = subprocess_pickle_echo(Foo, protocol={protocol})
+        cloned = subprocess_pickle_echo(Foo)
         assert cloned().method(2) == Foo().method(2)
 
-        cloned = subprocess_pickle_echo(Foo(), protocol={protocol})
+        cloned = subprocess_pickle_echo(Foo())
         assert cloned.method(2) == Foo().method(2)
 
-        cloned = subprocess_pickle_echo(f1, protocol={protocol})
+        cloned = subprocess_pickle_echo(f1)
         assert cloned()().method('a') == f1()().method('a')
 
-        cloned = subprocess_pickle_echo(f2, protocol={protocol})
+        cloned = subprocess_pickle_echo(f2)
         assert cloned(2) == f2(2)
 
-        cloned = subprocess_pickle_echo(f3, protocol={protocol})
+        cloned = subprocess_pickle_echo(f3)
         assert cloned() == f3()
 
-        cloned = subprocess_pickle_echo(f4, protocol={protocol})
+        cloned = subprocess_pickle_echo(f4)
         assert cloned(2) == f4(2)
-        """.format(protocol=self.protocol)
+        """
         assert_run_python_script(textwrap.dedent(code))
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),

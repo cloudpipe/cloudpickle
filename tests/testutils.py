@@ -28,7 +28,7 @@ def subprocess_pickle_echo(input_data):
     [1, 'a', None]
 
     """
-    pickled_input_data = dumps(input_data, protocol=protocol)
+    pickled_input_data = dumps(input_data)
     cmd = [sys.executable, __file__]  # run then pickle_echo() in __main__
     cloudpickle_repo_folder = op.normpath(
         op.join(op.dirname(__file__), '..'))
