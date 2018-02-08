@@ -284,16 +284,6 @@ class CloudPickler(Pickler):
 
         dispatch[buffer] = save_buffer
 
-    def save_unsupported(self, obj):
-        raise pickle.PicklingError("Cannot pickle objects of type %s" % type(obj))
-
-    dispatch[types.GeneratorType] = save_unsupported
-
-    # itertools objects do not pickle!
-    for v in itertools.__dict__.values():
-        if type(v) is type:
-            dispatch[v] = save_unsupported
-
     def save_module(self, obj):
         """
         Save a module as an import

@@ -347,15 +347,6 @@ class CloudPickleTest(unittest.TestCase):
         else:  # skip if scipy is not available
             pass
 
-    def test_save_unsupported(self):
-        sio = StringIO()
-        pickler = cloudpickle.CloudPickler(sio, 2)
-
-        with pytest.raises(pickle.PicklingError) as excinfo:
-            pickler.save_unsupported("test")
-
-        assert "Cannot pickle objects of type" in str(excinfo.value)
-
     def test_loads_namespace(self):
         obj = 1, 2, 3, 4
         returned_obj = cloudpickle.loads(cloudpickle.dumps(obj))
@@ -882,6 +873,20 @@ class CloudPickleTest(unittest.TestCase):
         depickled_method = pickle_depickle(d.get)
         self.assertEquals(depickled_method('a'), 1)
         self.assertEquals(depickled_method('b'), None)
+
+    def test_itertools_count(self):
+        counter = itertools.count(1, step=2)
+
+        # advance the counter a bit
+        next(counter)
+        next(counter)
+
+        new_counter = pickle_depickle(counter, protocol=self.protocol)
+
+        self.assertTrue(counter is not new_counter)
+
+        for _ in range(10):
+            self.assertEqual(next(counter), next(new_counter))
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
