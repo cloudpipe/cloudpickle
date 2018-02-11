@@ -20,6 +20,16 @@
 
 - Use `pickle.HIGHEST_PROTOCOL` by default.
 
+0.4.3
+=====
+
+- Fixed a regression: `AttributeError` when loading pickles that hold a
+  reference to a dynamically defined class from the `__main__` module.
+  ([issue #131]( https://github.com/cloudpipe/cloudpickle/issues/131)).
+
+- Fixed a crash in Python 2 when serializing non-hashable instancemethods of built-in
+  types. ([issue #144](https://github.com/cloudpipe/cloudpickle/issues/144))
+
 0.4.2
 =====
 
