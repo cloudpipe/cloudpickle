@@ -613,8 +613,8 @@ class CloudPickleTest(unittest.TestCase):
             msg='cell contents not set correctly',
         )
 
-    def test_logger(self):
-        logger = logging.getLogger('cloudpickle.dummy_test_logger')
+    def check_logger(self, name):
+        logger = logging.getLogger(name)
         pickled = pickle_depickle(logger, protocol=self.protocol)
         self.assertTrue(pickled is logger, (pickled, logger))
 
@@ -633,7 +633,13 @@ class CloudPickleTest(unittest.TestCase):
         out, _ = proc.communicate()
         self.assertEqual(proc.wait(), 0)
         self.assertEqual(out.strip().decode(),
-                         'INFO:cloudpickle.dummy_test_logger:hello')
+                         'INFO:{}:hello'.format(logger.name))
+
+    def test_logger(self):
+        # logging.RootLogger object
+        self.check_logger(None)
+        # logging.Logger object
+        self.check_logger('cloudpickle.dummy_test_logger')
 
     def test_abc(self):
 

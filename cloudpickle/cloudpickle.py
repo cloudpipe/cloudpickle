@@ -833,6 +833,11 @@ class CloudPickler(Pickler):
 
     dispatch[logging.Logger] = save_logger
 
+    def save_root_logger(self, obj):
+        self.save_reduce(logging.getLogger, (), obj=obj)
+
+    dispatch[logging.RootLogger] = save_root_logger
+
     """Special functions for Add-on libraries"""
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
