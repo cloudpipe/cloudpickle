@@ -1,4 +1,5 @@
 # Dependencies for running the tests with py.test
+flake8
 pytest
 pytest-cov
 mock
