@@ -222,7 +222,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_unhashable_closure(self):
         def f():
-            s = set((1, 2))  # mutable set is unhashable
+            s = {1, 2}  # mutable set is unhashable
 
             def g():
                 return len(s)
@@ -494,7 +494,7 @@ class CloudPickleTest(unittest.TestCase):
         nvars = 65537 + 258
         names = ['g%d' % i for i in range(1, nvars)]
         r = random.Random(42)
-        d = dict([(name, r.randrange(100)) for name in names])
+        d = {name: r.randrange(100) for name in names}
         # def f(x):
         #     x = g1, g2, ...
         #     return zlib.crc32(bytes(bytearray(x)))
@@ -693,7 +693,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled3.x, 3)
         self.assertEqual(len(weakset), 2)
 
-        self.assertEqual(set(weakset), set([depickled1, depickled2]))
+        self.assertEqual(set(weakset), {depickled1, depickled2})
 
     def test_faulty_module(self):
         for module_name in ['_faulty_module', '_missing_module', None]:
