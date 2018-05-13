@@ -1,3 +1,9 @@
+0.4.4
+=====
+
+- `logging.RootLogger` can be also pickled
+  ([PR #160](https://github.com/cloudpipe/cloudpickle/pull/160)).
+
 0.4.3
 =====
 
