@@ -1,3 +1,14 @@
+0.5.3
+=====
+- Fixed a crash in Python 2 when serializing non-hashable instancemethods of built-in
+  types ([issue #144](https://github.com/cloudpipe/cloudpickle/issues/144)).
+
+- itertools objects can also pickled
+  ([PR #156](https://github.com/cloudpipe/cloudpickle/pull/156)).
+
+- `logging.RootLogger` can be also pickled
+  ([PR #160](https://github.com/cloudpipe/cloudpickle/pull/160)).
+
 0.5.2
 =====
 
@@ -19,6 +30,12 @@
 =====
 
 - Use `pickle.HIGHEST_PROTOCOL` by default.
+
+0.4.4
+=====
+
+- `logging.RootLogger` can be also pickled
+  ([PR #160](https://github.com/cloudpipe/cloudpickle/pull/160)).
 
 0.4.3
 =====
