@@ -930,7 +930,7 @@ class CloudPickleTest(unittest.TestCase):
         def f(x):
             pass
 
-        f.__annotations__ = {'x': 1, 'return': type(float)}
+        f.__annotations__ = {'x': 1, 'return': float}
 
         @wraps(f)
         def g(x):
