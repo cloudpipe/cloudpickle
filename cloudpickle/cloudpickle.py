@@ -556,6 +556,8 @@ class CloudPickler(Pickler):
             'name': func.__name__,
             'doc': func.__doc__,
         }
+        if hasattr(func, '__annotations__'):
+            state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
         save(state)
@@ -1029,6 +1031,8 @@ def _fill_function(*args):
     func.__globals__.update(state['globals'])
     func.__defaults__ = state['defaults']
     func.__dict__ = state['dict']
+    if 'annotations' in state:
+        func.__annotations__ = state['annotations']
     if 'doc' in state:
         func.__doc__  = state['doc']
     if 'name' in state:

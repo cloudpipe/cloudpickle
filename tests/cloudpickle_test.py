@@ -923,6 +923,20 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__doc__, f.__doc__)
 
+    def test_wraps_preserves_function_annotations(self):
+        from functools import wraps
+
+        def f(x: 1) -> float:
+            pass
+
+        @wraps(f)
+        def g():
+            f()
+
+        f2 = pickle_depickle(g)
+
+        self.assertEqual(f2.__annotations__, f.__annotations__)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
