@@ -551,10 +551,13 @@ class CloudPickler(Pickler):
             'globals': f_globals,
             'defaults': defaults,
             'dict': dct,
-            'module': func.__module__,
             'closure_values': closure_values,
+            'module': func.__module__,
             'name': func.__name__,
+            'doc': func.__doc__,
         }
+        if hasattr(func, '__annotations__'):
+            state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
         save(state)
@@ -1028,6 +1031,10 @@ def _fill_function(*args):
     func.__globals__.update(state['globals'])
     func.__defaults__ = state['defaults']
     func.__dict__ = state['dict']
+    if 'annotations' in state:
+        func.__annotations__ = state['annotations']
+    if 'doc' in state:
+        func.__doc__  = state['doc']
     if 'name' in state:
         func.__name__ = state['name']
     if 'module' in state:

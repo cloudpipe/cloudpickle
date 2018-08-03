@@ -908,6 +908,38 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__name__, f.__name__)
 
+    def test_wraps_preserves_function_doc(self):
+        from functools import wraps
+
+        def f():
+            """42"""
+            pass
+
+        @wraps(f)
+        def g():
+            f()
+
+        f2 = pickle_depickle(g)
+
+        self.assertEqual(f2.__doc__, f.__doc__)
+
+    @unittest.skipIf(sys.version_info[0] < 3, "This syntax won't work on py2.")
+    def test_wraps_preserves_function_annotations(self):
+        from functools import wraps
+
+        def f(x):
+            pass
+
+        f.__annotations__ = {'x': 1, 'return': float}
+
+        @wraps(f)
+        def g(x):
+            f(x)
+
+        f2 = pickle_depickle(g)
+
+        self.assertEqual(f2.__annotations__, f.__annotations__)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
