@@ -894,6 +894,20 @@ class CloudPickleTest(unittest.TestCase):
         for _ in range(10):
             self.assertEqual(next(counter), next(new_counter))
 
+    def test_wraps_preserves_function_name(self):
+        from functools import wraps
+
+        def f():
+            pass
+
+        @wraps(f)
+        def g():
+            f()
+
+        f2 = pickle_depickle(g)
+
+        self.assertEqual(f2.__name__, f.__name__)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
