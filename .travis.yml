@@ -1,10 +1,10 @@
 language: python
-sudo: false
+dist: xenial
 python:
   - "2.7"
-  - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
   - "pypy"
 
 # This disables sudo, but makes builds start much faster
