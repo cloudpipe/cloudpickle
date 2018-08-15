@@ -841,6 +841,39 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
+    def test_interactively_global_variable(self):
+        # Check that callables defined in the __main__ module of a Python
+        # script (or jupyter kernel) correctly retrieve global variables.
+        code = """\
+        from testutils import subprocess_pickle_echo
+        from cloudpickle import dumps, loads
+
+        VARIABLE = "uninitialized"
+
+        def f0():
+            global VARIABLE
+            VARIABLE = "initialized"
+
+        def f1():
+            return VARIABLE
+
+        reload_f0 = loads(dumps(f0, protocol={protocol}))
+        reload_f1 = loads(dumps(f1, protocol={protocol}))
+        pickled_f1 = dumps(f1, protocol={protocol})
+
+        # Change the value of the global variable
+        reload_f0()
+
+        # Ensure that the global variable is the same for another function
+        result_f1 = reload_f1()
+        assert result_f1 == "initialized", result_f1
+
+        # Ensure that unpickling the global variable does not change its value
+        result_pickled_f1 = loads(pickled_f1)()
+        assert result_pickled_f1 == "initialized", result_pickled_f1
+        """.format(protocol=self.protocol)
+        assert_run_python_script(textwrap.dedent(code))
+
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
     def test_function_pickle_compat_0_4_0(self):
