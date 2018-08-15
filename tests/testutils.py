@@ -93,6 +93,10 @@ def assert_run_python_script(source_code, timeout=5):
             'stderr': STDOUT,
             'env': {'PYTHONPATH': pythonpath},
         }
+        # If coverage is running, pass the config file to the subprocess
+        coverage_rc = os.environ.get("COVERAGE_PROCESS_START")
+        if coverage_rc:
+            kwargs['env']['COVERAGE_PROCESS_START'] = coverage_rc
         if timeout_supported:
             kwargs['timeout'] = timeout
         try:

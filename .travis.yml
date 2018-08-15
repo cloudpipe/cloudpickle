@@ -29,4 +29,5 @@ script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' py.test -r s
 after_success:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
+  - coverage combine --append
   - codecov
