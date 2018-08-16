@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # if python version is not PyPY, then install miniconda
-if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* && $TRAVIS_PYTHON_VERSION != "3.7-dev" ]]
+if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* && $TRAVIS_PYTHON_VERSION != "3.7" ]]
 then
 
     # Escape standard Travis virtualenv
