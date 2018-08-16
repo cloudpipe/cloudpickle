@@ -3,6 +3,12 @@
 # if python version is not PyPY, then install miniconda
 if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]
 then
+    export PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
+    if [[ $TRAVIS_PYTHON_VERSION == "3.7-dev" ]]
+    then
+        export PYTHON_VERSION="3.7"
+    fi
+
     # Escape standard Travis virtualenv
     deactivate
     # See: http://conda.pydata.org/docs/travis.html
@@ -13,5 +19,5 @@ then
     conda config --set always_yes yes --set changeps1 no
     conda update -q conda
     conda info -a
-    conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION numpy scipy pip
+    conda create -q -n testenv python=$PYTHON_VERSION numpy scipy pip
 fi
