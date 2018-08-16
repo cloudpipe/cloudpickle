@@ -465,7 +465,7 @@ class CloudPickler(Pickler):
         # calls to issubclass slower.
         if "_abc_impl" in clsdict:
             import abc
-            (registry, *_) = abc._get_dump(obj)
+            (registry, _, _, _) = abc._get_dump(obj)
             clsdict["_abc_impl"] = [wr() for wr in registry]
 
         # On PyPy, __doc__ is a readonly attribute, so we need to include it in
