@@ -655,6 +655,8 @@ class CloudPickleTest(unittest.TestCase):
             def foo(self):
                 return 'it works!'
 
+        # This class is local so we can safely register tuple in it to verify
+        # the unpickled class also register tuple.
         AbstractClass.register(tuple)
 
         depickled_base = pickle_depickle(AbstractClass, protocol=self.protocol)
