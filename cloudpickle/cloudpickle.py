@@ -431,6 +431,7 @@ class CloudPickler(Pickler):
         Ensure de-pickler imports any package child-modules that
         are needed by the function
         """
+
         # check if any known dependency is an imported package
         for x in top_level_dependencies:
             if isinstance(x, types.ModuleType) and hasattr(x, '__package__') and x.__package__:
@@ -632,7 +633,15 @@ class CloudPickler(Pickler):
         # save the dict
         dct = func.__dict__
 
-        base_globals = self.globals_ref.get(id(func.__globals__), {})
+        base_globals = self.globals_ref.get(id(func.__globals__), None)
+        if base_globals is None:
+            # For functions defined in __main__, use vars(__main__) for
+            # base_global. This is necessary to share the global variables
+            # across multiple functions in this module.
+            if func.__module__ == "__main__":
+                base_globals = "__main__"
+            else:
+                base_globals = {}
         self.globals_ref[id(func.__globals__)] = base_globals
 
         return (code, f_globals, defaults, closure, dct, base_globals)
@@ -1037,7 +1046,11 @@ def _fill_function(*args):
     else:
         raise ValueError('Unexpected _fill_value arguments: %r' % (args,))
 
-    func.__globals__.update(state['globals'])
+    # Only set global variables that do not exist.
+    for k, v in state['globals'].items():
+        if k not in func.__globals__:
+            func.__globals__[k] = v
+
     func.__defaults__ = state['defaults']
     func.__dict__ = state['dict']
     if 'annotations' in state:
@@ -1076,6 +1089,8 @@ def _make_skel_func(code, cell_count, base_globals=None):
     """
     if base_globals is None:
         base_globals = {}
+    elif isinstance(base_globals, str):
+        base_globals = vars(sys.modules[base_globals])
     base_globals['__builtins__'] = __builtins__
 
     closure = (

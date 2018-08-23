@@ -848,6 +848,45 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
+    def test_interactively_defined_global_variable(self):
+        # Check that callables defined in the __main__ module of a Python
+        # script (or jupyter kernel) correctly retrieve global variables.
+        code_template = """\
+        from testutils import subprocess_pickle_echo
+        from cloudpickle import dumps, loads
+
+        def local_clone(obj, protocol=None):
+            return loads(dumps(obj, protocol=protocol))
+
+        VARIABLE = "default_value"
+
+        def f0():
+            global VARIABLE
+            VARIABLE = "changed_by_f0"
+
+        def f1():
+            return VARIABLE
+
+        cloned_f0 = {clone_func}(f0, protocol={protocol})
+        cloned_f1 = {clone_func}(f1, protocol={protocol})
+        pickled_f1 = dumps(f1, protocol={protocol})
+
+        # Change the value of the global variable
+        cloned_f0()
+
+        # Ensure that the global variable is the same for another function
+        result_f1 = cloned_f1()
+        assert result_f1 == "changed_by_f0", result_f1
+
+        # Ensure that unpickling the global variable does not change its value
+        result_pickled_f1 = loads(pickled_f1)()
+        assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
+        """
+        for clone_func in ['local_clone', 'subprocess_pickle_echo']:
+            code = code_template.format(protocol=self.protocol,
+                                        clone_func=clone_func)
+            assert_run_python_script(textwrap.dedent(code))
+
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
     def test_function_pickle_compat_0_4_0(self):

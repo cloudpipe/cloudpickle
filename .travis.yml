@@ -26,9 +26,11 @@ before_script:
   - flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
   # exit-zero treats all errors as warnings.  The GitHub editor is 127 chars wide
   - flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+  - python ci/install_coverage_subprocess_pth.py
 script:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
-  - PYTHONPATH='.:tests' py.test -r s --cov-config .coveragerc --cov=cloudpickle
+  - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' py.test -r s
 after_success:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
+  - coverage combine --append
   - codecov
