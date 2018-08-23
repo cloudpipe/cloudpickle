@@ -635,11 +635,12 @@ class CloudPickler(Pickler):
 
         base_globals = self.globals_ref.get(id(func.__globals__), None)
         if base_globals is None:
-            # For functions defined in __main__, use vars(__main__) for
-            # base_global. This is necessary to share the global variables
-            # across multiple functions in this module.
-            if func.__module__ == "__main__":
-                base_globals = "__main__"
+            # For functions defined in a well behaved module use
+            # vars(func.__module__) for base_globals. This is necessary to
+            # share the global variables across multiple pickled functions from
+            # this module.
+            if hasattr(func, '__module__') and func.__module__ is not None:
+                base_globals = func.__module__
             else:
                 base_globals = {}
         self.globals_ref[id(func.__globals__)] = base_globals
