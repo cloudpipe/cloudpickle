@@ -1,3 +1,7 @@
+0.5.3.dev0
+==========
+- Fixed a pickling issue for ABC in python3.7+ ([issue #180](https://github.com/cloudpipe/cloudpickle/issues/180)).
+
 0.5.3
 =====
 - Fixed a crash in Python 2 when serializing non-hashable instancemethods of built-in
