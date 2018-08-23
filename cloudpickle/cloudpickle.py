@@ -78,6 +78,10 @@ else:
     PY3 = True
 
 
+# caches dynamic modules that are not referenced in sys.modules
+_dynamic_modules_globals = {}
+
+
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
@@ -1090,12 +1094,16 @@ def _make_skel_func(code, cell_count, base_globals=None):
     if base_globals is None:
         base_globals = {}
     elif isinstance(base_globals, str):
+        base_globals_name=base_globals
         if sys.modules.get(base_globals, None) is not None:
-            # this checks if we can import the previous environment the object
+            # This checks if we can import the previous environment the object
             # lived in
             base_globals = vars(sys.modules[base_globals])
         else:
-            base_globals = {}
+            base_globals = _dynamic_modules_globals.get(base_globals, {})
+            # base_globals is not a string anymore, using base_globals_name
+            # instead
+            _dynamic_modules_globals[base_globals_name] = base_globals
 
     base_globals['__builtins__'] = __builtins__
 
