@@ -47,6 +47,9 @@ from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
 
 
+_TEST_GLOBAL_VARIABLE = "default_value"
+
+
 class RaiserOnPickle(object):
 
     def __init__(self, exc):
@@ -886,6 +889,39 @@ class CloudPickleTest(unittest.TestCase):
             code = code_template.format(protocol=self.protocol,
                                         clone_func=clone_func)
             assert_run_python_script(textwrap.dedent(code))
+
+    def test_closure_interacting_with_a_global_variable(self):
+        global _TEST_GLOBAL_VARIABLE
+        orig_value = _TEST_GLOBAL_VARIABLE
+        try:
+            def f0():
+                global _TEST_GLOBAL_VARIABLE
+                _TEST_GLOBAL_VARIABLE = "changed_by_f0"
+
+            def f1():
+                return _TEST_GLOBAL_VARIABLE
+
+            cloned_f0 = cloudpickle.loads(cloudpickle.dumps(
+                f0, protocol=self.protocol))
+            cloned_f1 = cloudpickle.loads(cloudpickle.dumps(
+                f1, protocol=self.protocol))
+            pickled_f1 = cloudpickle.dumps(f1, protocol=self.protocol)
+
+            # Change the value of the global variable
+            cloned_f0()
+
+            # Ensure that the global variable is the same for another function
+            result_f1 = cloned_f1()
+            assert result_f1 == "changed_by_f0", result_f1
+            assert f1() == result_f1
+
+            # Ensure that unpickling the global variable does not change its
+            # value
+            result_pickled_f1 = cloudpickle.loads(pickled_f1)()
+            assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
+        finally:
+            _TEST_GLOBAL_VARIABLE = orig_value
+
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
