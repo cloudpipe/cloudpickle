@@ -628,7 +628,7 @@ class CloudPickler(Pickler):
         if base_globals is None:
             # For functions defined in __main__, use vars(__main__) for
             # base_global. This is necessary to share the global variables
-            # across the multiple multiple functions in the module.
+            # across multiple functions in this module.
             if func.__module__ == "__main__":
                 base_globals = "__main__"
             else:

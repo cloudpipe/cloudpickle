@@ -841,7 +841,7 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
-    def test_interactively_global_variable(self):
+    def test_interactively_defined_global_variable(self):
         # Check that callables defined in the __main__ module of a Python
         # script (or jupyter kernel) correctly retrieve global variables.
         code = """\
