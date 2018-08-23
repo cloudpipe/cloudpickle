@@ -460,6 +460,15 @@ class CloudPickler(Pickler):
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
         clsdict.pop('__weakref__', None)
 
+        # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
+        # This is a fix which breaks the cache but this only makes the first
+        # calls to issubclass slower.
+        if "_abc_impl" in clsdict:
+            import abc
+            (registry, _, _, _) = abc._get_dump(obj)
+            clsdict["_abc_impl"] = [subclass_weakref()
+                                    for subclass_weakref in registry]
+
         # On PyPy, __doc__ is a readonly attribute, so we need to include it in
         # the initial skeleton class.  This is safe because we know that the
         # doc can't participate in a cycle with the original class.
@@ -1082,8 +1091,16 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
 
     See CloudPickler.save_dynamic_class for more info.
     """
+    registry = None
     for attrname, attr in class_dict.items():
-        setattr(skeleton_class, attrname, attr)
+        if attrname == "_abc_impl":
+            registry = attr
+        else:
+            setattr(skeleton_class, attrname, attr)
+    if registry is not None:
+        for subclass in registry:
+            skeleton_class.register(subclass)
+
     return skeleton_class
 
 

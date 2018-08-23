@@ -1,15 +1,18 @@
 language: python
-sudo: false
-python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
-  - "3.6"
-  - "pypy"
+
+matrix:
+  include:
+    - python: 2.7
+    - python: 3.5
+    - python: 3.6
+    - python: 3.7
+      sudo: required
+      dist: xenial
+    - python: "pypy"
+
 
 # This disables sudo, but makes builds start much faster
 # See http://blog.travis-ci.com/2014-12-17-faster-builds-with-container-based-infrastructure/
-sudo: false
 before_install: bash ./ci/before_install.sh
 install:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
