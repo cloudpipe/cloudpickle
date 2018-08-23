@@ -851,11 +851,11 @@ class CloudPickleTest(unittest.TestCase):
         def local_clone(obj, protocol=None):
             return loads(dumps(obj, protocol=protocol))
 
-        VARIABLE = "uninitialized"
+        VARIABLE = "default_value"
 
         def f0():
             global VARIABLE
-            VARIABLE = "initialized"
+            VARIABLE = "changed_by_f0"
 
         def f1():
             return VARIABLE
@@ -869,11 +869,11 @@ class CloudPickleTest(unittest.TestCase):
 
         # Ensure that the global variable is the same for another function
         result_f1 = cloned_f1()
-        assert result_f1 == "initialized", result_f1
+        assert result_f1 == "changed_by_f0", result_f1
 
         # Ensure that unpickling the global variable does not change its value
         result_pickled_f1 = loads(pickled_f1)()
-        assert result_pickled_f1 == "initialized", result_pickled_f1
+        assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
         """
         for clone_func in ['local_clone', 'subprocess_pickle_echo']:
             code = code_template.format(protocol=self.protocol,
