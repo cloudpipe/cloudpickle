@@ -1,6 +1,13 @@
-0.5.3.dev0
-==========
-- Fixed a pickling issue for ABC in python3.7+ ([issue #180](https://github.com/cloudpipe/cloudpickle/issues/180)).
+0.5.4
+=====
+
+- Fixed a pickling issue for ABC in python3.7+ ([issue #180](
+  https://github.com/cloudpipe/cloudpickle/issues/180)).
+
+- Fixed a bug when pickling functions in `__main__` that access global
+  variables ([issue #187](
+  https://github.com/cloudpipe/cloudpickle/issues/187)).
+
 
 0.5.3
 =====
