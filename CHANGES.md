@@ -1,3 +1,14 @@
+
+master
+======
+
+
+0.5.5
+=====
+
+- Fixed inconsistent version in `cloudpickle.__version__`.
+
+
 0.5.4
 =====
 

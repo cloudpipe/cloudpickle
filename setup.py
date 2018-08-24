@@ -8,7 +8,7 @@ except ImportError:
 
 dist = setup(
     name='cloudpickle',
-    version='0.5.4',
+    version='0.5.5',
     description='Extended pickling support for Python objects',
     author='Cloudpipe',
     author_email='cloudpipe@googlegroups.com',
