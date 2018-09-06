@@ -1091,7 +1091,13 @@ def _make_skel_func(code, cell_count, base_globals=None):
     if base_globals is None:
         base_globals = {}
     elif isinstance(base_globals, str):
-        base_globals = vars(sys.modules[base_globals])
+        if base_globals in sys.modules.keys():
+            # check if we can import the previous environment the object lived
+            # in
+            base_globals = vars(sys.modules[base_globals])
+        else:
+            base_globals = {}
+
     base_globals['__builtins__'] = __builtins__
 
     closure = (
