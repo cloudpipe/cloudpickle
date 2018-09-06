@@ -1092,8 +1092,8 @@ def _make_skel_func(code, cell_count, base_globals=None):
         base_globals = {}
     elif isinstance(base_globals, str):
         if base_globals in sys.modules.keys():
-            # check if we can import the previous environment the object lived
-            # in
+            # this checks if we can import the previous environment the object
+            # lived in
             base_globals = vars(sys.modules[base_globals])
         else:
             base_globals = {}
