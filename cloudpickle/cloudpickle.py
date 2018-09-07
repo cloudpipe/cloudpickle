@@ -78,6 +78,9 @@ else:
     PY3 = True
 
 
+# cache that tracks the values of global variables.
+_BASE_GLOBALS_CACHE = {}
+
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
@@ -935,7 +938,10 @@ def subimport(name):
 def dynamic_subimport(name, vars):
     mod = imp.new_module(name)
     mod.__dict__.update(vars)
-    sys.modules[name] = mod
+    # adding a dynamic module to sys.module can cause recursive imports
+    # in python 2.x.x because site.Quitter contains sys as one of its globals
+    if sys.version > '3':
+        sys.modules[name] = mod
     return mod
 
 
@@ -1095,8 +1101,11 @@ def _make_skel_func(code, cell_count, base_globals=None):
             # this checks if we can import the previous environment the object
             # lived in
             base_globals = vars(sys.modules[base_globals])
+        elif id(base_globals) in _BASE_GLOBALS_CACHE.keys():
+            base_globals = _BASE_GLOBALS_CACHE[id(base_globals)]
         else:
             base_globals = {}
+            _BASE_GLOBALS_CACHE[id(base_globals)] = base_globals
 
     base_globals['__builtins__'] = __builtins__
 
