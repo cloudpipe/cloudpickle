@@ -81,6 +81,7 @@ else:
 # cache that tracks the values of global variables.
 _BASE_GLOBALS_CACHE = {}
 
+
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
