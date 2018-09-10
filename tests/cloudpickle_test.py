@@ -929,10 +929,10 @@ class CloudPickleTest(unittest.TestCase):
         this test verifies that:
         - any modification in the global variables of a dynamic
         module living in a child process won't get overridden
-        when new object are unpickled in the child's interpreter
+        when new objects are unpickled in the child's interpreter
 
         - vice versa, e.g a modification in the parent process does not
-        override the value of the variable in the child process
+        override the value of the variables in the child process
 
         The two cases are equivalent, and here, the second case is tested.
         """
@@ -969,6 +969,7 @@ class CloudPickleTest(unittest.TestCase):
 
             # change the mod's global variable x
             mod.x = 2
+
             # at this point, mod.func_that_relies_on_dynamic_module()
             # returns 2
             assert mod.func_that_relies_on_dynamic_module() == 2
