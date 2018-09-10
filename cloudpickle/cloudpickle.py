@@ -56,7 +56,6 @@ import sys
 import traceback
 import types
 import weakref
-import hashlib
 
 
 # cloudpickle is meant for inter process communication: we expect all
