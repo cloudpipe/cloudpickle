@@ -1099,10 +1099,8 @@ def _make_skel_func(code, cell_count, base_globals=None):
             # this checks if we can import the previous environment the object
             # lived in
             base_globals = vars(sys.modules[base_globals_name])
-        elif base_globals_name in _dynamic_modules.keys():
-            base_globals = _dynamic_modules[base_globals_name]
         else:
-            base_globals = {}
+            base_globals = _dynamic_modules.get(base_globals_name, {})
             _dynamic_modules[base_globals_name] = base_globals
 
     base_globals['__builtins__'] = __builtins__
