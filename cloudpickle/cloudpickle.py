@@ -56,6 +56,7 @@ import sys
 import traceback
 import types
 import weakref
+import hashlib
 
 
 # cloudpickle is meant for inter process communication: we expect all
@@ -939,10 +940,6 @@ def subimport(name):
 def dynamic_subimport(name, vars):
     mod = imp.new_module(name)
     mod.__dict__.update(vars)
-    # adding a dynamic module to sys.module can cause recursive imports
-    # in python 2.x.x because site.Quitter contains sys as one of its globals
-    if sys.version > '3':
-        sys.modules[name] = mod
     return mod
 
 
@@ -1098,15 +1095,16 @@ def _make_skel_func(code, cell_count, base_globals=None):
     if base_globals is None:
         base_globals = {}
     elif isinstance(base_globals, str):
+        base_globals_name = base_globals
         if base_globals in sys.modules.keys():
             # this checks if we can import the previous environment the object
             # lived in
             base_globals = vars(sys.modules[base_globals])
-        elif id(base_globals) in _BASE_GLOBALS_CACHE.keys():
-            base_globals = _BASE_GLOBALS_CACHE[id(base_globals)]
+        elif base_globals in _BASE_GLOBALS_CACHE.keys():
+            base_globals = _BASE_GLOBALS_CACHE[base_globals]
         else:
             base_globals = {}
-            _BASE_GLOBALS_CACHE[id(base_globals)] = base_globals
+            _BASE_GLOBALS_CACHE[base_globals_name] = base_globals
 
     base_globals['__builtins__'] = __builtins__
 

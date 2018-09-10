@@ -909,11 +909,12 @@ class CloudPickleTest(unittest.TestCase):
 
             # Change the value of the global variable
             cloned_f0()
+            assert _TEST_GLOBAL_VARIABLE == "changed_by_f0"
 
             # Ensure that the global variable is the same for another function
-            result_f1 = cloned_f1()
-            assert result_f1 == "changed_by_f0", result_f1
-            assert f1() == result_f1
+            result_cloned_f1 = cloned_f1()
+            assert result_cloned_f1 == "changed_by_f0", result_cloned_f1
+            assert f1() == result_cloned_f1
 
             # Ensure that unpickling the global variable does not change its
             # value
@@ -921,6 +922,32 @@ class CloudPickleTest(unittest.TestCase):
             assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
+
+    def test_function_from_dynamic_module_with_globals_modifications(self):
+        mod = imp.new_module('mod')
+        code = '''
+        x = 1
+        def func_that_relies_on_dynamic_module():
+            global x
+            return x
+        '''
+        exec(textwrap.dedent(code), mod.__dict__)
+
+        # first, dump the module
+        fileobj = cloudpickle.dumps(mod.func_that_relies_on_dynamic_module)
+
+        first_f = pickle.loads(fileobj)
+        # change the mod's global variable x
+        mod.x = 2
+
+        fileobj = cloudpickle.dumps(mod.func_that_relies_on_dynamic_module)
+
+        mod.x = 1
+
+        # finally, re-load the dynamic module
+        new_f = pickle.loads(fileobj)
+
+        assert first_f() == new_f()
 
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
