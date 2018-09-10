@@ -79,7 +79,7 @@ else:
 
 
 # caches dynamic modules that are not referenced in sys.modules
-_dynamic_modules = {}
+_dynamic_modules_globals = {}
 
 
 def _make_cell_set_template_code():
@@ -1100,8 +1100,8 @@ def _make_skel_func(code, cell_count, base_globals=None):
             # lived in
             base_globals = vars(sys.modules[base_globals_name])
         else:
-            base_globals = _dynamic_modules.get(base_globals_name, {})
-            _dynamic_modules[base_globals_name] = base_globals
+            base_globals = _dynamic_modules_globals.get(base_globals_name, {})
+            _dynamic_modules_globals[base_globals_name] = base_globals
 
     base_globals['__builtins__'] = __builtins__
 

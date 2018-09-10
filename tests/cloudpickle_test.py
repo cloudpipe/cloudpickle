@@ -983,7 +983,7 @@ class CloudPickleTest(unittest.TestCase):
                     first_f = pickle.load(fid)
 
                 # at this point, a module called 'mod' should exist in
-                # _dynamic_modules. further function loading
+                # _dynamic_modules_globals. further function loading
                 # will use the globals living in mod
 
                 assert first_f() == 1
@@ -993,7 +993,7 @@ class CloudPickleTest(unittest.TestCase):
                     new_f = pickle.load(fid)
 
                 # assert the initial global got overridden by
-                # _dynamic_modules
+                # _dynamic_modules_globals
                 assert new_f()==1
 
                 # both function's global x should point to the
