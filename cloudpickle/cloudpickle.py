@@ -79,8 +79,8 @@ else:
     PY3 = True
 
 
-# cache that tracks the values of global variables.
-_BASE_GLOBALS_CACHE = {}
+# caches dynamic modules that are not referenced in sys.modules
+_dynamic_modules = {}
 
 
 def _make_cell_set_template_code():
@@ -1096,15 +1096,15 @@ def _make_skel_func(code, cell_count, base_globals=None):
         base_globals = {}
     elif isinstance(base_globals, str):
         base_globals_name = base_globals
-        if base_globals in sys.modules.keys():
+        if base_globals_name in sys.modules.keys():
             # this checks if we can import the previous environment the object
             # lived in
-            base_globals = vars(sys.modules[base_globals])
-        elif base_globals in _BASE_GLOBALS_CACHE.keys():
-            base_globals = _BASE_GLOBALS_CACHE[base_globals]
+            base_globals = vars(sys.modules[base_globals_name])
+        elif base_globals_name in _dynamic_modules.keys():
+            base_globals = _dynamic_modules[base_globals_name]
         else:
             base_globals = {}
-            _BASE_GLOBALS_CACHE[base_globals_name] = base_globals
+            _dynamic_modules[base_globals_name] = base_globals
 
     base_globals['__builtins__'] = __builtins__
 
