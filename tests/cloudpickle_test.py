@@ -926,25 +926,19 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_function_from_dynamic_module_with_globals_modifications(self):
         """
-        this test verifies that:
-        - any modification in the global variables of a dynamic
-        module living in a child process won't get overridden
-        when new objects are unpickled in the child's interpreter
-
-        - vice versa, e.g a modification in the parent process does not
-        override the value of the variables in the child process
-
-        The two cases are equivalent, and here, the second case is tested.
+        unpickling functions coming from a dynamic module should lead to
+        new global variables being created each time.
+        Hence, a modification of the globals of one function should not
+        interact with the globals of another function.
+        This test validates this behavior.
         """
 
         # first, we create a dynamic module in the parent process
         mod = imp.new_module('mod')
         code = '''
         x = 1
-        def func_that_relies_on_dynamic_module(v=None):
+        def func_that_relies_on_dynamic_module():
             global x
-            if v is not None:
-                x = v
             return x
         '''
         exec(textwrap.dedent(code), mod.__dict__)
@@ -957,12 +951,8 @@ class CloudPickleTest(unittest.TestCase):
             # values for the global variable x.
 
             # a child process that sequentially unpickles the
-            # two functions is then launched
-
-            # once the _first_ function gets unpickled, mod is created and
-            # tracked in the child environment. Whatever the global variable
-            # x's value in the second function, it will be overriden by the
-            # initial value of x in the child environment
+            # two functions is then launched, and asserts
+            # the independance of those two global variables
 
             with open('first_function.pk', 'wb') as fid:
                 cloudpickle.dump(mod.func_that_relies_on_dynamic_module, fid)
@@ -982,26 +972,16 @@ class CloudPickleTest(unittest.TestCase):
                 with open('first_function.pk','rb') as fid:
                     first_f = pickle.load(fid)
 
-                # at this point, a module called 'mod' should exist in
-                # _dynamic_modules_globals. further function loading
-                # will use the globals living in mod
-
                 assert first_f() == 1
 
                 # load a function with initial global variable x set to 2
                 with open('function_with_modified_globals.pk','rb') as fid:
                     new_f = pickle.load(fid)
 
-                # assert the initial global got overridden by
-                # _dynamic_modules_globals
-                assert new_f()==1
+                # assert that by first_f's  global variable x does not interact
+                # with new_f's global variable x
+                assert new_f()==2
 
-                # both function's global x should point to the
-                # same variable. calling first_f('test_value')
-                # will change this variable, and new_f() should
-                # return the changed variable
-                assert first_f('test_value') == 'test_value'
-                assert new_f() == 'test_value'
             """
 
             # finally, we execute the code

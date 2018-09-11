@@ -1,6 +1,8 @@
-
 master
 ======
+
+- global variables from modules referenced in sys.modules in the child process
+  now overrides the initial global variables of the pickled function
 
 
 0.5.5
@@ -18,7 +20,6 @@ master
 - Fixed a bug when pickling functions in `__main__` that access global
   variables ([issue #187](
   https://github.com/cloudpipe/cloudpickle/issues/187)).
-
 
 0.5.3
 =====
