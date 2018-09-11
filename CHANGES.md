@@ -2,7 +2,8 @@ master
 ======
 
 - global variables from modules referenced in sys.modules in the child process
-  now overrides the initial global variables of the pickled function
+  now overrides the initial global variables of the pickled function.
+  ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/187))
 
 
 0.5.5
