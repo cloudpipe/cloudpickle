@@ -441,23 +441,23 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(id(mod1), id(mod2))
 
     def test_load_dynamic_module_in_grandchild_process(self):
-        # make sure that a when loaded, a dynamic module
-        # preserves its dynamic property. Otherwise,
-        # this will lead to an import error if pickled in the child process
-        # and reloaded in another one
+        # Make sure that when loaded, a dynamic module preserves its dynamic
+        # property. Otherwise, this will lead to an ImportError if pickled in
+        # the child process and reloaded in another one.
 
-        # we create a new dynamic module
+        # We create a new dynamic module
         mod = imp.new_module('mod')
         code = '''
         x = 1
         '''
         exec(textwrap.dedent(code), mod.__dict__)
 
-        # this script will be ran in a separate child process
-        # it will import the pickled dynamic module, and then
-        # re-pickle it under a new name.
-        # finally, it will create a child process that will
-        # load the re-pickled dynamic module
+        # This script will be ran in a separate child process. It will import
+        # the pickled dynamic module, and then re-pickle it under a new name.
+        # Finally, it will create a child process that will load the re-pickled
+        # dynamic module.
+        parent_process_module_file = 'dynamic_module_from_parent_process.pkl'
+        child_process_module_file = 'dynamic_module_from_child_process.pkl'
         child_process_script = '''
             import pickle
             import textwrap
@@ -466,39 +466,47 @@ class CloudPickleTest(unittest.TestCase):
             from testutils import assert_run_python_script
 
 
-            child_of_child_process_script = {}
+            child_of_child_process_script = {child_of_child_process_script}
 
-            with open('dynamic_module_from_parent_process.pk', 'rb') as fid:
-                mod = pickle.load(fid)
+            with open('{parent_process_module_file}', 'rb') as f:
+                mod = pickle.load(f)
 
-            with open('dynamic_module_from_child_process.pk', 'wb') as fid:
-                cloudpickle.dump(mod, fid)
+            with open('{child_process_module_file}', 'wb') as f:
+                cloudpickle.dump(mod, f)
 
             assert_run_python_script(textwrap.dedent(child_of_child_process_script))
             '''
 
-        # the script ran by the process created by the child process
-        child_of_child_process_script = ''' \'\'\'
+        # The script ran by the process created by the child process
+        child_of_child_process_script = """ '''
                 import pickle
-                with open('dynamic_module_from_child_process.pk','rb') as fid:
+                with open('{child_process_module_file}','rb') as fid:
                     mod = pickle.load(fid)
-                \'\'\' '''
+                ''' """
+
+        # Filling the two scripts with the pickled modules filepaths and,
+        # for the first child process, the script to be executed by its
+        # own child process.
+        child_of_child_process_script = child_of_child_process_script.format(
+                child_process_module_file=child_process_module_file)
 
         child_process_script = child_process_script.format(
-                child_of_child_process_script)
+                parent_process_module_file=parent_process_module_file,
+                child_process_module_file=child_process_module_file,
+                child_of_child_process_script=child_of_child_process_script)
 
         try:
-            with open('dynamic_module_from_parent_process.pk', 'wb') as fid:
+            with open(parent_process_module_file, 'wb') as fid:
                 cloudpickle.dump(mod, fid)
 
             assert_run_python_script(textwrap.dedent(child_process_script))
 
         finally:
-            # remove temporary created files
-            if os.path.exists('dynamic_module_from_parent_process.pk'):
-                os.unlink('dynamic_module_from_parent_process.pk')
-            if os.path.exists('dynamic_module_from_child_process.pk'):
-                os.unlink('dynamic_module_from_child_process.pk')
+            # Remove temporary created files
+            if os.path.exists(parent_process_module_file):
+                os.unlink(parent_process_module_file)
+            if os.path.exists(child_process_module_file):
+                os.unlink(child_process_module_file)
 
     def test_find_module(self):
         import pickle  # ensure this test is decoupled from global imports
