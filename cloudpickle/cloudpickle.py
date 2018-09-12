@@ -78,7 +78,6 @@ else:
     PY3 = True
 
 
-
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 

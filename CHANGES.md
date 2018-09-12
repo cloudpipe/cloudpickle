@@ -1,8 +1,8 @@
 master
 ======
 
-- global variables from modules referenced in sys.modules in the child process
-  now overrides the initial global variables of the pickled function.
+  - Ensure that unpickling a locally defined function that accesses the global variables
+  of a module does not reset the values of the global variables if they are already initialized.
   ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/187))
 
 

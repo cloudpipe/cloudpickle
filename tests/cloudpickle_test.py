@@ -893,6 +893,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_closure_interacting_with_a_global_variable(self):
         global _TEST_GLOBAL_VARIABLE
+        assert _TEST_GLOBAL_VARIABLE == "default_value"
         orig_value = _TEST_GLOBAL_VARIABLE
         try:
             def f0():
@@ -923,74 +924,6 @@ class CloudPickleTest(unittest.TestCase):
             assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
-
-    def test_function_from_dynamic_module_with_globals_modifications(self):
-        """
-        unpickling functions coming from a dynamic module should lead to
-        new global variables being created each time.
-        Hence, a modification of the globals of one function should not
-        interact with the globals of another function.
-        This test validates this behavior.
-        """
-
-        # first, we create a dynamic module in the parent process
-        mod = imp.new_module('mod')
-        code = '''
-        x = 1
-        def func_that_relies_on_dynamic_module():
-            global x
-            return x
-        '''
-        exec(textwrap.dedent(code), mod.__dict__)
-
-        try:
-            # simple sanity check on the function's output
-            assert mod.func_that_relies_on_dynamic_module() == 1
-
-            # the function of mod is pickled two times, with two different
-            # values for the global variable x.
-
-            # a child process that sequentially unpickles the
-            # two functions is then launched, and asserts
-            # the independance of those two global variables
-
-            with open('first_function.pk', 'wb') as fid:
-                cloudpickle.dump(mod.func_that_relies_on_dynamic_module, fid)
-
-            # change the mod's global variable x
-            mod.x = 2
-
-            # at this point, mod.func_that_relies_on_dynamic_module()
-            # returns 2
-            assert mod.func_that_relies_on_dynamic_module() == 2
-            with open('function_with_modified_globals.pk', 'wb') as fid:
-                cloudpickle.dump(mod.func_that_relies_on_dynamic_module, fid)
-
-            child_process_code = """
-                import pickle
-
-                with open('first_function.pk','rb') as fid:
-                    first_f = pickle.load(fid)
-
-                assert first_f() == 1
-
-                # load a function with initial global variable x set to 2
-                with open('function_with_modified_globals.pk','rb') as fid:
-                    new_f = pickle.load(fid)
-
-                # assert that by first_f's  global variable x does not interact
-                # with new_f's global variable x
-                assert new_f()==2
-
-            """
-
-            # finally, we execute the code
-            assert_run_python_script(textwrap.dedent(child_process_code))
-
-        finally:
-            # remove the created files
-            os.unlink('first_function.pk')
-            os.unlink('function_with_modified_globals.pk')
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
