@@ -454,7 +454,6 @@ class CloudPickleTest(unittest.TestCase):
         exec(textwrap.dedent(code), mod.__dict__)
 
         # this script will be ran in a separate child process
-
         # it will import the pickled dynamic module, and then
         # re-pickle it under a new name.
         # finally, it will create a child process that will
@@ -465,6 +464,7 @@ class CloudPickleTest(unittest.TestCase):
 
             import cloudpickle
             from testutils import assert_run_python_script
+
 
             child_of_child_process_script = {}
 
