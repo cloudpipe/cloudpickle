@@ -1,8 +1,12 @@
 master
 ======
 
-  - Ensure that unpickling a locally defined function that accesses the global variables
-  of a module does not reset the values of the global variables if they are already initialized.
+0.5.6
+=====
+
+- Ensure that unpickling a locally defined function that accesses the global
+  variables of a module does not reset the values of the global variables if
+  they are already initialized.
   ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/187))
 
 
