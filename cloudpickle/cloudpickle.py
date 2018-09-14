@@ -79,7 +79,20 @@ else:
 
 
 # caches dynamic modules that are not referenced in sys.modules
-_dynamic_modules_globals = {}
+_dynamic_modules_globals = weakref.WeakValueDictionary()
+
+# _dynamic_modules_globals will store _base_globals variables.
+# Or, _base_globals end up being dicts, and built-in dict instances
+# cannot be weakly referenced. Therefore, we create a mirror of the
+# dict type, and at the mutation of _base globals from string to dict,
+# we use the DynamicDict constructor instead of the builtin dict one.
+
+
+class DynamicDict(dict):
+    """class used to instanciate base_globals, in order to be weakly refrenced
+    into _dynamic_modules_globals
+    """
+    pass
 
 
 def _make_cell_set_template_code():
@@ -1094,13 +1107,14 @@ def _make_skel_func(code, cell_count, base_globals=None):
     if base_globals is None:
         base_globals = {}
     elif isinstance(base_globals, str):
-        base_globals_name=base_globals
+        base_globals_name = base_globals
         if sys.modules.get(base_globals, None) is not None:
             # This checks if we can import the previous environment the object
             # lived in
             base_globals = vars(sys.modules[base_globals])
         else:
-            base_globals = _dynamic_modules_globals.get(base_globals, {})
+            base_globals = _dynamic_modules_globals.get(
+                    base_globals, DynamicDict())
             # base_globals is not a string anymore, using base_globals_name
             # instead
             _dynamic_modules_globals[base_globals_name] = base_globals

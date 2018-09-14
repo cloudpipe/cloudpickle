@@ -4,6 +4,7 @@ import abc
 import collections
 import base64
 import functools
+import gc
 import imp
 from io import BytesIO
 import itertools
@@ -42,7 +43,8 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
+from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set,\
+        _dynamic_modules_globals
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -439,6 +441,48 @@ class CloudPickleTest(unittest.TestCase):
         # Test dynamic modules when imported back are singletons
         mod1, mod2 = pickle_depickle([mod, mod])
         self.assertEqual(id(mod1), id(mod2))
+
+    def test_dynamic_modules_cache(self):
+        # _dynamic_modules_globals is a WeakValueDictionary, so if this dynamic
+        # module has no other reference than in this # dict (whether on the
+        # child process or the parent process), this module will be garbage
+        # collected.
+
+        # We first create a module
+        mod = imp.new_module('mod')
+        code = '''
+        x = 1
+        def f():
+            return
+        '''
+        exec(textwrap.dedent(code), mod.__dict__)
+
+        pickled_module_path = 'mod.pkl'
+
+        with open(pickled_module_path, 'wb') as f:
+            cloudpickle.dump(mod, f)
+
+        # _dynamic_modules_globals will have mod appended to its values
+        # in the child process only
+        child_process_script = '''
+        import pickle
+        import cloudpickle
+        with open("{pickled_module_path}", 'rb') as f:
+            _ = pickle.load(f)
+        '''
+        child_process_script = child_process_script.format(
+                pickled_module_path=pickled_module_path)
+
+        assert_run_python_script(textwrap.dedent(child_process_script))
+
+        # We remove the other references to the object and trigger a
+        # gc event
+        del mod
+        gc.collect()
+
+        # At this point, there is no other reference to this module, so
+        # _dynamic_modules_globals should be empty
+        assert list(_dynamic_modules_globals.keys()) == []
 
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
