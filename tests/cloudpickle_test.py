@@ -459,9 +459,6 @@ class CloudPickleTest(unittest.TestCase):
 
         pickled_module_path = 'mod_f.pkl'
 
-        with open(pickled_module_path, 'wb') as f:
-            cloudpickle.dump(mod.func, f)
-
         # _dynamic_modules_globals will have mod appended to its values
         # in the child process only
         child_process_script = '''
@@ -483,10 +480,19 @@ class CloudPickleTest(unittest.TestCase):
         # so _dynamic_modules_globals should now be empty
         assert list(_dynamic_modules_globals.keys())==[]
         '''
+
         child_process_script = child_process_script.format(
                 pickled_module_path=pickled_module_path)
 
-        assert_run_python_script(textwrap.dedent(child_process_script))
+        try:
+            with open(pickled_module_path, 'wb') as f:
+                cloudpickle.dump(mod.func, f)
+
+            assert_run_python_script(textwrap.dedent(child_process_script))
+
+        finally:
+            os.unlink(pickled_module_path)
+
 
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
