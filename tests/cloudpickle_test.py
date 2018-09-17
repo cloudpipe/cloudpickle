@@ -457,7 +457,7 @@ class CloudPickleTest(unittest.TestCase):
         '''
         exec(textwrap.dedent(code), mod.__dict__)
 
-        pickled_module_path = 'mod.pkl'
+        pickled_module_path = 'mod_f.pkl'
 
         with open(pickled_module_path, 'wb') as f:
             cloudpickle.dump(mod.func, f)
