@@ -510,30 +510,28 @@ class CloudPickleTest(unittest.TestCase):
                 os.unlink(child_process_module_file)
 
     def test_correct_globals_import(self):
-        def my_small_function(x, y):
-            def nested_function():
-                pass
-
-            return x + y
+        def nested_function(x):
+            return x + 1
 
         def unwanted_function(x):
             return math.exp(x)
 
+        def my_small_function(x, y):
+            return nested_function(x) + y
+
         b = cloudpickle.dumps(my_small_function)
 
-        # Cloudpickle will use the current module's name for base_globals.
-        # Separately, global variables used by my_small_function will be
-        # pickled in f_globals. So at no point should 'math' appear in the
-        # pickled object, since it is not used by my_small_function explicitly
-        assert b'my_small_function' in b
+        # Make sure that the pickle byte strings only includes the definition
+        # of my_small_function and its dependency nested_function while
+        # extra function and modules such as unwanted_function and the math
+        # modules are not included so as to keep the pickle payload as
+        # lightweight as possible.
 
-        # nested_function is a local variable defined inside my_small_function,
-        # so its name should appear in the pickled object
+        assert b'my_small_function' in b
         assert b'nested_function' in b
 
-        # unwanted_function should not appear in the pickled nested_function
-        # object. We check this as a non-regression test.
         assert b'unwanted_function' not in b
+        assert b'math' not in b
 
     def test_find_module(self):
         import pickle  # ensure this test is decoupled from global imports
