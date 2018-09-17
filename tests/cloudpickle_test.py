@@ -510,15 +510,18 @@ class CloudPickleTest(unittest.TestCase):
                 os.unlink(child_process_module_file)
 
     def test_correct_globals_import(self):
-        def unrelated_function(x):
-            return math.exp(x)
+        import math
 
         def my_small_function(x, y):
             return x+y
 
         b = cloudpickle.dumps(my_small_function)
+
+        # Cloudpickle will use the current module's name for base_globals.
+        # Separately, global variables used by my_small_function will be
+        # pickled in f_globals. So at no point should 'math' appear in the
+        # pickled object, since it is not used by my_small_function explicitly
         assert b'my_small_function' in b
-        assert b'unrelated_function' not in b
         assert b'math' not in b
 
     def test_find_module(self):
