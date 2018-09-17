@@ -513,7 +513,10 @@ class CloudPickleTest(unittest.TestCase):
         import math
 
         def my_small_function(x, y):
-            return x+y
+            def nested_function():
+                pass
+
+            return x + y
 
         b = cloudpickle.dumps(my_small_function)
 
@@ -523,6 +526,10 @@ class CloudPickleTest(unittest.TestCase):
         # pickled object, since it is not used by my_small_function explicitly
         assert b'my_small_function' in b
         assert b'math' not in b
+
+        # nested_function is a local variable defined inside my_small_function,
+        # so its name should appear in the pickled object
+        assert b'nested_function' in b
 
     def test_find_module(self):
         import pickle  # ensure this test is decoupled from global imports
