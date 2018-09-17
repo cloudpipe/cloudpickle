@@ -489,9 +489,6 @@ class CloudPickleTest(unittest.TestCase):
 
         assert_run_python_script(textwrap.dedent(child_process_script))
 
-        # We remove the other references to the object and trigger a
-        # gc event
-
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
         # property. Otherwise, this will lead to an ImportError if pickled in
