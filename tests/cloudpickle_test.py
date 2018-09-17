@@ -510,11 +510,11 @@ class CloudPickleTest(unittest.TestCase):
                 os.unlink(child_process_module_file)
 
     def test_correct_globals_import(self):
-        def unrelated_function(a):
-            return math.exp(a)
+        def unrelated_function(x):
+            return math.exp(x)
 
-        def my_small_function(a):
-            return a+b
+        def my_small_function(x, y):
+            return x+y
 
         b = cloudpickle.dumps(my_small_function)
         assert b'my_small_function' in b
