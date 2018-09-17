@@ -521,10 +521,10 @@ class CloudPickleTest(unittest.TestCase):
 
         b = cloudpickle.dumps(my_small_function)
 
-        # Make sure that the pickle byte strings only includes the definition
+        # Make sure that the pickle byte string only includes the definition
         # of my_small_function and its dependency nested_function while
-        # extra function and modules such as unwanted_function and the math
-        # modules are not included so as to keep the pickle payload as
+        # extra functions and modules such as unwanted_function and the math
+        # module are not included so as to keep the pickle payload as
         # lightweight as possible.
 
         assert b'my_small_function' in b
