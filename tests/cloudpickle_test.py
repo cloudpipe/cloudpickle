@@ -8,6 +8,7 @@ import imp
 from io import BytesIO
 import itertools
 import logging
+import math
 from operator import itemgetter, attrgetter
 import pickle
 import platform
@@ -507,6 +508,18 @@ class CloudPickleTest(unittest.TestCase):
                 os.unlink(parent_process_module_file)
             if os.path.exists(child_process_module_file):
                 os.unlink(child_process_module_file)
+
+    def test_correct_globals_import(self):
+        def unrelated_function(a):
+            return math.exp(a)
+
+        def my_small_function(a):
+            return a+b
+
+        b = cloudpickle.dumps(my_small_function)
+        assert b'my_small_function' in b
+        assert b'unrelated_function' not in b
+        assert b'math' not in b
 
     def test_find_module(self):
         import pickle  # ensure this test is decoupled from global imports
