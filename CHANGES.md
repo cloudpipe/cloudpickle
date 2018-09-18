@@ -1,6 +1,11 @@
 master
 ======
 
+- Ensure that unpickling a function defined in a dynamic module several times
+  sequentially does not reset the values of global variables.
+  ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/205))
+
+
 0.5.6
 =====
 
