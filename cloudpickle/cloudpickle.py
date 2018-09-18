@@ -78,14 +78,9 @@ else:
     PY3 = True
 
 
-# caches dynamic modules that are not referenced in sys.modules
+# Container for the global namespace to ensure consistent unpickling of
+# functions defined in dynamic modules (modules not registed in sys.modules).
 _dynamic_modules_globals = weakref.WeakValueDictionary()
-
-# _dynamic_modules_globals will store base_globals variables. Or, base_globals
-# end up being dicts, and built-in dict instances cannot be weakly referenced.
-# Therefore, we create a mirror of the dict type, and at the mutation of
-# base globals from string to dict, we use the _DynamicModuleFuncGlobals
-# constructor instead of the builtin dict one.
 
 
 class _DynamicModuleFuncGlobals(dict):
