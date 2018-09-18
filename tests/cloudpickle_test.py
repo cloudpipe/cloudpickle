@@ -8,6 +8,7 @@ import imp
 from io import BytesIO
 import itertools
 import logging
+import math
 from operator import itemgetter, attrgetter
 import pickle
 import platform
@@ -507,6 +508,30 @@ class CloudPickleTest(unittest.TestCase):
                 os.unlink(parent_process_module_file)
             if os.path.exists(child_process_module_file):
                 os.unlink(child_process_module_file)
+
+    def test_correct_globals_import(self):
+        def nested_function(x):
+            return x + 1
+
+        def unwanted_function(x):
+            return math.exp(x)
+
+        def my_small_function(x, y):
+            return nested_function(x) + y
+
+        b = cloudpickle.dumps(my_small_function)
+
+        # Make sure that the pickle byte string only includes the definition
+        # of my_small_function and its dependency nested_function while
+        # extra functions and modules such as unwanted_function and the math
+        # module are not included so as to keep the pickle payload as
+        # lightweight as possible.
+
+        assert b'my_small_function' in b
+        assert b'nested_function' in b
+
+        assert b'unwanted_function' not in b
+        assert b'math' not in b
 
     def test_find_module(self):
         import pickle  # ensure this test is decoupled from global imports
