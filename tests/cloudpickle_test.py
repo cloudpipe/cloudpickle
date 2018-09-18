@@ -43,8 +43,8 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set,\
-        _dynamic_modules_globals
+from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
+from cloudpickle.cloudpickle import _dynamic_modules_globals
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -443,10 +443,10 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(id(mod1), id(mod2))
 
     def test_dynamic_modules_globals(self):
-        # _dynamic_modules_globals is a WeakValueDictionary, so if this dynamic
-        # module has no other reference than in this # dict (whether on the
-        # child process or the parent process), this module will be garbage
-        # collected.
+        # _dynamic_modules_globals is a WeakValueDictionary, so if a value
+        # in this dict (containing a set of global variables from a dynamic
+        # module created in the parent process) has no other reference than in
+        # this dict in the child process, it will be garbage collected.
 
         # We first create a module
         mod = imp.new_module('mod')
@@ -459,8 +459,6 @@ class CloudPickleTest(unittest.TestCase):
 
         pickled_module_path = 'mod_f.pkl'
 
-        # _dynamic_modules_globals will have mod appended to its values
-        # in the child process only
         child_process_script = '''
         import pickle
         from cloudpickle.cloudpickle import _dynamic_modules_globals
@@ -470,15 +468,18 @@ class CloudPickleTest(unittest.TestCase):
 
         # A dictionnary storing the globals of the newly unpickled function
         # should have been created
-        assert list(_dynamic_modules_globals.keys())==['mod']
+        assert list(_dynamic_modules_globals.keys()) == ['mod']
 
+        # func.__globals__ is the only non-weak reference to
+        # _dynamic_modules_globals['mod']. By deleting func, we delete also
+        # _dynamic_modules_globals['mod']
         del func
         gc.collect()
 
         # There is no reference to the globals of func since func has been
         # deleted and _dynamic_modules_globals is a WeakValueDictionary,
         # so _dynamic_modules_globals should now be empty
-        assert list(_dynamic_modules_globals.keys())==[]
+        assert list(_dynamic_modules_globals.keys()) == []
         '''
 
         child_process_script = child_process_script.format(
