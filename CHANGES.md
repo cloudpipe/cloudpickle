@@ -4,6 +4,8 @@ master
 - Ensure that unpickling a function defined in a dynamic module several times
   sequentially does not reset the values of global variables.
   ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/205))
+- Restrict the ability to pickle annotations to python3.7+ ([issue #193](
+  https://github.com/cloudpipe/cloudpickle/issues/193) and [issue #196](https://github.com/cloudpipe/cloudpickle/issues/196))
 
 
 0.5.6
