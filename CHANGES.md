@@ -1,6 +1,18 @@
-
 master
 ======
+
+- Ensure that unpickling a function defined in a dynamic module several times
+  sequentially does not reset the values of global variables.
+  ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/205))
+
+
+0.5.6
+=====
+
+- Ensure that unpickling a locally defined function that accesses the global
+  variables of a module does not reset the values of the global variables if
+  they are already initialized.
+  ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/187))
 
 
 0.5.5
@@ -18,7 +30,6 @@ master
 - Fixed a bug when pickling functions in `__main__` that access global
   variables ([issue #187](
   https://github.com/cloudpipe/cloudpickle/issues/187)).
-
 
 0.5.3
 =====
