@@ -4,7 +4,6 @@ import abc
 import collections
 import base64
 import functools
-import imp
 from io import BytesIO
 import itertools
 import logging
@@ -16,6 +15,7 @@ import random
 import subprocess
 import sys
 import textwrap
+import types
 import unittest
 import weakref
 import os
@@ -415,7 +415,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle, pickle_clone)
 
     def test_dynamic_module(self):
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         x = 1
         def f(y):
@@ -449,7 +449,7 @@ class CloudPickleTest(unittest.TestCase):
         # this dict in the child process, it will be garbage collected.
 
         # We first create a module
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         x = 1
         def func():
@@ -500,7 +500,7 @@ class CloudPickleTest(unittest.TestCase):
         # the child process and reloaded in another one.
 
         # We create a new dynamic module
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         x = 1
         '''
@@ -592,7 +592,7 @@ class CloudPickleTest(unittest.TestCase):
 
         assert not _can_find_module('invalid_module')
 
-        dynamic_module = imp.new_module('dynamic_module')  # noqa
+        dynamic_module = types.ModuleType('dynamic_module')  # noqa
         assert not _can_find_module('dynamic_module')
 
     def test_Ellipsis(self):
@@ -610,7 +610,7 @@ class CloudPickleTest(unittest.TestCase):
 
         fi = itertools.chain.from_iterable
         fi_depickled = pickle_depickle(fi, protocol=self.protocol)
-        self.assertEqual(list(fi([[1, 2], [3, 4]])), [1, 2, 3, 4])
+        self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
     @pytest.mark.skipif(tornado is None,
                         reason="test needs Tornado installed")
@@ -1074,7 +1074,7 @@ class CloudPickleTest(unittest.TestCase):
         # subsequent uplickling.
 
         # first, we create a dynamic module in the parent process
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         GLOBAL_STATE = "initial value"
 
