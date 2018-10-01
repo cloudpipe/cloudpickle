@@ -44,7 +44,7 @@ from __future__ import print_function
 
 import dis
 from functools import partial
-import imp
+import importlib
 import io
 import itertools
 import logging
@@ -309,11 +309,7 @@ class CloudPickler(Pickler):
         if hasattr(obj, '__file__'):
             is_dynamic = False
         else:
-            try:
-                _find_module(mod_name)
-                is_dynamic = False
-            except ImportError:
-                is_dynamic = True
+            is_dynamic = not _can_find_module(mod_name)
 
         self.modules.add(obj)
         if is_dynamic:
@@ -949,7 +945,7 @@ def subimport(name):
 
 
 def dynamic_subimport(name, vars):
-    mod = imp.new_module(name)
+    mod = types.ModuleType(name)
     mod.__dict__.update(vars)
     return mod
 
@@ -1146,19 +1142,30 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     return skeleton_class
 
 
-def _find_module(mod_name):
+def _can_find_module(mod_name):
     """
     Iterate over each part instead of calling imp.find_module directly.
-    This function is able to find submodules (e.g. scikit.tree)
+    This function is able to find submodules (e.g. os.path).
+
+    Return True if the module can be found.
     """
-    path = None
-    for part in mod_name.split('.'):
-        if path is not None:
-            path = [path]
-        file, path, description = imp.find_module(part, path)
-        if file is not None:
-            file.close()
-    return path, description
+    if hasattr(importlib, 'util'):
+        spec = importlib.util.find_spec(mod_name)
+        return spec is not None
+    else:
+        # Backward compat for Python 2
+        import imp
+        try:
+            path = None
+            for part in mod_name.split('.'):
+                if path is not None:
+                    path = [path]
+                file, path, description = imp.find_module(part, path)
+                if file is not None:
+                    file.close()
+        except ImportError:
+            return False
+        return True
 
 
 """Constructors for 3rd party libraries

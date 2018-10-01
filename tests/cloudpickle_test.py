@@ -4,7 +4,6 @@ import abc
 import collections
 import base64
 import functools
-import gc
 import imp
 from io import BytesIO
 import itertools
@@ -44,8 +43,8 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
-from cloudpickle.cloudpickle import _dynamic_modules_globals
+from cloudpickle.cloudpickle import _can_find_module
+from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -495,7 +494,6 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             os.unlink(pickled_module_path)
 
-
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
         # property. Otherwise, this will lead to an ImportError if pickled in
@@ -588,16 +586,14 @@ class CloudPickleTest(unittest.TestCase):
         assert b'unwanted_function' not in b
         assert b'math' not in b
 
-    def test_find_module(self):
-        import pickle  # ensure this test is decoupled from global imports
-        _find_module('pickle')
+    def test_can_find_module(self):
+        import pickle  # noqa: decouple this test from global imports
+        assert _can_find_module('pickle')
 
-        with pytest.raises(ImportError):
-            _find_module('invalid_module')
+        assert not _can_find_module('invalid_module')
 
-        with pytest.raises(ImportError):
-            valid_module = imp.new_module('valid_module')
-            _find_module('valid_module')
+        dynamic_module = imp.new_module('dynamic_module')  # noqa
+        assert not _can_find_module('dynamic_module')
 
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
