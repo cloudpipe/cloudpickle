@@ -822,8 +822,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled_class().foo(), 'it works!')
         self.assertEqual(depickled_instance.foo(), 'it works!')
 
-        # assertRaises doesn't return a contextmanager in python 2.6 :(.
-        self.failUnlessRaises(TypeError, depickled_base)
+        self.assertRaises(TypeError, depickled_base)
 
         class DepickledBaseSubclass(depickled_base):
             def foo(self):
@@ -1165,7 +1164,7 @@ class CloudPickleTest(unittest.TestCase):
             b'\x01K\x01K\x01KCU\x04|\x00\x00Sq\x06N\x85q\x07)U\x01xq\x08\x85q'
             b'\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
             b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13NtR.')
-        self.assertEquals(42, cloudpickle.loads(pickled)(42))
+        self.assertEqual(42, cloudpickle.loads(pickled)(42))
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
@@ -1179,7 +1178,7 @@ class CloudPickleTest(unittest.TestCase):
             b'\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
             b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13U\x08__main__q'
             b'\x14NtR.')
-        self.assertEquals(42, cloudpickle.loads(pickled)(42))
+        self.assertEqual(42, cloudpickle.loads(pickled)(42))
 
     def test_pickle_reraise(self):
         for exc_type in [Exception, ValueError, TypeError, RuntimeError]:
@@ -1190,8 +1189,8 @@ class CloudPickleTest(unittest.TestCase):
     def test_unhashable_function(self):
         d = {'a': 1}
         depickled_method = pickle_depickle(d.get)
-        self.assertEquals(depickled_method('a'), 1)
-        self.assertEquals(depickled_method('b'), None)
+        self.assertEqual(depickled_method('a'), 1)
+        self.assertEqual(depickled_method('b'), None)
 
     def test_itertools_count(self):
         counter = itertools.count(1, step=2)
