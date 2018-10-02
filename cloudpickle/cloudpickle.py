@@ -304,16 +304,10 @@ class CloudPickler(Pickler):
         """
         Save a module as an import
         """
-        mod_name = obj.__name__
-        # If module is successfully found then it is not a dynamically created module
-        if hasattr(obj, '__file__'):
-            is_dynamic = False
-        else:
-            is_dynamic = not _can_find_module(mod_name)
-
         self.modules.add(obj)
-        if is_dynamic:
-            self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)), obj=obj)
+        if _is_dynamic(obj):
+            self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
+                             obj=obj)
         else:
             self.save_reduce(subimport, (obj.__name__,), obj=obj)
 
@@ -1142,30 +1136,31 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     return skeleton_class
 
 
-def _can_find_module(mod_name):
+def _is_dynamic(module):
     """
-    Iterate over each part instead of calling imp.find_module directly.
-    This function is able to find submodules (e.g. os.path).
+    Return True if the module is special module that cannot be imported by its
+    name.
+    """
+    # Quick check: module that have __file__ attribute are not dynamic modules.
+    if hasattr(module, '__file__'):
+        return False
 
-    Return True if the module can be found.
-    """
-    if hasattr(importlib, 'util'):
-        spec = importlib.util.find_spec(mod_name)
-        return spec is not None
+    if hasattr(module, '__spec__'):
+        return module.__spec__ is None
     else:
         # Backward compat for Python 2
         import imp
         try:
             path = None
-            for part in mod_name.split('.'):
+            for part in module.__name__.split('.'):
                 if path is not None:
                     path = [path]
-                file, path, description = imp.find_module(part, path)
-                if file is not None:
-                    file.close()
+                f, path, description = imp.find_module(part, path)
+                if f is not None:
+                    f.close()
         except ImportError:
-            return False
-        return True
+            return True
+        return False
 
 
 """Constructors for 3rd party libraries
