@@ -589,9 +589,13 @@ class CloudPickleTest(unittest.TestCase):
     def test_is_dynamic_module(self):
         import pickle  # decouple this test from global imports
         import os.path
+        import distutils
+        import distutils.ccompiler
 
         assert not _is_dynamic(pickle)
-        assert not _is_dynamic(os.path)
+        assert not _is_dynamic(os.path)  # fake (aliased) module
+        assert not _is_dynamic(distutils)  # package
+        assert not _is_dynamic(distutils.ccompiler)  # module in package
 
         # user-created module without using the import machinery are also
         # dynamic
