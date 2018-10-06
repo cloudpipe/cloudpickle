@@ -677,6 +677,9 @@ class CloudPickler(Pickler):
         The name of this method is somewhat misleading: all types get
         dispatched here.
         """
+        if obj is type(None):
+            return self.save_reduce(type, (None,), obj=obj)
+
         if obj.__module__ == "__main__":
             return self.save_dynamic_class(obj)
 
