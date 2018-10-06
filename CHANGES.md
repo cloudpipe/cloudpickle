@@ -8,7 +8,8 @@ master
 - Restrict the ability to pickle annotations to python3.7+ ([issue #193](
   https://github.com/cloudpipe/cloudpickle/issues/193) and [issue #196](https://github.com/cloudpipe/cloudpickle/issues/196))
 
-- Fixed pickling issue with `NoneType` ([issue #209](https://github.com/cloudpipe/cloudpickle/issues/209))
+- Fixed pickling issue with singleton types `NoneType`, `type(...)` and 
+  `type(NotImplemented)` ([issue #209](https://github.com/cloudpipe/cloudpickle/issues/209))
 
 
 0.5.6
