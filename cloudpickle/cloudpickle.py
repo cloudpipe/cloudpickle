@@ -679,6 +679,10 @@ class CloudPickler(Pickler):
         """
         if obj is type(None):
             return self.save_reduce(type, (None,), obj=obj)
+        elif obj is type(Ellipsis):
+            return self.save_reduce(type, (Ellipsis,), obj=obj)
+        elif obj is type(NotImplemented):
+            return self.save_reduce(type, (NotImplemented,), obj=obj)
 
         if obj.__module__ == "__main__":
             return self.save_dynamic_class(obj)

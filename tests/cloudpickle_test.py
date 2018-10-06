@@ -611,6 +611,14 @@ class CloudPickleTest(unittest.TestCase):
         res = pickle_depickle(type(None), protocol=self.protocol)
         self.assertEqual(type(None), res)
 
+    def test_EllipsisType(self):
+        res = pickle_depickle(type(Ellipsis), protocol=self.protocol)
+        self.assertEqual(type(Ellipsis), res)
+
+    def test_NotImplementedType(self):
+        res = pickle_depickle(type(NotImplemented), protocol=self.protocol)
+        self.assertEqual(type(NotImplemented), res)
+
     def test_builtin_function_without_module(self):
         on = object.__new__
         on_depickled = pickle_depickle(on, protocol=self.protocol)
