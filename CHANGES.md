@@ -6,7 +6,11 @@ master
   ([issue #187](https://github.com/cloudpipe/cloudpickle/issues/205))
 
 - Restrict the ability to pickle annotations to python3.7+ ([issue #193](
-  https://github.com/cloudpipe/cloudpickle/issues/193) and [issue #196](https://github.com/cloudpipe/cloudpickle/issues/196))
+  https://github.com/cloudpipe/cloudpickle/issues/193) and [issue #196](
+  https://github.com/cloudpipe/cloudpickle/issues/196))
+
+- Stop using the deprecated `imp` module under Python 3.
+  ([issue #207](https://github.com/cloudpipe/cloudpickle/issues/207))
 
 - Fixed pickling issue with singleton types `NoneType`, `type(...)` and 
   `type(NotImplemented)` ([issue #209](https://github.com/cloudpipe/cloudpickle/issues/209))

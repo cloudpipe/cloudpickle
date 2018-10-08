@@ -4,8 +4,6 @@ import abc
 import collections
 import base64
 import functools
-import gc
-import imp
 from io import BytesIO
 import itertools
 import logging
@@ -17,6 +15,7 @@ import random
 import subprocess
 import sys
 import textwrap
+import types
 import unittest
 import weakref
 import os
@@ -44,8 +43,8 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _find_module, _make_empty_cell, cell_set
-from cloudpickle.cloudpickle import _dynamic_modules_globals
+from cloudpickle.cloudpickle import _is_dynamic
+from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -416,7 +415,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle, pickle_clone)
 
     def test_dynamic_module(self):
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         x = 1
         def f(y):
@@ -450,7 +449,7 @@ class CloudPickleTest(unittest.TestCase):
         # this dict in the child process, it will be garbage collected.
 
         # We first create a module
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         x = 1
         def func():
@@ -495,14 +494,13 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             os.unlink(pickled_module_path)
 
-
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
         # property. Otherwise, this will lead to an ImportError if pickled in
         # the child process and reloaded in another one.
 
         # We create a new dynamic module
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         x = 1
         '''
@@ -588,16 +586,21 @@ class CloudPickleTest(unittest.TestCase):
         assert b'unwanted_function' not in b
         assert b'math' not in b
 
-    def test_find_module(self):
-        import pickle  # ensure this test is decoupled from global imports
-        _find_module('pickle')
+    def test_is_dynamic_module(self):
+        import pickle  # decouple this test from global imports
+        import os.path
+        import distutils
+        import distutils.ccompiler
 
-        with pytest.raises(ImportError):
-            _find_module('invalid_module')
+        assert not _is_dynamic(pickle)
+        assert not _is_dynamic(os.path)  # fake (aliased) module
+        assert not _is_dynamic(distutils)  # package
+        assert not _is_dynamic(distutils.ccompiler)  # module in package
 
-        with pytest.raises(ImportError):
-            valid_module = imp.new_module('valid_module')
-            _find_module('valid_module')
+        # user-created module without using the import machinery are also
+        # dynamic
+        dynamic_module = types.ModuleType('dynamic_module')
+        assert _is_dynamic(dynamic_module)
 
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
@@ -626,7 +629,7 @@ class CloudPickleTest(unittest.TestCase):
 
         fi = itertools.chain.from_iterable
         fi_depickled = pickle_depickle(fi, protocol=self.protocol)
-        self.assertEqual(list(fi([[1, 2], [3, 4]])), [1, 2, 3, 4])
+        self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
     @pytest.mark.skipif(tornado is None,
                         reason="test needs Tornado installed")
@@ -834,8 +837,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled_class().foo(), 'it works!')
         self.assertEqual(depickled_instance.foo(), 'it works!')
 
-        # assertRaises doesn't return a contextmanager in python 2.6 :(.
-        self.failUnlessRaises(TypeError, depickled_base)
+        self.assertRaises(TypeError, depickled_base)
 
         class DepickledBaseSubclass(depickled_base):
             def foo(self):
@@ -1091,7 +1093,7 @@ class CloudPickleTest(unittest.TestCase):
         # subsequent uplickling.
 
         # first, we create a dynamic module in the parent process
-        mod = imp.new_module('mod')
+        mod = types.ModuleType('mod')
         code = '''
         GLOBAL_STATE = "initial value"
 
@@ -1177,7 +1179,7 @@ class CloudPickleTest(unittest.TestCase):
             b'\x01K\x01K\x01KCU\x04|\x00\x00Sq\x06N\x85q\x07)U\x01xq\x08\x85q'
             b'\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
             b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13NtR.')
-        self.assertEquals(42, cloudpickle.loads(pickled)(42))
+        self.assertEqual(42, cloudpickle.loads(pickled)(42))
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
@@ -1191,7 +1193,7 @@ class CloudPickleTest(unittest.TestCase):
             b'\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
             b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13U\x08__main__q'
             b'\x14NtR.')
-        self.assertEquals(42, cloudpickle.loads(pickled)(42))
+        self.assertEqual(42, cloudpickle.loads(pickled)(42))
 
     def test_pickle_reraise(self):
         for exc_type in [Exception, ValueError, TypeError, RuntimeError]:
@@ -1202,8 +1204,8 @@ class CloudPickleTest(unittest.TestCase):
     def test_unhashable_function(self):
         d = {'a': 1}
         depickled_method = pickle_depickle(d.get)
-        self.assertEquals(depickled_method('a'), 1)
-        self.assertEquals(depickled_method('b'), None)
+        self.assertEqual(depickled_method('a'), 1)
+        self.assertEqual(depickled_method('b'), None)
 
     def test_itertools_count(self):
         counter = itertools.count(1, step=2)
