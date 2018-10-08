@@ -1,5 +1,5 @@
-master
-======
+0.6.0
+=====
 
 - Ensure that unpickling a function defined in a dynamic module several times
   sequentially does not reset the values of global variables.
