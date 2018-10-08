@@ -9,8 +9,7 @@ master
   https://github.com/cloudpipe/cloudpickle/issues/193) and [issue #196](
   https://github.com/cloudpipe/cloudpickle/issues/196))
 
-- Stop using the deprecated `imp` module when a solution based on
-  `importlib` is available.
+- Stop using the deprecated `imp` module under Python 3.
   ([issue #207](https://github.com/cloudpipe/cloudpickle/issues/207))
 
 

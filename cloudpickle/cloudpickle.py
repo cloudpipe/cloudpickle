@@ -44,7 +44,6 @@ from __future__ import print_function
 
 import dis
 from functools import partial
-import importlib
 import io
 import itertools
 import logging
