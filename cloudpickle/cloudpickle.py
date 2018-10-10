@@ -1105,6 +1105,9 @@ def _make_skel_func(code, cell_count, base_globals=None):
     elif isinstance(base_globals, str):
         base_globals_name = base_globals
         try:
+            # First try to reuse the globals from the module containing the
+            # function. If it is not possible to retrieve it, fallback to an
+            # empty dictionary.
             base_globals = vars(importlib.import_module(base_globals))
         except ImportError:
             base_globals = _dynamic_modules_globals.get(
