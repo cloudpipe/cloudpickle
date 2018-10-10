@@ -17,6 +17,19 @@ except ImportError:
     timeout_supported = False
 
 
+TEST_GLOBALS = "a test value"
+
+
+def make_local_function():
+    def g(x):
+        # this function checks that the globals are correctly handled and that
+        # the builtins are available
+        assert TEST_GLOBALS == "a test value"
+        return sum(range(10))
+
+    return g
+
+
 def subprocess_pickle_echo(input_data, protocol=None):
     """Echo function with a child Python process
 

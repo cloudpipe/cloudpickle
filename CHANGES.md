@@ -1,3 +1,10 @@
+0.6.1
+=====
+
+- Fix regression in 0.6.0 which breaks the pickling of local function defined    in a module, making it impossible to access builtins functions.
+  ([issue #211](https://github.com/cloudpipe/cloudpickle/issues/211))
+
+
 0.6.0
 =====
 
