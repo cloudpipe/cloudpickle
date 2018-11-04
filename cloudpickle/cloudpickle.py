@@ -161,6 +161,7 @@ def _extract_func_subimports(code, f_globals, closure_values):
     """
 
     top_level_dependencies = itertools.chain(f_globals.values(), closure_values),
+    names_set = set(code.co_names)
 
     module_names = []
     # check if any known dependency is an imported package
@@ -174,8 +175,8 @@ def _extract_func_subimports(code, f_globals, closure_values):
                 # Older versions of pytest will add a "None" module to sys.modules.
                 if name is not None and name.startswith(prefix):
                     # check whether the function can address the sub-module
-                    tokens = set(name[len(prefix):].split('.'))
-                    if not tokens - set(code.co_names):
+                    tokens = name[len(prefix):].split('.')
+                    if not names_set.issuperset(tokens):
                         module_names.append(name)
     return module_names
 
@@ -222,7 +223,7 @@ def extract_func_data(func, globals_ref, code_globals_cache):
             base_globals = func.__module__
         else:
             base_globals = {}
-    globals_ref[id(func.__globals__)] = base_globals
+        globals_ref[id(func.__globals__)] = base_globals
 
     f_subimports = _extract_func_subimports(code, f_globals, closure_values or ())
     return code, state, base_globals, f_subimports
