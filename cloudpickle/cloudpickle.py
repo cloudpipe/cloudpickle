@@ -140,6 +140,10 @@ def _extract_code_globals(code_object, code_globals_cache):
     return out_names
 
 
+# sentinel used by ``_fill_function`` which will leave the cell empty
+_empty_cell_value = type('_empty_cell_value', (object,), {'__reduce__': classmethod(lambda cls: cls.__name__)})()
+
+
 def _extract_func_closure_values(func):
     if func.__closure__ is None:
         return None
@@ -332,91 +336,6 @@ def extract_class_data(cls):
         
     pre_state = (cls.__name__, cls.__bases__, type_kwargs)
     return pre_state, class_dict
-
-
-def _make_cell_set_template_code():
-    """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
-
-    Notes
-    -----
-    In Python 3, we could use an easier function:
-
-    .. code-block:: python
-
-       def f():
-           cell = None
-
-           def _stub(value):
-               nonlocal cell
-               cell = value
-
-           return _stub
-
-        _cell_set_template_code = f()
-
-    This function is _only_ a LOAD_FAST(arg); STORE_DEREF, but that is
-    invalid syntax on Python 2. If we use this function we also don't need
-    to do the weird freevars/cellvars swap below
-    """
-    def inner(value):
-        lambda: cell  # make ``cell`` a closure so that we get a STORE_DEREF
-        cell = value
-
-    co = inner.__code__
-
-    # NOTE: we are marking the cell variable as a free variable intentionally
-    # so that we simulate an inner function instead of the outer function. This
-    # is what gives us the ``nonlocal`` behavior in a Python 2 compatible way.
-    if not PY3:
-        return types.CodeType(
-            co.co_argcount,
-            co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags,
-            co.co_code,
-            co.co_consts,
-            co.co_names,
-            co.co_varnames,
-            co.co_filename,
-            co.co_name,
-            co.co_firstlineno,
-            co.co_lnotab,
-            co.co_cellvars,  # this is the trickery
-            (),
-        )
-    else:
-        return types.CodeType(
-            co.co_argcount,
-            co.co_kwonlyargcount,
-            co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags,
-            co.co_code,
-            co.co_consts,
-            co.co_names,
-            co.co_varnames,
-            co.co_filename,
-            co.co_name,
-            co.co_firstlineno,
-            co.co_lnotab,
-            co.co_cellvars,  # this is the trickery
-            (),
-        )
-
-
-_cell_set_template_code = _make_cell_set_template_code()
-
-
-def cell_set(cell, value):
-    """Set the value of a closure cell.
-    """
-    return types.FunctionType(
-        _cell_set_template_code,
-        {},
-        '_cell_set_inner',
-        (),
-        (cell,),
-    )(value)
 
 
 # relevant opcodes
@@ -1017,31 +936,83 @@ def _gen_not_implemented():
     return NotImplemented
 
 
-def instance(cls):
-    """
-    Create a new instance of a class.
+def _make_cell_set_template_code():
+    """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
-    Parameters
-    ----------
-    cls : type
-        The class to create an instance of.
+    Notes
+    -----
+    In Python 3, we could use an easier function:
 
-    Returns
-    -------
-    instance : cls
-        A new instance of ``cls``.
+    .. code-block:: python
+
+       def f():
+           cell = None
+
+           def _stub(value):
+               nonlocal cell
+               cell = value
+
+           return _stub
+
+        _cell_set_template_code = f()
+
+    This function is _only_ a LOAD_FAST(arg); STORE_DEREF, but that is
+    invalid syntax on Python 2. If we use this function we also don't need
+    to do the weird freevars/cellvars swap below
     """
-    return cls()
+    def inner(value):
+        lambda: cell  # make ``cell`` a closure so that we get a STORE_DEREF
+        cell = value
+
+    co = inner.__code__
+
+    # NOTE: we are marking the cell variable as a free variable intentionally
+    # so that we simulate an inner function instead of the outer function. This
+    # is what gives us the ``nonlocal`` behavior in a Python 2 compatible way.
+    if not PY3:
+        return types.CodeType(
+            co.co_argcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            co.co_name,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_cellvars,  # this is the trickery
+            (),
+        )
+    else:
+        return types.CodeType(
+            co.co_argcount,
+            co.co_kwonlyargcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            co.co_name,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_cellvars,  # this is the trickery
+            (),
+        )
 
 
-@instance
-class _empty_cell_value(object):
+_cell_set_template_code = _make_cell_set_template_code()
+
+
+def cell_set(cell, value):
+    """Set the value of a closure cell.
     """
-    sentinel for empty closures
-    """
-    @classmethod
-    def __reduce__(cls):
-        return cls.__name__
+    return types.FunctionType(_cell_set_template_code, {}, '_cell_set_inner', (), (cell,))(value)
 
 
 def _fill_function(*args):
