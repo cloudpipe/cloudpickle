@@ -78,6 +78,43 @@ else:
     PY3 = True
 
 
+if sys.version_info < (3, 4):
+    def _walk_global_ops(code):
+        """
+        Yield (opcode, argument number) tuples for all
+        global-referencing instructions in *code*.
+        """
+        code = getattr(code, 'co_code', b'')
+        if not PY3:
+            code = map(ord, code)
+
+        n = len(code)
+        i = 0
+        extended_arg = 0
+        while i < n:
+            op = code[i]
+            i += 1
+            if op >= HAVE_ARGUMENT:
+                oparg = code[i] + code[i + 1] * 256 + extended_arg
+                extended_arg = 0
+                i += 2
+                if op == EXTENDED_ARG:
+                    extended_arg = oparg * 65536
+                if op in GLOBAL_OPS:
+                    yield op, oparg
+
+else:
+    def _walk_global_ops(code):
+        """
+        Yield (opcode, argument number) tuples for all
+        global-referencing instructions in *code*.
+        """
+        for instr in dis.get_instructions(code):
+            op = instr.opcode
+            if op in GLOBAL_OPS:
+                yield op, instr.arg
+
+
 def _extract_code_globals(code_object, code_globals_cache):
     """
     Find all globals names read or written to by codeblock code object.
@@ -103,34 +140,77 @@ def _extract_code_globals(code_object, code_globals_cache):
     return out_names
 
 
+def _extract_func_closure_values(func):
+    if func.__closure__ is None:
+        return None
+
+    closure_values = []
+    for cell in func.__closure__:
+        try:
+            closure_values.append(cell.cell_contents)
+        except ValueError:
+            # sentinel used by ``_fill_function`` which will leave the cell empty
+            closure_values.append(_empty_cell_value)
+    return closure_values
+
+
+def _extract_func_subimports(code, f_globals, closure_values):
+    """
+    Ensure de-pickler imports any package child-modules that
+    are needed by the function
+    """
+
+    top_level_dependencies = itertools.chain(f_globals.values(), closure_values),
+
+    module_names = []
+    # check if any known dependency is an imported package
+    for x in top_level_dependencies:
+        if isinstance(x, types.ModuleType) and hasattr(x, '__package__') and x.__package__:
+            # check if the package has any currently loaded sub-imports
+            prefix = x.__name__ + '.'
+            # A concurrent thread could mutate sys.modules,
+            # make sure we iterate over a copy to avoid exceptions
+            for name in list(sys.modules):
+                # Older versions of pytest will add a "None" module to sys.modules.
+                if name is not None and name.startswith(prefix):
+                    # check whether the function can address the sub-module
+                    tokens = set(name[len(prefix):].split('.'))
+                    if not tokens - set(code.co_names):
+                        module_names.append(name)
+    return module_names
+
+
 def extract_func_data(func, globals_ref, code_globals_cache):
     """
     Turn the function into a tuple of data necessary to recreate it:
         code, globals, defaults, closure_values, dict
     """
-    code = func.__code__
 
-    # extract all global ref's
-    func_global_refs = _extract_code_globals(code, code_globals_cache)
+    # save the rest of the func data needed by _fill_function
+    state = {
+        'module': func.__module__,
+        'name': func.__name__,
+        'doc': func.__doc__,
+        'defaults': func.__defaults__,  # defaults requires no processing
+        'dict': func.__dict__,  # save the dict
+    }
+    if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
+        state['annotations'] = func.__annotations__
+    if hasattr(func, '__qualname__'):
+        state['qualname'] = func.__qualname__
+
+    code = func.__code__
 
     # process all variables referenced by global environment
     f_globals = {}
-    for var in func_global_refs:
+    for var in _extract_code_globals(code, code_globals_cache):
         if var in func.__globals__:
             f_globals[var] = func.__globals__[var]
-
-    # defaults requires no processing
-    defaults = func.__defaults__
+    state['globals'] = f_globals
 
     # process closure
-    closure = (
-        list(map(_get_cell_contents, func.__closure__))
-        if func.__closure__ is not None
-        else None
-    )
-
-    # save the dict
-    dct = func.__dict__
+    closure_values = _extract_func_closure_values(func)
+    state['closure_values'] = closure_values
 
     base_globals = globals_ref.get(id(func.__globals__), None)
     if base_globals is None:
@@ -144,7 +224,8 @@ def extract_func_data(func, globals_ref, code_globals_cache):
             base_globals = {}
     globals_ref[id(func.__globals__)] = base_globals
 
-    return code, f_globals, defaults, closure, dct, base_globals
+    f_subimports = _extract_func_subimports(code, f_globals, closure_values or ())
+    return code, state, base_globals, f_subimports
 
 
 FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR = 0
@@ -350,43 +431,6 @@ _BUILTIN_TYPE_CONSTRUCTORS = {
 }
 
 
-if sys.version_info < (3, 4):
-    def _walk_global_ops(code):
-        """
-        Yield (opcode, argument number) tuples for all
-        global-referencing instructions in *code*.
-        """
-        code = getattr(code, 'co_code', b'')
-        if not PY3:
-            code = map(ord, code)
-
-        n = len(code)
-        i = 0
-        extended_arg = 0
-        while i < n:
-            op = code[i]
-            i += 1
-            if op >= HAVE_ARGUMENT:
-                oparg = code[i] + code[i + 1] * 256 + extended_arg
-                extended_arg = 0
-                i += 2
-                if op == EXTENDED_ARG:
-                    extended_arg = oparg * 65536
-                if op in GLOBAL_OPS:
-                    yield op, oparg
-
-else:
-    def _walk_global_ops(code):
-        """
-        Yield (opcode, argument number) tuples for all
-        global-referencing instructions in *code*.
-        """
-        for instr in dis.get_instructions(code):
-            op = instr.opcode
-            if op in GLOBAL_OPS:
-                yield op, instr.arg
-
-
 class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
@@ -514,30 +558,6 @@ class CloudPickler(Pickler):
 
     dispatch[types.FunctionType] = save_function
 
-    def _save_subimports(self, code, top_level_dependencies):
-        """
-        Ensure de-pickler imports any package child-modules that
-        are needed by the function
-        """
-
-        # check if any known dependency is an imported package
-        for x in top_level_dependencies:
-            if isinstance(x, types.ModuleType) and hasattr(x, '__package__') and x.__package__:
-                # check if the package has any currently loaded sub-imports
-                prefix = x.__name__ + '.'
-                # A concurrent thread could mutate sys.modules,
-                # make sure we iterate over a copy to avoid exceptions
-                for name in list(sys.modules):
-                    # Older versions of pytest will add a "None" module to sys.modules.
-                    if name is not None and name.startswith(prefix):
-                        # check whether the function can address the sub-module
-                        tokens = set(name[len(prefix):].split('.'))
-                        if not tokens - set(code.co_names):
-                            # ensure unpickler executes this import
-                            self.save(sys.modules[name])
-                            # then discards the reference to it
-                            self.write(pickle.POP)
-
     def save_dynamic_class(self, obj):
         """
         Save a class that can't be stored as module global.
@@ -624,41 +644,30 @@ class CloudPickler(Pickler):
         save = self.save
         write = self.write
 
-        code, f_globals, defaults, closure_values, dct, base_globals = extract_func_data(
-            func, self.globals_ref, self._extract_code_globals_cache)
+        code, state, base_globals, f_subimports = extract_func_data(func, self.globals_ref,
+                                                                    self._extract_code_globals_cache)
 
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
-        self._save_subimports(
-            code,
-            itertools.chain(f_globals.values(), closure_values or ()),
-        )
+        # Ensure de-pickler imports any package child-modules that are needed by the function.
+        for name in f_subimports:
+            # ensure unpickler executes this import
+            save(sys.modules[name])
+            # then discards the reference to it
+            write(pickle.POP)
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
         save((
             code,
-            len(closure_values) if closure_values is not None else -1,
+            len(state['closure_values']) if state['closure_values'] is not None else -1,
             base_globals,
         ))
         write(pickle.REDUCE)
         self.memoize(func)
 
         # save the rest of the func data needed by _fill_function
-        state = {
-            'globals': f_globals,
-            'defaults': defaults,
-            'dict': dct,
-            'closure_values': closure_values,
-            'module': func.__module__,
-            'name': func.__name__,
-            'doc': func.__doc__,
-        }
-        if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
-            state['annotations'] = func.__annotations__
-        if hasattr(func, '__qualname__'):
-            state['qualname'] = func.__qualname__
         save(state)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
@@ -1018,14 +1027,6 @@ def _gen_ellipsis():
 
 def _gen_not_implemented():
     return NotImplemented
-
-
-def _get_cell_contents(cell):
-    try:
-        return cell.cell_contents
-    except ValueError:
-        # sentinel used by ``_fill_function`` which will leave the cell empty
-        return _empty_cell_value
 
 
 def instance(cls):
