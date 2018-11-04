@@ -160,7 +160,7 @@ def _extract_func_subimports(code, f_globals, closure_values):
     are needed by the function
     """
 
-    top_level_dependencies = itertools.chain(f_globals.values(), closure_values),
+    top_level_dependencies = itertools.chain(f_globals.values(), closure_values)
     names_set = set(code.co_names)
 
     module_names = []
@@ -176,7 +176,7 @@ def _extract_func_subimports(code, f_globals, closure_values):
                 if name is not None and name.startswith(prefix):
                     # check whether the function can address the sub-module
                     tokens = name[len(prefix):].split('.')
-                    if not names_set.issuperset(tokens):
+                    if names_set.issuperset(tokens):
                         module_names.append(name)
     return module_names
 
