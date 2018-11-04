@@ -78,6 +78,132 @@ else:
     PY3 = True
 
 
+def _extract_code_globals(code_object, code_globals_cache):
+    """
+    Find all globals names read or written to by codeblock code object.
+    """
+    out_names = code_globals_cache.get(code_object)
+    if out_names is None:
+        try:
+            names = code_object.co_names
+        except AttributeError:
+            # PyPy "builtin-code" object
+            out_names = set()
+        else:
+            out_names = {names[oparg] for _, oparg in _walk_global_ops(code_object)}
+
+            # see if nested function have any global refs
+            if code_object.co_consts:
+                for const in code_object.co_consts:
+                    if type(const) is types.CodeType:
+                        out_names |= _extract_code_globals(const, code_globals_cache)
+
+        code_globals_cache[code_object] = out_names
+
+    return out_names
+
+
+def extract_func_data(func, globals_ref, code_globals_cache):
+    """
+    Turn the function into a tuple of data necessary to recreate it:
+        code, globals, defaults, closure_values, dict
+    """
+    code = func.__code__
+
+    # extract all global ref's
+    func_global_refs = _extract_code_globals(code, code_globals_cache)
+
+    # process all variables referenced by global environment
+    f_globals = {}
+    for var in func_global_refs:
+        if var in func.__globals__:
+            f_globals[var] = func.__globals__[var]
+
+    # defaults requires no processing
+    defaults = func.__defaults__
+
+    # process closure
+    closure = (
+        list(map(_get_cell_contents, func.__closure__))
+        if func.__closure__ is not None
+        else None
+    )
+
+    # save the dict
+    dct = func.__dict__
+
+    base_globals = globals_ref.get(id(func.__globals__), None)
+    if base_globals is None:
+        # For functions defined in a well behaved module use
+        # vars(func.__module__) for base_globals. This is necessary to
+        # share the global variables across multiple pickled functions from
+        # this module.
+        if hasattr(func, '__module__') and func.__module__ is not None:
+            base_globals = func.__module__
+        else:
+            base_globals = {}
+    globals_ref[id(func.__globals__)] = base_globals
+
+    return code, f_globals, defaults, closure, dct, base_globals
+
+
+FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR = 0
+FUNC_TYPE_STRICT_GLOBAL = 1
+FUNC_TYPE_DYNAMIC = 2
+FUNC_TYPE_BUILTIN_FIELD = 3
+FUNC_TYPE_GLOBAL = 4
+
+
+def inspect_function_info(func, name):
+    """
+    Collect type & path info of the function.
+    """
+    if name is None:
+        name = func.__name__
+    try:
+        if func in _BUILTIN_TYPE_CONSTRUCTORS:
+            return FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR, None, None, name
+    except TypeError:  # Methods of builtin types aren't hashable in python 2.
+        pass
+
+    try:
+        # whichmodule() could fail, see
+        # https://bitbucket.org/gutworth/six/issues/63/importing-six-breaks-pickling
+        module_name = pickle.whichmodule(func, name)
+    except Exception:
+        module_name = None
+    # print('which gives %s %s %s' % (modname, obj, name))
+    try:
+        module = sys.modules[module_name]
+        if module_name == '__main__':
+            module = None
+    except KeyError:
+        # eval'd items such as namedtuple give invalid items for their function __module__
+        module = None
+
+    try:
+        lookedup_by_name = getattr(module, name, None)
+    except Exception:
+        lookedup_by_name = None
+
+    if module:
+        if lookedup_by_name is func:
+            return FUNC_TYPE_STRICT_GLOBAL, module, module_name, name
+
+    # if func is lambda, def'ed at prompt, is in main, or is nested, then
+    # we'll pickle the actual function object rather than simply saving a
+    # reference (as is done in default pickler), via save_function_tuple.
+    if (getattr(func.__code__, 'co_filename', None) == '<stdin>' or  # func defined interactively, may be in a console
+            getattr(func, '__name__') == '<lambda>' or  # func is lambda
+            module is None or  # fail to locate func's module
+            lookedup_by_name is None or lookedup_by_name is not func):  # func is nested
+        return FUNC_TYPE_DYNAMIC, module, module_name, name
+
+    if not hasattr(func, '__code__'):
+        return FUNC_TYPE_BUILTIN_FIELD, module, module_name, name
+    return FUNC_TYPE_GLOBAL, module, module_name, name
+
+
 # Container for the global namespace to ensure consistent unpickling of
 # functions defined in dynamic modules (modules not registed in sys.modules).
 _dynamic_modules_globals = weakref.WeakValueDictionary()
@@ -186,10 +312,6 @@ LOAD_GLOBAL = opcode.opmap['LOAD_GLOBAL']
 GLOBAL_OPS = (STORE_GLOBAL, DELETE_GLOBAL, LOAD_GLOBAL)
 HAVE_ARGUMENT = dis.HAVE_ARGUMENT
 EXTENDED_ARG = dis.EXTENDED_ARG
-
-
-def islambda(func):
-    return getattr(func, '__name__') == '<lambda>'
 
 
 _BUILTIN_TYPE_NAMES = {}
@@ -340,13 +462,11 @@ class CloudPickler(Pickler):
         Determines what kind of function obj is (e.g. lambda, defined at
         interactive prompt, etc) and handles the pickling appropriately.
         """
-        try:
-            should_special_case = obj in _BUILTIN_TYPE_CONSTRUCTORS
-        except TypeError:
-            # Methods of builtin types aren't hashable in python 2.
-            should_special_case = False
-
-        if should_special_case:
+        
+        func_type, module, module_name, name = inspect_function_info(obj, name)
+        if module:
+            self.modules.add(module)
+        if func_type == FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR:
             # We keep a special-cased cache of built-in type constructors at
             # global scope, because these functions are structured very
             # differently in different python versions and implementations (for
@@ -356,46 +476,17 @@ class CloudPickler(Pickler):
             #
             # If the function we've received is in that cache, we just
             # serialize it as a lookup into the cache.
-            return self.save_reduce(_BUILTIN_TYPE_CONSTRUCTORS[obj], (), obj=obj)
-
-        write = self.write
-
-        if name is None:
-            name = obj.__name__
-        try:
-            # whichmodule() could fail, see
-            # https://bitbucket.org/gutworth/six/issues/63/importing-six-breaks-pickling
-            modname = pickle.whichmodule(obj, name)
-        except Exception:
-            modname = None
-        # print('which gives %s %s %s' % (modname, obj, name))
-        try:
-            themodule = sys.modules[modname]
-        except KeyError:
-            # eval'd items such as namedtuple give invalid items for their function __module__
-            modname = '__main__'
-
-        if modname == '__main__':
-            themodule = None
-
-        try:
-            lookedup_by_name = getattr(themodule, name, None)
-        except Exception:
-            lookedup_by_name = None
-
-        if themodule:
-            self.modules.add(themodule)
-            if lookedup_by_name is obj:
-                return self.save_global(obj, name)
-
-        # a builtin_function_or_method which comes in as an attribute of some
-        # object (e.g., itertools.chain.from_iterable) will end
-        # up with modname "__main__" and so end up here. But these functions
-        # have no __code__ attribute in CPython, so the handling for
-        # user-defined functions below will fail.
-        # So we pickle them here using save_reduce; have to do it differently
-        # for different python versions.
-        if not hasattr(obj, '__code__'):
+            self.save_reduce(_BUILTIN_TYPE_CONSTRUCTORS[obj], (), obj=obj)
+        elif func_type == FUNC_TYPE_STRICT_GLOBAL:
+            self.save_global(obj, name)
+        elif func_type == FUNC_TYPE_BUILTIN_FIELD:
+            # a builtin_function_or_method which comes in as an attribute of some
+            # object (e.g., itertools.chain.from_iterable) will end
+            # up with module_name "__main__" and so end up here. But these functions
+            # have no __code__ attribute in CPython, so the handling for
+            # user-defined functions below will fail.
+            # So we pickle them here using save_reduce; have to do it differently
+            # for different python versions.
             if PY3:
                 rv = obj.__reduce_ex__(self.proto)
             else:
@@ -403,32 +494,23 @@ class CloudPickler(Pickler):
                     rv = (getattr, (obj.__self__, name))
                 else:
                     raise pickle.PicklingError("Can't pickle %r" % obj)
-            return self.save_reduce(obj=obj, *rv)
-
-        # if func is lambda, def'ed at prompt, is in main, or is nested, then
-        # we'll pickle the actual function object rather than simply saving a
-        # reference (as is done in default pickler), via save_function_tuple.
-        if (islambda(obj)
-                or getattr(obj.__code__, 'co_filename', None) == '<stdin>'
-                or themodule is None):
+            self.save_reduce(obj=obj, *rv)
+        elif func_type == FUNC_TYPE_DYNAMIC:
             self.save_function_tuple(obj)
-            return
+        elif func_type == FUNC_TYPE_GLOBAL:
+            write = self.write
+            if obj.__dict__:
+                # essentially save_reduce, but workaround needed to avoid recursion
+                self.save(_restore_attr)
+                write(pickle.MARK + pickle.GLOBAL + module_name + '\n' + name + '\n')
+                self.memoize(obj)
+                self.save(obj.__dict__)
+                write(pickle.TUPLE + pickle.REDUCE)
+            else:
+                write(pickle.GLOBAL + module_name + '\n' + name + '\n')
+                self.memoize(obj)
         else:
-            # func is nested
-            if lookedup_by_name is None or lookedup_by_name is not obj:
-                self.save_function_tuple(obj)
-                return
-
-        if obj.__dict__:
-            # essentially save_reduce, but workaround needed to avoid recursion
-            self.save(_restore_attr)
-            write(pickle.MARK + pickle.GLOBAL + modname + '\n' + name + '\n')
-            self.memoize(obj)
-            self.save(obj.__dict__)
-            write(pickle.TUPLE + pickle.REDUCE)
-        else:
-            write(pickle.GLOBAL + modname + '\n' + name + '\n')
-            self.memoize(obj)
+            raise TypeError("Invalid function type.")
 
     dispatch[types.FunctionType] = save_function
 
@@ -542,7 +624,8 @@ class CloudPickler(Pickler):
         save = self.save
         write = self.write
 
-        code, f_globals, defaults, closure_values, dct, base_globals = self.extract_func_data(func)
+        code, f_globals, defaults, closure_values, dct, base_globals = extract_func_data(
+            func, self.globals_ref, self._extract_code_globals_cache)
 
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
@@ -584,74 +667,6 @@ class CloudPickler(Pickler):
         weakref.WeakKeyDictionary()
         if not hasattr(sys, "pypy_version_info")
         else {})
-
-    @classmethod
-    def extract_code_globals(cls, co):
-        """
-        Find all globals names read or written to by codeblock co
-        """
-        out_names = cls._extract_code_globals_cache.get(co)
-        if out_names is None:
-            try:
-                names = co.co_names
-            except AttributeError:
-                # PyPy "builtin-code" object
-                out_names = set()
-            else:
-                out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
-
-                # see if nested function have any global refs
-                if co.co_consts:
-                    for const in co.co_consts:
-                        if type(const) is types.CodeType:
-                            out_names |= cls.extract_code_globals(const)
-
-            cls._extract_code_globals_cache[co] = out_names
-
-        return out_names
-
-    def extract_func_data(self, func):
-        """
-        Turn the function into a tuple of data necessary to recreate it:
-            code, globals, defaults, closure_values, dict
-        """
-        code = func.__code__
-
-        # extract all global ref's
-        func_global_refs = self.extract_code_globals(code)
-
-        # process all variables referenced by global environment
-        f_globals = {}
-        for var in func_global_refs:
-            if var in func.__globals__:
-                f_globals[var] = func.__globals__[var]
-
-        # defaults requires no processing
-        defaults = func.__defaults__
-
-        # process closure
-        closure = (
-            list(map(_get_cell_contents, func.__closure__))
-            if func.__closure__ is not None
-            else None
-        )
-
-        # save the dict
-        dct = func.__dict__
-
-        base_globals = self.globals_ref.get(id(func.__globals__), None)
-        if base_globals is None:
-            # For functions defined in a well behaved module use
-            # vars(func.__module__) for base_globals. This is necessary to
-            # share the global variables across multiple pickled functions from
-            # this module.
-            if hasattr(func, '__module__') and func.__module__ is not None:
-                base_globals = func.__module__
-            else:
-                base_globals = {}
-        self.globals_ref[id(func.__globals__)] = base_globals
-
-        return code, f_globals, defaults, closure, dct, base_globals
 
     def save_builtin_function(self, obj):
         if obj.__module__ == "__builtin__":
