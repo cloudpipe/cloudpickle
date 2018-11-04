@@ -43,7 +43,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _is_dynamic
+from cloudpickle.cloudpickle import _is_dynamic_module
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 
 from .testutils import subprocess_pickle_echo
@@ -626,15 +626,15 @@ class CloudPickleTest(unittest.TestCase):
         import distutils
         import distutils.ccompiler
 
-        assert not _is_dynamic(pickle)
-        assert not _is_dynamic(os.path)  # fake (aliased) module
-        assert not _is_dynamic(distutils)  # package
-        assert not _is_dynamic(distutils.ccompiler)  # module in package
+        assert not _is_dynamic_module(pickle)
+        assert not _is_dynamic_module(os.path)  # fake (aliased) module
+        assert not _is_dynamic_module(distutils)  # package
+        assert not _is_dynamic_module(distutils.ccompiler)  # module in package
 
         # user-created module without using the import machinery are also
         # dynamic
         dynamic_module = types.ModuleType('dynamic_module')
-        assert _is_dynamic(dynamic_module)
+        assert _is_dynamic_module(dynamic_module)
 
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
