@@ -590,6 +590,20 @@ class CloudPickler(Pickler):
             raise TypeError("Invalid function type.")
 
     dispatch[types.FunctionType] = save_function
+    
+    def _reduce_states(self, pre_func, post_func, pre_state, post_state, obj):
+        self.save(post_func)
+        # Mark the start of the args tuple for `post_func`.
+        self.write(pickle.MARK)
+        # Create and memoize an skeleton with obj's name and bases.
+        self.save_reduce(pre_func, pre_state, obj=obj)
+        # Now save the rest of obj. Any references to obj
+        # encountered while saving will point to the skeleton.
+        self.save(post_state)
+        # Write a tuple of (skeleton, post_state).
+        self.write(pickle.TUPLE)
+        # Call post_func(skeleton, post_state)
+        self.write(pickle.REDUCE)
 
     def save_dynamic_class(self, obj):
         """
@@ -601,9 +615,6 @@ class CloudPickler(Pickler):
         """
         
         pre_state, post_state = extract_class_data(obj)
-
-        save = self.save
-        write = self.write
 
         # We write pickle instructions explicitly here to handle the
         # possibility that the type object participates in a cycle with its own
@@ -617,24 +628,7 @@ class CloudPickler(Pickler):
         # Enum class), or if the type defines methods that close over the name
         # of the type, (which is common for Python 2-style super() calls).
 
-        # Push the rehydration function.
-        save(_rehydrate_skeleton_class)
-
-        # Mark the start of the args tuple for the rehydration function.
-        write(pickle.MARK)
-
-        # Create and memoize an skeleton class with obj's name and bases.
-        self.save_reduce(type(obj), pre_state, obj=obj)
-
-        # Now save the rest of obj's __dict__. Any references to obj
-        # encountered while saving will point to the skeleton class.
-        save(post_state)
-
-        # Write a tuple of (skeleton_class, clsdict).
-        write(pickle.TUPLE)
-
-        # Call _rehydrate_skeleton_class(skeleton_class, clsdict)
-        write(pickle.REDUCE)
+        self._reduce_states(type(obj), _rehydrate_skeleton_class, pre_state, post_state, obj=obj)
 
     def save_function_tuple(self, func):
         """
@@ -653,33 +647,18 @@ class CloudPickler(Pickler):
             self.save_reduce(_rebuild_tornado_coroutine, (func.__wrapped__,), obj=func)
             return
 
-        save = self.save
-        write = self.write
-
         pre_state, post_state, f_subimports = extract_func_data(func, self.globals_ref,
                                                                 self._extract_code_globals_cache)
-
-        save(_fill_function)  # skeleton function updater
-        write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
         # Ensure de-pickler imports any package child-modules that are needed by the function.
         for name in f_subimports:
             print(name)
             # ensure unpickler executes this import
-            save(sys.modules[name])
+            self.save(sys.modules[name])
             # then discards the reference to it
-            write(pickle.POP)
-
-        # create a skeleton function object and memoize it
-        save(_make_skel_func)
-        save(pre_state)
-        write(pickle.REDUCE)
-        self.memoize(func)
-
-        # save the rest of the func data needed by _fill_function
-        save(post_state)
-        write(pickle.TUPLE)
-        write(pickle.REDUCE)  # applies _fill_function on the tuple
+            self.write(pickle.POP)
+            
+        self._reduce_states(_make_skel_func, _fill_function, pre_state, post_state, obj=func)
 
     _extract_code_globals_cache = (
         weakref.WeakKeyDictionary()
@@ -1150,9 +1129,7 @@ def _make_skel_func(code, cell_count, base_globals=None):
     base_globals['__builtins__'] = __builtins__
 
     closure = (
-        tuple(_make_empty_cell() for _ in range(cell_count))
-        if cell_count >= 0 else
-        None
+        tuple(_make_empty_cell() for _ in range(cell_count)) if cell_count >= 0 else None
     )
     return types.FunctionType(code, base_globals, None, None, closure)
 
