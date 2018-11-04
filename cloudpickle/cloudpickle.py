@@ -183,12 +183,11 @@ def _extract_func_subimports(code, f_globals, closure_values):
 
 def extract_func_data(func, globals_ref, code_globals_cache):
     """
-    Turn the function into a tuple of data necessary to recreate it:
-        code, globals, defaults, closure_values, dict
+    Turn the function into a tuple of data necessary to recreate it.
     """
 
     # save the rest of the func data needed by _fill_function
-    state = {
+    post_state = {
         'module': func.__module__,
         'name': func.__name__,
         'doc': func.__doc__,
@@ -196,9 +195,9 @@ def extract_func_data(func, globals_ref, code_globals_cache):
         'dict': func.__dict__,  # save the dict
     }
     if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
-        state['annotations'] = func.__annotations__
+        post_state['annotations'] = func.__annotations__
     if hasattr(func, '__qualname__'):
-        state['qualname'] = func.__qualname__
+        post_state['qualname'] = func.__qualname__
 
     code = func.__code__
 
@@ -207,11 +206,11 @@ def extract_func_data(func, globals_ref, code_globals_cache):
     for var in _extract_code_globals(code, code_globals_cache):
         if var in func.__globals__:
             f_globals[var] = func.__globals__[var]
-    state['globals'] = f_globals
+    post_state['globals'] = f_globals
 
     # process closure
     closure_values = _extract_func_closure_values(func)
-    state['closure_values'] = closure_values
+    post_state['closure_values'] = closure_values
 
     base_globals = globals_ref.get(id(func.__globals__), None)
     if base_globals is None:
@@ -225,8 +224,9 @@ def extract_func_data(func, globals_ref, code_globals_cache):
             base_globals = {}
         globals_ref[id(func.__globals__)] = base_globals
 
+    pre_state = (code, len(closure_values) if closure_values is not None else -1, base_globals)
     f_subimports = _extract_func_subimports(code, f_globals, closure_values or ())
-    return code, state, base_globals, f_subimports
+    return pre_state, post_state, f_subimports
 
 
 FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR = 0
@@ -272,6 +272,9 @@ def inspect_function_info(func, name):
         if lookedup_by_name is func:
             return FUNC_TYPE_STRICT_GLOBAL, module, module_name, name
 
+    if not hasattr(func, '__code__'):
+        return FUNC_TYPE_BUILTIN_FIELD, module, module_name, name
+
     # if func is lambda, def'ed at prompt, is in main, or is nested, then
     # we'll pickle the actual function object rather than simply saving a
     # reference (as is done in default pickler), via save_function_tuple.
@@ -281,8 +284,7 @@ def inspect_function_info(func, name):
             lookedup_by_name is None or lookedup_by_name is not func):  # func is nested
         return FUNC_TYPE_DYNAMIC, module, module_name, name
 
-    if not hasattr(func, '__code__'):
-        return FUNC_TYPE_BUILTIN_FIELD, module, module_name, name
+
     return FUNC_TYPE_GLOBAL, module, module_name, name
 
 
@@ -300,6 +302,36 @@ class _DynamicModuleFuncGlobals(dict):
     derived class.
     """
     pass
+
+
+def extract_class_data(cls):
+    """
+    Turn the class into a tuple of data necessary to recreate it.
+    """
+    class_dict = dict(cls.__dict__)  # copy dict proxy to a dict
+    class_dict.pop('__weakref__', None)
+
+    # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
+    # This is a fix which breaks the cache but this only makes the first
+    # calls to issubclass slower.
+    if "_abc_impl" in class_dict:
+        import abc
+        (registry, _, _, _) = abc._get_dump(cls)
+        class_dict["_abc_impl"] = [subclass_weakref() for subclass_weakref in registry]
+
+    # On PyPy, __doc__ is a readonly attribute, so we need to include it in
+    # the initial skeleton class.  This is safe because we know that the
+    # doc can't participate in a cycle with the original class.
+    type_kwargs = {'__doc__': class_dict.pop('__doc__', None)}
+
+    # If type overrides __dict__ as a property, include it in the type kwargs.
+    # In Python 2, we can't set this attribute after construction.
+    __dict__ = class_dict.pop('__dict__', None)
+    if isinstance(__dict__, property):
+        type_kwargs['__dict__'] = __dict__
+        
+    pre_state = (cls.__name__, cls.__bases__, type_kwargs)
+    return pre_state, class_dict
 
 
 def _make_cell_set_template_code():
@@ -567,28 +599,8 @@ class CloudPickler(Pickler):
         functions, or that otherwise can't be serialized as attribute lookups
         from global modules.
         """
-        clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
-        clsdict.pop('__weakref__', None)
-
-        # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
-        # This is a fix which breaks the cache but this only makes the first
-        # calls to issubclass slower.
-        if "_abc_impl" in clsdict:
-            import abc
-            (registry, _, _, _) = abc._get_dump(obj)
-            clsdict["_abc_impl"] = [subclass_weakref()
-                                    for subclass_weakref in registry]
-
-        # On PyPy, __doc__ is a readonly attribute, so we need to include it in
-        # the initial skeleton class.  This is safe because we know that the
-        # doc can't participate in a cycle with the original class.
-        type_kwargs = {'__doc__': clsdict.pop('__doc__', None)}
-
-        # If type overrides __dict__ as a property, include it in the type kwargs.
-        # In Python 2, we can't set this attribute after construction.
-        __dict__ = clsdict.pop('__dict__', None)
-        if isinstance(__dict__, property):
-            type_kwargs['__dict__'] = __dict__
+        
+        pre_state, post_state = extract_class_data(obj)
 
         save = self.save
         write = self.write
@@ -612,12 +624,11 @@ class CloudPickler(Pickler):
         write(pickle.MARK)
 
         # Create and memoize an skeleton class with obj's name and bases.
-        tp = type(obj)
-        self.save_reduce(tp, (obj.__name__, obj.__bases__, type_kwargs), obj=obj)
+        self.save_reduce(type(obj), pre_state, obj=obj)
 
         # Now save the rest of obj's __dict__. Any references to obj
         # encountered while saving will point to the skeleton class.
-        save(clsdict)
+        save(post_state)
 
         # Write a tuple of (skeleton_class, clsdict).
         write(pickle.TUPLE)
@@ -645,14 +656,15 @@ class CloudPickler(Pickler):
         save = self.save
         write = self.write
 
-        code, state, base_globals, f_subimports = extract_func_data(func, self.globals_ref,
-                                                                    self._extract_code_globals_cache)
+        pre_state, post_state, f_subimports = extract_func_data(func, self.globals_ref,
+                                                                self._extract_code_globals_cache)
 
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
         # Ensure de-pickler imports any package child-modules that are needed by the function.
         for name in f_subimports:
+            print(name)
             # ensure unpickler executes this import
             save(sys.modules[name])
             # then discards the reference to it
@@ -660,16 +672,12 @@ class CloudPickler(Pickler):
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
-        save((
-            code,
-            len(state['closure_values']) if state['closure_values'] is not None else -1,
-            base_globals,
-        ))
+        save(pre_state)
         write(pickle.REDUCE)
         self.memoize(func)
 
         # save the rest of the func data needed by _fill_function
-        save(state)
+        save(post_state)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
