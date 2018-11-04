@@ -305,9 +305,8 @@ class CloudPickler(Pickler):
         Save a module as an import
         """
         self.modules.add(obj)
-        if _is_dynamic(obj):
-            self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
-                             obj=obj)
+        if _is_dynamic_module(obj):
+            self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)), obj=obj)
         else:
             self.save_reduce(subimport, (obj.__name__,), obj=obj)
 
@@ -335,7 +334,8 @@ class CloudPickler(Pickler):
     dispatch[types.CodeType] = save_codeobject
 
     def save_function(self, obj, name=None):
-        """ Registered with the dispatch to handle all function types.
+        """
+        Registered with the dispatch to handle all function types.
 
         Determines what kind of function obj is (e.g. lambda, defined at
         interactive prompt, etc) and handles the pickling appropriately.
@@ -523,7 +523,8 @@ class CloudPickler(Pickler):
         write(pickle.REDUCE)
 
     def save_function_tuple(self, func):
-        """  Pickles an actual func object.
+        """
+        Pickles an actual func object.
 
         A func comprises: code, globals, defaults, closure, and dict.  We
         extract and save these, injecting reducing functions at certain points
@@ -535,8 +536,7 @@ class CloudPickler(Pickler):
         soon as it's created.  The other stuff can then be filled in later.
         """
         if is_tornado_coroutine(func):
-            self.save_reduce(_rebuild_tornado_coroutine, (func.__wrapped__,),
-                             obj=func)
+            self.save_reduce(_rebuild_tornado_coroutine, (func.__wrapped__,), obj=func)
             return
 
         save = self.save
@@ -651,7 +651,7 @@ class CloudPickler(Pickler):
                 base_globals = {}
         self.globals_ref[id(func.__globals__)] = base_globals
 
-        return (code, f_globals, defaults, closure, dct, base_globals)
+        return code, f_globals, defaults, closure, dct, base_globals
 
     def save_builtin_function(self, obj):
         if obj.__module__ == "__builtin__":
@@ -903,7 +903,8 @@ def _rebuild_tornado_coroutine(func):
 # Shorthands for legacy support
 
 def dump(obj, file, protocol=None):
-    """Serialize obj as bytes streamed into file
+    """
+    Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
     pickle.HIGHEST_PROTOCOL. This setting favors maximum communication speed
@@ -916,7 +917,8 @@ def dump(obj, file, protocol=None):
 
 
 def dumps(obj, protocol=None):
-    """Serialize obj as a string of bytes allocated in memory
+    """
+    Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
     pickle.HIGHEST_PROTOCOL. This setting favors maximum communication speed
@@ -1012,7 +1014,8 @@ def _get_cell_contents(cell):
 
 
 def instance(cls):
-    """Create a new instance of a class.
+    """
+    Create a new instance of a class.
 
     Parameters
     ----------
@@ -1029,7 +1032,8 @@ def instance(cls):
 
 @instance
 class _empty_cell_value(object):
-    """sentinel for empty closures
+    """
+    sentinel for empty closures
     """
     @classmethod
     def __reduce__(cls):
@@ -1037,7 +1041,8 @@ class _empty_cell_value(object):
 
 
 def _fill_function(*args):
-    """Fills in the rest of function data into the skeleton function object
+    """
+    Fills in the rest of function data into the skeleton function object
 
     The skeleton itself is create by _make_skel_func().
     """
@@ -1096,9 +1101,10 @@ def _make_empty_cell():
 
 
 def _make_skel_func(code, cell_count, base_globals=None):
-    """ Creates a skeleton function object that contains just the provided
-        code and the correct number of cells in func_closure.  All other
-        func attributes (e.g. func_globals) are empty.
+    """
+    Creates a skeleton function object that contains just the provided
+    code and the correct number of cells in func_closure.
+    All other func attributes (e.g. func_globals) are empty.
     """
     if base_globals is None:
         base_globals = {}
@@ -1127,7 +1133,8 @@ def _make_skel_func(code, cell_count, base_globals=None):
 
 
 def _rehydrate_skeleton_class(skeleton_class, class_dict):
-    """Put attributes from `class_dict` back on `skeleton_class`.
+    """
+    Put attributes from `class_dict` back on `skeleton_class`.
 
     See CloudPickler.save_dynamic_class for more info.
     """
@@ -1144,7 +1151,7 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     return skeleton_class
 
 
-def _is_dynamic(module):
+def _is_dynamic_module(module):
     """
     Return True if the module is special module that cannot be imported by its
     name.
@@ -1186,7 +1193,7 @@ if sys.version_info < (3, 4):
     method_descriptor = type(str.upper)
 
     def _reduce_method_descriptor(obj):
-        return (getattr, (obj.__objclass__, obj.__name__))
+        return getattr, (obj.__objclass__, obj.__name__)
 
     try:
         import copy_reg as copyreg
