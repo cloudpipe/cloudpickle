@@ -407,17 +407,6 @@ class CloudPickler(Pickler):
             else:
                 raise
 
-    def save_memoryview(self, obj):
-        self.save(obj.tobytes())
-
-    dispatch[memoryview] = save_memoryview
-
-    if not PY3:
-        def save_buffer(self, obj):
-            self.save(str(obj))
-
-        dispatch[buffer] = save_buffer  # noqa: F821 'buffer' was removed in Python 3
-
     def save_module(self, obj):
         """
         Save a module as an import
@@ -685,6 +674,19 @@ class CloudPickler(Pickler):
 
     if not PY3:
         dispatch[types.InstanceType] = save_inst
+        
+    ### Serializer for special objects ###
+        
+    def save_memoryview(self, obj):
+        self.save(obj.tobytes())
+
+    dispatch[memoryview] = save_memoryview
+
+    if not PY3:
+        def save_buffer(self, obj):
+            self.save(str(obj))
+
+        dispatch[buffer] = save_buffer  # noqa: F821 'buffer' was removed in Python 3
 
     def save_property(self, obj):
         # properties not correctly saved in python
