@@ -76,6 +76,10 @@ Running the tests
       pip install -r dev-requirements.txt
       PYTHONPATH='.:tests' py.test
 
+How it works
+------------
+
+See [HOW IT WORKS](HOW_IT_WORKS.md)
 
 History
 -------

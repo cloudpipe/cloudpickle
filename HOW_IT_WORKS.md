@@ -1,0 +1,223 @@
+# How cloudpickle works
+
+This article explains how cloudpickle serializes objects.
+
+## Overview
+
+In this chapter, we introduce some important concepts which could be used later.
+
+What cloudpickle mainly does is to convert objects into data/states that ``pickle`` could serialize;
+also cloudpickle can deserialize objects by reduction.
+
+The following workflow illustrates the process:
+
+```
+Serialization:
+
+obj --- [ cloudpickle ] ---> reduction_methods, serializable states
+reduction_methods, serializable states --- [ pickle ] ---> bytes
+
+Deserialization:
+
+bytes --- [ pickle ] ---> reduction_methods, serializable states
+reduction_methods(serializable states) ---> obj
+
+```
+
+Deserialization generally needs two stages: construction stage & decoration stage.
+
+At construction stage, we setup an instance of object while at decoration stage, we fulfill properties of the instance.
+
+We need two stages instead of one is because
+
+1. Some attributes of certain objects can only be defined at construction; after that, these attributes could be immutable.
+2. In some situations filling object attributes through constructor could be easier or more efficient.
+3. Some of these pieces can contain a reference to itself, so a skeleton is needed to avoid infinite loops.
+
+Since deserialization asks for two stages, serialization should also have two different set of states for different stages.
+The state used in construction stage is called `pre_state`, and the state used in decoration stage is called `post_state`, correspondingly.
+
+By introducing `pre_state` & `post_state`, the process becomes:
+
+```
+Serialization:
+
+obj --- [ cloudpickle ] ---> decoration_method, construction_method, pre_state, post_state
+decoration_method, construction_method, pre_state, post_state --- [ pickle ] ---> bytes
+
+Deserialization:
+
+bytes --- [ pickle ] ---> decoration_method, construction_method, pre_state, post_state
+decoration_method(construction_method(pre_state), post_state) ---> obj
+
+```
+
+`decoration_method` & `construction_method` are all global functions in `cloudpickle` module which can be serialized by `pickle`.
+
+For some simple objects, they only need construction stage or decoration stage.
+
+
+## Function serialization
+
+Serialization for functions is essential to cloudpickle. We will use a lot of text to describe the principle.
+
+Function serialization is complex because there are various types of functions in python. Let's check them one by one.
+
+### FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR
+
+They are `__new__` methods for built-in types like `dict`, `frozenset`, `set`, `list`, `tuple` and `object`.
+
+We just need to use factory functions to replace `__new__` methods for serialization.
+
+### FUNC_TYPE_STRICT_GLOBAL
+
+They are global functions and fields of named static python modules. Generally speaking, they are top-level functions defined in a
+module file.
+
+We treat them as a special case of global variable.
+
+### FUNC_TYPE_BUILTIN_FIELD
+
+A built-in function or method which comes in as an attribute of some object (e.g., itertools.chain.from_iterable)
+will end up with module_name "__main__" and so end up here.
+But these functions have no __code__ attribute in CPython,
+so the handling for user-defined functions below will fail.
+So we pickle them here using save_reduce; have to do it differently for different python versions.
+
+### FUNC_TYPE_DYNAMIC
+
+They are special functions that cannot be accessed by name reference.
+
+These functions include:
+
+* lambdas
+* functions defined interactively, may be in a console
+* functions whose module is unknown
+* functions could be nested
+* functions who are replaced by other objects, for example, a decorator
+
+Serialize these functions are trickiest because we have no choice but keeping their content.
+
+A function comprises of name, qualname, module, doc, annotations, code, globals, defaults, closure and dict.
+
+There are something worth mention about globals.
+
+We use two fields to control the globals. One is called `shared_module`, another is `f_globals`.
+
+Considering the following situation:
+
+```
+VARIABLE = "uninitialized"
+
+def func1():
+    global VARIABLE
+    VARIABLE = "initialized"
+    return VARIABLE
+```
+
+If one tries to serialize and deserialize this function by simply saving and loading its globals, what will happen
+is that its globals are assigned to another module instead of this one. Thus we need to make use of variable sharing & proper global variable assign.
+
+* shared_module
+
+    `shared_module` is used to share globals between functions. It is a string equals to `func.__module__`.
+
+    During serialization, a dict called `globals_ref` whose keys are `id(func.__globals__)` are used to cache and reuse `shared_module`.
+
+    During deserialization, a weakref dict `_dynamic_modules_globals`, whose keys are `shared_module`, is
+    used to cache and reuse `_DynamicModuleFuncGlobals` which contains globals.
+
+* f_globals
+
+    `f_globals` is a dict contains the intersection of globals defined in `func.__globals__` and those defined in op codes of the function.
+    During deserialization, `f_globals` will copy back to `func.__globals__` but **not override existing variables**.
+
+OK. Let's talk about the serialization.
+
+Serialization of functions include two stages, thus we have `pre_state` and `post_state`.
+
+`pre_state` is a tuple contains code, count of closure values and `shared_module`.
+`post_state` is a dict contains name, qualname, module_name, doc, annotations, f_globals, defaults, closure and dict.
+
+The construction method for `pre_state` is `_make_skel_func`; the decoration method for `post_state` is `_fill_function`.
+
+However, before these stages, we need to deal with sub-imports.
+
+Sub-imports are modules that are not imported by `__init__` of its parent package.
+
+Here is an example:
+
+```python
+def test_submodule(self):
+    # Function that refers (by attribute) to a sub-module of a package.
+
+    # Choose any module NOT imported by __init__ of its parent package
+    # examples in standard library include:
+    # - http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
+
+    global xml # imitate performing this import at top of file
+    import xml.etree.ElementTree
+    def example():
+        x = xml.etree.ElementTree.Comment # potential AttributeError
+
+    s = cloudpickle.dumps(example)
+
+    # refresh the environment, i.e., unimport the dependency
+    del xml
+    for item in list(sys.modules):
+        if item.split('.')[0] == 'xml':
+            del sys.modules[item]
+
+    # deserialise
+    f = pickle.loads(s)
+    f() # perform test for error
+```
+
+Sub-imports are hard encoded into the serialization context of the function to ensure its loading during deserialization.
+
+### FUNC_TYPE_GLOBAL_UNKNOWN
+
+They are functions not belong to any types before. Cloudpickle will try its best to recover it on deserialization.
+
+## Type/Class serialization
+
+This is also called `save_global` due to the convention of `pickle`.
+
+They also have several kinds.
+
+### Special global built-in types
+
+For example, `type(None)`, `type(...)` and `NotImplemented`. Factory functions are used here.
+
+### Built-in types in `types` module
+
+Use `getattr` as a factory function to fetch values from `types` module on deserialization.
+
+### Dynamic classes
+
+They cannot be accessed via module name so we have to serialize its content.
+
+Serialization of these classes also include two stages, thus we have `pre_state` and `post_state`.
+See `extract_class_data` for details.
+
+The construction method for `pre_state` is the type of the class; the decoration method for `post_state` is `_rehydrate_skeleton_class`.
+
+### Other types
+
+They are normal types that can be accessed via module. They are serialized by `pickle`. Fail otherwise.
+
+## Module serialization
+
+Modules are divided into static modules and dynamic modules.
+
+Static modules have a non-None `__file__` or `__spec__` attribute, they are typically defined in a file.
+
+Dynamic modules can not be imported by a path.
+
+For static modules, we just need to call `__import__` on its name during deserialization.
+
+For dynamic modules, we construct it with its name by `types.ModuleType(name)`, and fill its dict with variables.
+
+## Others
+
+Their serialization interface are registered in `dispatch` attribute of `CloudPickle` class.
