@@ -174,7 +174,10 @@ def _extract_func_subimports(code, f_globals, closure_values):
     """
 
     top_level_dependencies = itertools.chain(f_globals.values(), closure_values)
-    names_set = set(code.co_names)
+    if hasattr(code, 'co_names'):
+        names_set = set(code.co_names)
+    else:
+        names_set = set()
 
     # A concurrent thread could mutate sys.modules,
     # make sure we iterate over a copy to avoid exceptions
