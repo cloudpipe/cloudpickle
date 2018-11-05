@@ -230,19 +230,16 @@ def extract_func_data(func, globals_ref, code_globals_cache):
     closure_values = _extract_func_closure_values(func)
     post_state['closure_values'] = closure_values
 
-    base_globals = globals_ref.get(id(func.__globals__), None)
-    if base_globals is None:
+    shared_module = globals_ref.get(id(func.__globals__), None)
+    if shared_module is None:
         # For functions defined in a well behaved module use
         # vars(func.__module__) for base_globals. This is necessary to
         # share the global variables across multiple pickled functions from
         # this module.
-        if hasattr(func, '__module__') and func.__module__ is not None:
-            base_globals = func.__module__
-        else:
-            base_globals = {}
-        globals_ref[id(func.__globals__)] = base_globals
+        shared_module = func.__module__
+        globals_ref[id(func.__globals__)] = shared_module
 
-    pre_state = (code, len(closure_values) if closure_values is not None else -1, base_globals)
+    pre_state = (code, len(closure_values) if closure_values is not None else -1, shared_module)
     f_subimports = _extract_func_subimports(code, f_globals, closure_values or ())
     return pre_state, post_state, f_subimports
 
@@ -307,7 +304,7 @@ def inspect_function_info(func, name):
 
 
 # Container for the global namespace to ensure consistent unpickling of
-# functions defined in dynamic modules (modules not registed in sys.modules).
+# functions defined in dynamic modules (modules not registered in sys.modules).
 _dynamic_modules_globals = weakref.WeakValueDictionary()
 
 
@@ -1081,27 +1078,28 @@ def _make_empty_cell():
     return (lambda: cell).__closure__[0]
 
 
-def _make_skel_func(code, cell_count, base_globals=None):
+def _make_skel_func(code, cell_count, shared_module):
     """
     Creates a skeleton function object that contains just the provided
     code and the correct number of cells in func_closure.
     All other func attributes (e.g. func_globals) are empty.
     """
-    if base_globals is None:
+    if shared_module is None:
         base_globals = {}
-    elif isinstance(base_globals, str):
-        base_globals_name = base_globals
+    elif isinstance(shared_module, str):
         try:
             # First try to reuse the globals from the module containing the
             # function. If it is not possible to retrieve it, fallback to an
             # empty dictionary.
-            base_globals = vars(importlib.import_module(base_globals))
+            base_globals = vars(importlib.import_module(shared_module))
         except ImportError:
-            base_globals = _dynamic_modules_globals.get(
-                    base_globals_name, None)
+            base_globals = _dynamic_modules_globals.get(shared_module, None)
             if base_globals is None:
                 base_globals = _DynamicModuleFuncGlobals()
-            _dynamic_modules_globals[base_globals_name] = base_globals
+            _dynamic_modules_globals[shared_module] = base_globals
+    else:
+        print(shared_module)
+        raise TypeError("Unexpected type '%s' for 'shared_module'." % type(shared_module))
 
     base_globals['__builtins__'] = __builtins__
 
