@@ -1097,8 +1097,9 @@ def _make_skel_func(code, cell_count, shared_module):
             if base_globals is None:
                 base_globals = _DynamicModuleFuncGlobals()
             _dynamic_modules_globals[shared_module] = base_globals
+    elif isinstance(shared_module, dict):
+        base_globals = shared_module  # for compatible
     else:
-        print(shared_module)
         raise TypeError("Unexpected type '%s' for 'shared_module'." % type(shared_module))
 
     base_globals['__builtins__'] = __builtins__
