@@ -560,12 +560,11 @@ class CloudPickler(Pickler):
 
         # Ensure de-pickler imports any package child-modules that are needed by the function.
         for name in f_subimports:
-            print(name)
             # ensure unpickler executes this import
             self.save(sys.modules[name])
             # then discards the reference to it
             self.write(pickle.POP)
-            
+
         self._reduce_states(_make_skel_func, _fill_function, pre_state, post_state, obj=func)
 
     _extract_code_globals_cache = (
