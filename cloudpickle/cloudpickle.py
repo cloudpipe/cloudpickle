@@ -78,6 +78,15 @@ else:
     PY3 = True
 
 
+# relevant opcodes
+STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
+DELETE_GLOBAL = opcode.opmap['DELETE_GLOBAL']
+LOAD_GLOBAL = opcode.opmap['LOAD_GLOBAL']
+GLOBAL_OPS = (STORE_GLOBAL, DELETE_GLOBAL, LOAD_GLOBAL)
+HAVE_ARGUMENT = dis.HAVE_ARGUMENT
+EXTENDED_ARG = dis.EXTENDED_ARG
+
+
 if sys.version_info < (3, 4):
     def _walk_global_ops(code):
         """
@@ -167,6 +176,12 @@ def _extract_func_subimports(code, f_globals, closure_values):
     top_level_dependencies = itertools.chain(f_globals.values(), closure_values)
     names_set = set(code.co_names)
 
+    # A concurrent thread could mutate sys.modules,
+    # make sure we iterate over a copy to avoid exceptions
+    sys_modules = list(sys.modules)
+    # Older versions of pytest will add a "None" module to sys.modules.
+    sys_modules = [m for m in sys_modules if m is not None]
+
     module_names = []
     # check if any known dependency is an imported package
     for x in top_level_dependencies:
@@ -175,9 +190,8 @@ def _extract_func_subimports(code, f_globals, closure_values):
             prefix = x.__name__ + '.'
             # A concurrent thread could mutate sys.modules,
             # make sure we iterate over a copy to avoid exceptions
-            for name in list(sys.modules):
-                # Older versions of pytest will add a "None" module to sys.modules.
-                if name is not None and name.startswith(prefix):
+            for name in sys_modules:
+                if name.startswith(prefix):
                     # check whether the function can address the sub-module
                     tokens = name[len(prefix):].split('.')
                     if names_set.issuperset(tokens):
@@ -235,9 +249,9 @@ def extract_func_data(func, globals_ref, code_globals_cache):
 
 FUNC_TYPE_BUILTIN_TYPE_CONSTRUCTOR = 0
 FUNC_TYPE_STRICT_GLOBAL = 1
-FUNC_TYPE_DYNAMIC = 2
-FUNC_TYPE_BUILTIN_FIELD = 3
-FUNC_TYPE_GLOBAL = 4
+FUNC_TYPE_BUILTIN_FIELD = 2
+FUNC_TYPE_DYNAMIC = 3
+FUNC_TYPE_GLOBAL_UNKNOWN = 4
 
 
 def inspect_function_info(func, name):
@@ -285,11 +299,11 @@ def inspect_function_info(func, name):
     if (getattr(func.__code__, 'co_filename', None) == '<stdin>' or  # func defined interactively, may be in a console
             getattr(func, '__name__') == '<lambda>' or  # func is lambda
             module is None or  # fail to locate func's module
-            lookedup_by_name is None or lookedup_by_name is not func):  # func is nested
+            lookedup_by_name is None or # func is nested
+            lookedup_by_name is not func):  # func has been replaced by other objects
         return FUNC_TYPE_DYNAMIC, module, module_name, name
 
-
-    return FUNC_TYPE_GLOBAL, module, module_name, name
+    return FUNC_TYPE_GLOBAL_UNKNOWN, module, module_name, name
 
 
 # Container for the global namespace to ensure consistent unpickling of
@@ -336,15 +350,6 @@ def extract_class_data(cls):
         
     pre_state = (cls.__name__, cls.__bases__, type_kwargs)
     return pre_state, class_dict
-
-
-# relevant opcodes
-STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
-DELETE_GLOBAL = opcode.opmap['DELETE_GLOBAL']
-LOAD_GLOBAL = opcode.opmap['LOAD_GLOBAL']
-GLOBAL_OPS = (STORE_GLOBAL, DELETE_GLOBAL, LOAD_GLOBAL)
-HAVE_ARGUMENT = dis.HAVE_ARGUMENT
-EXTENDED_ARG = dis.EXTENDED_ARG
 
 
 _BUILTIN_TYPE_NAMES = {}
@@ -482,7 +487,7 @@ class CloudPickler(Pickler):
             self.save_reduce(obj=obj, *rv)
         elif func_type == FUNC_TYPE_DYNAMIC:
             self.save_function_tuple(obj)
-        elif func_type == FUNC_TYPE_GLOBAL:
+        elif func_type == FUNC_TYPE_GLOBAL_UNKNOWN:
             write = self.write
             if obj.__dict__:
                 # essentially save_reduce, but workaround needed to avoid recursion
