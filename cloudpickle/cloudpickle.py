@@ -269,12 +269,26 @@ class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
 
-    def __init__(self, file, protocol=None):
+    def __init__(self, file, protocol=None, override_existing_globals=True):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         Pickler.__init__(self, file, protocol=protocol)
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
+
+        # When unpickling a function created in a dynamic module or the __main__
+        # module, its set of global variables may be different from the one from
+        # the module the function belongs to, for example if the dynamic module
+        # has had its variables mutated between pickling and unpickling time
+        # of the function.
+
+        # - If set to True, the attribue override_existing_globals will
+        # override the global variables of the dynamic module with the ones
+        # from the pickled function at the function's unpickling time.
+        # - If set to False, the global variables from the pickled function
+        # will be overriden by the dynamic module global variables at the
+        # function's unpickling time
+        self.override_existing_globals = override_existing_globals
 
     def dump(self, obj):
         self.inject_addons()
@@ -596,6 +610,7 @@ class CloudPickler(Pickler):
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
         save(state)
+        save(self.override_existing_globals)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
@@ -921,7 +936,7 @@ def _rebuild_tornado_coroutine(func):
 
 # Shorthands for legacy support
 
-def dump(obj, file, protocol=None):
+def dump(obj, file, protocol=None, override_existing_globals=True):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -931,10 +946,11 @@ def dump(obj, file, protocol=None):
     Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
     compatibility with older versions of Python.
     """
-    CloudPickler(file, protocol=protocol).dump(obj)
+    CloudPickler(file, protocol=protocol,
+                 override_existing_globals=override_existing_globals).dump(obj)
 
 
-def dumps(obj, protocol=None):
+def dumps(obj, protocol=None, override_existing_globals=True):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -946,7 +962,8 @@ def dumps(obj, protocol=None):
     """
     file = StringIO()
     try:
-        cp = CloudPickler(file, protocol=protocol)
+        cp = CloudPickler(file, protocol=protocol,
+                          override_existing_globals=override_existing_globals)
         cp.dump(obj)
         return file.getvalue()
     finally:
@@ -1060,9 +1077,14 @@ def _fill_function(*args):
 
     The skeleton itself is create by _make_skel_func().
     """
+    override_existing_globals = True
     if len(args) == 2:
         func = args[0]
         state = args[1]
+    elif len(args) == 3:
+        func = args[0]
+        state = args[1]
+        override_existing_globals = args[2]
     elif len(args) == 5:
         # Backwards compat for cloudpickle v0.4.0, after which the `module`
         # argument was introduced
@@ -1078,10 +1100,14 @@ def _fill_function(*args):
     else:
         raise ValueError('Unexpected _fill_value arguments: %r' % (args,))
 
-    # Only set global variables that do not exist.
-    for k, v in state['globals'].items():
-        if k not in func.__globals__:
-            func.__globals__[k] = v
+    # This updates the variables of func's module using func's globals from the
+    # time at which it was pickled.
+    if override_existing_globals:
+        func.__globals__.update(state['globals'])
+    else:
+        for k, v in state['globals'].items():
+            if k not in func.__globals__:
+                func.__globals__[k] = v
 
     func.__defaults__ = state['defaults']
     func.__dict__ = state['dict']
