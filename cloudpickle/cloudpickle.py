@@ -276,18 +276,22 @@ class CloudPickler(Pickler):
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
-        # When unpickling a function created in a dynamic module or the __main__
-        # module, its set of global variables may be different from the one from
-        # the module the function belongs to, for example if the dynamic module
-        # has had its variables mutated between pickling and unpickling time
-        # of the function.
+        # Functions belonging to the same module (the __main__ or a dynamic
+        # module) share the same global variables. Using cloudpickle, they will
+        # share those global variables in the process they are unpickled in as
+        # well. However, the state of those global variables may differ in the
+        # pickled functions, for example if one global variable was mutated
+        # between two calls to pickle.dump. override_existing_globals is a
+        # switch that allows two different behaviors:
 
-        # - If set to True, the attribue override_existing_globals will
-        # override the global variables of the dynamic module with the ones
-        # from the pickled function at the function's unpickling time.
-        # - If set to False, the global variables from the pickled function
-        # will be overriden by the dynamic module global variables at the
-        # function's unpickling time
+        # - If override_existing_globals=True, the global variables of the
+        # module containing this function will be overridden in the process
+        # which load the pickled object with the values of these variables at
+        # the pickling time.
+        # - If override_existing_globals=False, the global variables of the
+        # module containing this function will not be overridden in the process
+        # which load the pickled object. If the global variable is not
+        # declared, it will be initialized with the value at pickling time.
         self.override_existing_globals = override_existing_globals
 
     def dump(self, obj):
