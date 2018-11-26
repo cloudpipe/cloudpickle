@@ -434,8 +434,31 @@ class CloudPickler(Pickler):
 
     def _save_subimports(self, code, top_level_dependencies):
         """
-        Ensure de-pickler imports any package child-modules that
-        are needed by the function
+        Save submodules used by a function but not listed in its globals.
+
+        In the example below:
+
+        ```
+        import concurrent.futures
+        import cloudpickle
+
+
+        def func():
+            x = concurrent.futures.ThreadPoolExecutor
+
+
+        if __name__ == '__main__':
+            cloudpickle.dumps(func)
+        ```
+
+        the globals extracted by cloudpickle in the function's state include
+        the concurrent module, but not its submodule (here,
+        concurrent.futures), which is the module used by func.
+
+        To ensure that calling the depickled function does not raise an
+        AttributeError, this function looks for any currently loaded submodule
+        that the function uses and whose parent is present in the function
+        globals, and saves it before saving the function.
         """
 
         # check if any known dependency is an imported package
