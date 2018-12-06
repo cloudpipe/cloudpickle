@@ -112,7 +112,7 @@ def _make_cell_set_template_code():
 
            return _stub
 
-        _cell_set_template_code = f()
+        _cell_set_template_code = f().__code__
 
     This function is _only_ a LOAD_FAST(arg); STORE_DEREF, but that is
     invalid syntax on Python 2. If we use this function we also don't need
