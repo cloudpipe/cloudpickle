@@ -1,13 +1,14 @@
-import unittest
-import tempfile
-import os
-import shutil
-import pickle
-import sys
-from io import StringIO
+from __future__ import unicode_literals
 
-import pytest
+import os
+import pickle
+import shutil
+import sys
+import tempfile
+import unittest
+
 from mock import patch, mock_open
+import pytest
 
 import cloudpickle
 
@@ -19,7 +20,7 @@ class CloudPickleFileTests(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         self.tmpfilepath = os.path.join(self.tmpdir, 'testfile')
-        self.teststring = u'Hello world!'
+        self.teststring = 'Hello world!'
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
