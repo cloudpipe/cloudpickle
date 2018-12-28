@@ -7,7 +7,6 @@ import sys
 import tempfile
 import unittest
 
-from mock import patch, mock_open
 import pytest
 
 import cloudpickle
@@ -99,18 +98,6 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEqual(out, pickle.loads(cloudpickle.dumps(out)))
         self.assertRaises(pickle.PicklingError,
                           lambda: cloudpickle.dumps(sys.stdin))
-
-    def NOT_WORKING_test_tty(self):
-        # FIXME: Mocking 'file' is not trivial... and fails for now
-        from sys import version_info
-        if version_info.major == 2:
-            import __builtin__ as builtins  # pylint:disable=import-error
-        else:
-            import builtins  # pylint:disable=import-error
-
-        with patch.object(builtins, 'open', mock_open(), create=True):
-            with open('foo', 'w+') as handle:
-                cloudpickle.dumps(handle)
 
 
 if __name__ == '__main__':
