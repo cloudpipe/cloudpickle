@@ -771,10 +771,8 @@ class CloudPickleTest(unittest.TestCase):
     def test_multiprocess(self):
         # running a function pickled by another process (a la dask.distributed)
         def scope():
-            import curses.textpad
             def example():
                 x = xml.etree.ElementTree.Comment
-                x = curses.textpad.Textbox
             return example
         global xml
         import xml.etree.ElementTree
@@ -795,10 +793,10 @@ class CloudPickleTest(unittest.TestCase):
         # (unlike test_submodule)
         global etree
         def scope():
-            import curses.textpad as foobar
+            import xml.etree as foobar
             def example():
                 x = etree.Comment
-                x = foobar.Textbox
+                x = foobar.ElementTree
             return example
         example = scope()
         import xml.etree.ElementTree as etree
