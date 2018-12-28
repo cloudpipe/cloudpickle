@@ -4,7 +4,7 @@ import abc
 import collections
 import base64
 import functools
-from io import BytesIO
+import io
 import itertools
 import logging
 import math
@@ -21,11 +21,6 @@ import types
 import unittest
 import weakref
 import os
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
 
 import pytest
 
@@ -369,7 +364,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_load_namespace(self):
         obj = 1, 2, 3, 4
-        bio = BytesIO()
+        bio = io.BytesIO()
         cloudpickle.dump(obj, bio)
         bio.seek(0)
         returned_obj = cloudpickle.load(bio)
