@@ -832,12 +832,12 @@ class CloudPickleTest(unittest.TestCase):
         dumped = cloudpickle.dumps(logger)
 
         code = """if 1:
-            import cloudpickle, logging
+            import base64, cloudpickle, logging
 
             logging.basicConfig(level=logging.INFO)
-            logger = cloudpickle.loads(%(dumped)r)
+            logger = cloudpickle.loads(base64.b32decode(b'{}'))
             logger.info('hello')
-            """ % locals()
+            """.format(base64.b32encode(dumped).decode('ascii'))
         proc = subprocess.Popen([sys.executable, "-c", code],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
