@@ -69,12 +69,6 @@ def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
     return pickle.loads(cloudpickle.dumps(obj, protocol=protocol))
 
 
-class CloudPicklerTest(unittest.TestCase):
-    def setUp(self):
-        self.file_obj = StringIO()
-        self.cloudpickler = cloudpickle.CloudPickler(self.file_obj, 2)
-
-
 class CloudPickleTest(unittest.TestCase):
 
     protocol = cloudpickle.DEFAULT_PROTOCOL
