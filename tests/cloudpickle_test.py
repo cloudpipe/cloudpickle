@@ -1310,6 +1310,23 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__annotations__, f.__annotations__)
 
+    def test_instance_with_slots(self):
+        for slots in [["registered_attribute"], "registered_attribute"]:
+            class ClassWithSlots(object):
+                __slots__ = slots
+
+                def __init__(self):
+                    self.registered_attribute = 42
+
+            initial_obj = ClassWithSlots()
+            depickled_obj = pickle_depickle(
+                initial_obj, protocol=self.protocol)
+
+            for obj in [initial_obj, depickled_obj]:
+                self.assertEqual(obj.registered_attribute, 42)
+                with pytest.raises(AttributeError):
+                    obj.non_registered_attribute = 1
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 

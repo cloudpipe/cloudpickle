@@ -55,6 +55,7 @@ import operator
 import importlib
 import itertools
 import traceback
+import six
 from functools import partial
 
 
@@ -499,6 +500,17 @@ class CloudPickler(Pickler):
         # the initial skeleton class.  This is safe because we know that the
         # doc can't participate in a cycle with the original class.
         type_kwargs = {'__doc__': clsdict.pop('__doc__', None)}
+
+        if hasattr(obj, "__slots__"):
+            type_kwargs['__slots__'] = obj.__slots__
+            # pickle string length optimization: member descriptors of obj are
+            # created automatically from obj's __slots__ attribute, no need to
+            # save them in obj's state
+            if isinstance(obj.__slots__, six.string_types):
+                clsdict.pop(obj.__slots__)
+            else:
+                for k in obj.__slots__:
+                    clsdict.pop(k, None)
 
         # If type overrides __dict__ as a property, include it in the type kwargs.
         # In Python 2, we can't set this attribute after construction.
