@@ -1077,7 +1077,7 @@ class CloudPickleTest(unittest.TestCase):
         cloned_f1 = {clone_func}(f1, protocol={protocol})
         pickled_f1 = dumps(
             f1, protocol={protocol},
-            override_existing_globals={override_existing_globals})
+            override_globals={override_globals})
 
         # Change the value of the global variable
         cloned_f0()
@@ -1087,26 +1087,26 @@ class CloudPickleTest(unittest.TestCase):
         assert result_f1 == "changed_by_f0", result_f1
 
         # Ensure that unpickling the global variable overrides (resp. does not
-        # change) the global variable if override_existing_globals was True
+        # change) the global variable if override_globals was True
         # (resp. False) at pickling time
         result_pickled_f1 = loads(pickled_f1)()
-        if {override_existing_globals}:
+        if {override_globals}:
             assert result_pickled_f1 == "default_value", result_pickled_f1
         else:
             assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
         """
         for clone_func in ['local_clone', 'subprocess_pickle_echo']:
-            for override_existing_globals in [True, False]:
+            for override_globals in [True, False]:
                 code = code_template.format(
                     protocol=self.protocol, clone_func=clone_func,
-                    override_existing_globals=override_existing_globals)
+                    override_globals=override_globals)
                 assert_run_python_script(textwrap.dedent(code))
 
     def test_closure_interacting_with_a_global_variable(self):
         global _TEST_GLOBAL_VARIABLE
         assert _TEST_GLOBAL_VARIABLE == "default_value"
         orig_value = _TEST_GLOBAL_VARIABLE
-        for override_existing_globals in [True, False]:
+        for override_globals in [True, False]:
             try:
                 def f0():
                     global _TEST_GLOBAL_VARIABLE
@@ -1117,15 +1117,15 @@ class CloudPickleTest(unittest.TestCase):
 
                 cloned_f0 = cloudpickle.loads(cloudpickle.dumps(
                     f0, protocol=self.protocol,
-                    override_existing_globals=override_existing_globals))
+                    override_globals=override_globals))
 
                 cloned_f1 = cloudpickle.loads(cloudpickle.dumps(
                     f1, protocol=self.protocol,
-                    override_existing_globals=override_existing_globals))
+                    override_globals=override_globals))
 
                 pickled_f1 = cloudpickle.dumps(
                     f1, protocol=self.protocol,
-                    override_existing_globals=override_existing_globals)
+                    override_globals=override_globals)
 
                 # Change the value of the global variable
                 cloned_f0()
@@ -1138,10 +1138,10 @@ class CloudPickleTest(unittest.TestCase):
                 assert f1() == result_cloned_f1
 
                 # Ensure that unpickling the global variable overrides (resp.
-                # does not change) its value if override_existing_globals was
+                # does not change) its value if override_globals was
                 # True (resp False) at pickling time
                 res_pickled_f1 = cloudpickle.loads(pickled_f1)()
-                if override_existing_globals:
+                if override_globals:
                     assert res_pickled_f1 == "default_value", res_pickled_f1
                 else:
                     assert res_pickled_f1 == "changed_by_f0", res_pickled_f1
@@ -1153,7 +1153,7 @@ class CloudPickleTest(unittest.TestCase):
         # defined in a dynamic module in a child process are not reset by
         # subsequent unpickling.
 
-        for override_existing_globals in [True, False]:
+        for override_globals in [True, False]:
             try:
                 # first, we create a dynamic module in the parent process
                 mod = types.ModuleType('mod')
@@ -1184,7 +1184,7 @@ class CloudPickleTest(unittest.TestCase):
                 with open('function_with_initial_globals.pkl', 'wb') as f:
                     cloudpickle.dump(
                         mod.func_defined_in_dynamic_module, f,
-                        override_existing_globals=override_existing_globals)
+                        override_globals=override_globals)
 
                 # Change the mod's global variable
                 mod.GLOBAL_STATE = 'changed value'
@@ -1195,7 +1195,7 @@ class CloudPickleTest(unittest.TestCase):
                 with open('function_with_modified_globals.pkl', 'wb') as f:
                     cloudpickle.dump(
                         mod.func_defined_in_dynamic_module, f,
-                        override_existing_globals=override_existing_globals)
+                        override_globals=override_globals)
 
                 child_process_code = """
                     import pickle
@@ -1216,17 +1216,17 @@ class CloudPickleTest(unittest.TestCase):
 
                     # Verify that loading the function overrides (resp. does
                     # not change) the global variable GLOBAL_STATE of mod, if
-                    # override_existing_globals was True (resp. False) at
+                    # override_globals was True (resp. False) at
                     # pickling time
 
-                    if {override_existing_globals}:
+                    if {override_globals}:
                         assert func_with_modified_globals() == 'changed value'
                     else:
                         assert func_with_modified_globals() == 'initial value'
 
                     # Update the value from the child process and check that
                     # unpickling resets (resp. does not reset) our change if
-                    # override_existing_globals was True (resp. False) at
+                    # override_globals was True (resp. False) at
                     # pickling time
                     assert (
                         func_with_initial_globals('new value') == 'new value')
@@ -1235,14 +1235,14 @@ class CloudPickleTest(unittest.TestCase):
                     with open('function_with_initial_globals.pkl','rb') as f:
                         func_with_initial_globals = pickle.load(f)
 
-                    if {override_existing_globals}:
+                    if {override_globals}:
                         assert func_with_initial_globals() == 'initial value'
                         assert func_with_modified_globals() == 'initial value'
                     else:
                         assert func_with_initial_globals() == 'new value'
                         assert func_with_modified_globals() == 'new value'
 
-                """.format(override_existing_globals=override_existing_globals)
+                """.format(override_globals=override_globals)
                 assert_run_python_script(textwrap.dedent(child_process_code))
 
             finally:

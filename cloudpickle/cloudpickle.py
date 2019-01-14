@@ -274,20 +274,20 @@ class CloudPickler(Pickler):
 
     protocol : int
 
-    override_existing_globals : bool
+    override_globals : bool
         Functions belonging to the same module (the __main__ or a dynamic
         module) share the same global variables. Using cloudpickle, they will
         share those global variables in the process they are unpickled in as
         well. However, the state of those global variables may differ in the
         pickled functions, for example if one global variable was mutated
-        between two calls to pickle.dump. override_existing_globals is a
+        between two calls to pickle.dump. override_globals is a
         switch that allows two different behaviors:
 
-        * If override_existing_globals=True, the global variables of the
+        * If override_globals=True, the global variables of the
           module containing this function will be overridden in the process
           which load the pickled object with the values of these variables at
           the pickling time.
-        * If override_existing_globals=False, the global variables of the
+        * If override_globals=False, the global variables of the
           module containing the definition of the nested or dynamically defined
           function will not be overridden in the process loading the pickled
           object. If the global variable is not declared, it will be
@@ -297,14 +297,14 @@ class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
 
-    def __init__(self, file, protocol=None, override_existing_globals=True):
+    def __init__(self, file, protocol=None, override_globals=True):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         Pickler.__init__(self, file, protocol=protocol)
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
-        self.override_existing_globals = override_existing_globals
+        self.override_globals = override_globals
 
     def dump(self, obj):
         self.inject_addons()
@@ -620,7 +620,7 @@ class CloudPickler(Pickler):
             'module': func.__module__,
             'name': func.__name__,
             'doc': func.__doc__,
-            'override_existing_globals': self.override_existing_globals
+            'override_globals': self.override_globals
         }
         if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
             state['annotations'] = func.__annotations__
@@ -952,7 +952,7 @@ def _rebuild_tornado_coroutine(func):
 
 # Shorthands for legacy support
 
-def dump(obj, file, protocol=None, override_existing_globals=True):
+def dump(obj, file, protocol=None, override_globals=True):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -963,10 +963,10 @@ def dump(obj, file, protocol=None, override_existing_globals=True):
     compatibility with older versions of Python.
     """
     CloudPickler(file, protocol=protocol,
-                 override_existing_globals=override_existing_globals).dump(obj)
+                 override_globals=override_globals).dump(obj)
 
 
-def dumps(obj, protocol=None, override_existing_globals=True):
+def dumps(obj, protocol=None, override_globals=True):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -979,7 +979,7 @@ def dumps(obj, protocol=None, override_existing_globals=True):
     file = StringIO()
     try:
         cp = CloudPickler(file, protocol=protocol,
-                          override_existing_globals=override_existing_globals)
+                          override_globals=override_globals)
         cp.dump(obj)
         return file.getvalue()
     finally:
@@ -1113,7 +1113,7 @@ def _fill_function(*args):
 
     # This updates the variables of func's module using func's globals from the
     # time at which it was pickled.
-    if state.get('override_existing_globals', True):
+    if state.get('override_globals', True):
         func.__globals__.update(state['globals'])
     else:
         for k, v in state['globals'].items():
