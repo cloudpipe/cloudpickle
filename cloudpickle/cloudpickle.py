@@ -668,7 +668,7 @@ class CloudPickler(Pickler):
             # vars(func.__module__) for base_globals. This is necessary to
             # share the global variables across multiple pickled functions from
             # this module.
-            if hasattr(func, '__module__') and func.__module__ is not None:
+            if func.__module__ is not None:
                 base_globals = func.__module__
             else:
                 base_globals = {}
