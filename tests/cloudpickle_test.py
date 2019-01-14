@@ -1151,7 +1151,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_function_from_dynamic_module_with_globals_modifications(self):
         # This test verifies that the global variable state of a function
         # defined in a dynamic module in a child process are not reset by
-        # subsequent uplickling.
+        # subsequent unpickling.
 
         for override_existing_globals in [True, False]:
             try:
@@ -1176,9 +1176,10 @@ class CloudPickleTest(unittest.TestCase):
                 # functions. Those unpickle functions should share the same
                 # global variables in the child process: Once the first
                 # function gets unpickled, mod is created and tracked in the
-                # child environment. This is state is preserved when unpickling
-                # the second function whatever the global variable
-                # GLOBAL_STATE's value at the time of pickling.
+                # child environment. If override_globals is False, then the
+                # module state is preserved when unpickling the second function
+                # whatever the global variable GLOBAL_STATE's value at the time
+                # of pickling.
 
                 with open('function_with_initial_globals.pkl', 'wb') as f:
                     cloudpickle.dump(
@@ -1224,7 +1225,7 @@ class CloudPickleTest(unittest.TestCase):
                         assert func_with_modified_globals() == 'initial value'
 
                     # Update the value from the child process and check that
-                    # unpickling reset (resp. does not reset) our change if
+                    # unpickling resets (resp. does not reset) our change if
                     # override_existing_globals was True (resp. False) at
                     # pickling time
                     assert (

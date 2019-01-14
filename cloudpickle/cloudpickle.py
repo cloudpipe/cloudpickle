@@ -266,6 +266,34 @@ else:
 
 
 class CloudPickler(Pickler):
+    """Pickler with extended pickling abilities.
+
+    Parameters
+    ----------
+    file :
+
+    protocol : int
+
+    override_existing_globals : bool
+        Functions belonging to the same module (the __main__ or a dynamic
+        module) share the same global variables. Using cloudpickle, they will
+        share those global variables in the process they are unpickled in as
+        well. However, the state of those global variables may differ in the
+        pickled functions, for example if one global variable was mutated
+        between two calls to pickle.dump. override_existing_globals is a
+        switch that allows two different behaviors:
+
+        * If override_existing_globals=True, the global variables of the
+          module containing this function will be overridden in the process
+          which load the pickled object with the values of these variables at
+          the pickling time.
+        * If override_existing_globals=False, the global variables of the
+          module containing the definition of the nested or dynamically defined
+          function will not be overridden in the process loading the pickled
+          object. If the global variable is not declared, it will be
+          initialized with the value at pickling time.
+
+    """
 
     dispatch = Pickler.dispatch.copy()
 
@@ -276,22 +304,6 @@ class CloudPickler(Pickler):
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
-        # Functions belonging to the same module (the __main__ or a dynamic
-        # module) share the same global variables. Using cloudpickle, they will
-        # share those global variables in the process they are unpickled in as
-        # well. However, the state of those global variables may differ in the
-        # pickled functions, for example if one global variable was mutated
-        # between two calls to pickle.dump. override_existing_globals is a
-        # switch that allows two different behaviors:
-
-        # - If override_existing_globals=True, the global variables of the
-        # module containing this function will be overridden in the process
-        # which load the pickled object with the values of these variables at
-        # the pickling time.
-        # - If override_existing_globals=False, the global variables of the
-        # module containing this function will not be overridden in the process
-        # which load the pickled object. If the global variable is not
-        # declared, it will be initialized with the value at pickling time.
         self.override_existing_globals = override_existing_globals
 
     def dump(self, obj):
@@ -1105,6 +1117,7 @@ def _fill_function(*args):
         func.__globals__.update(state['globals'])
     else:
         for k, v in state['globals'].items():
+            # Only set global variables that do not exist.
             if k not in func.__globals__:
                 func.__globals__[k] = v
 
