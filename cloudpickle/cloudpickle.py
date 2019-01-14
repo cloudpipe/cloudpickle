@@ -273,8 +273,6 @@ class CloudPickler(Pickler):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         Pickler.__init__(self, file, protocol=protocol)
-        # set of modules to unpickle
-        self.modules = set()
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
@@ -304,7 +302,6 @@ class CloudPickler(Pickler):
         """
         Save a module as an import
         """
-        self.modules.add(obj)
         if _is_dynamic(obj):
             self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
                              obj=obj)
@@ -384,7 +381,6 @@ class CloudPickler(Pickler):
             lookedup_by_name = None
 
         if themodule:
-            self.modules.add(themodule)
             if lookedup_by_name is obj:
                 return self.save_global(obj, name)
 
