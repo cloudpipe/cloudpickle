@@ -65,10 +65,15 @@ DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
 if sys.version < '3':
     from pickle import Pickler
+    try:
+        from cStringIO import StringIO
+    except ImportError:
+        from StringIO import StringIO
     PY3 = False
 else:
     types.ClassType = type
     from pickle import _Pickler as Pickler
+    from io import BytesIO as StringIO
     PY3 = True
 
 
@@ -818,6 +823,11 @@ class CloudPickler(Pickler):
 
     def save_file(self, obj):
         """Save a file"""
+        try:
+            import StringIO as pystringIO  # we can't use cStringIO as it lacks the name attribute
+        except ImportError:
+            import io as pystringIO
+
         if not hasattr(obj, 'name') or not hasattr(obj, 'mode'):
             raise pickle.PicklingError("Cannot pickle files that do not map to an actual file")
         if obj is sys.stdout:
@@ -835,10 +845,7 @@ class CloudPickler(Pickler):
 
         name = obj.name
 
-        if "b" in obj.mode or not PY3:
-            retval = io.BytesIO()
-        else:
-            retval = io.StringIO()
+        retval = pystringIO.StringIO()
 
         try:
             # Read the whole file
@@ -936,7 +943,7 @@ def dumps(obj, protocol=None):
     Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
     compatibility with older versions of Python.
     """
-    file = io.BytesIO()
+    file = StringIO()
     try:
         cp = CloudPickler(file, protocol=protocol)
         cp.dump(obj)

@@ -71,7 +71,7 @@ class CloudPickleTest(unittest.TestCase):
     protocol = cloudpickle.DEFAULT_PROTOCOL
 
     def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
+        self.tmpdir = tempfile.mkdtemp(prefix="tmp_cloudpickle_test_")
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
