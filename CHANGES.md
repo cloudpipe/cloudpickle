@@ -1,3 +1,12 @@
+0.7.0
+=====
+
+- Add a switch in `cloudpickle.dump` speficying if variables present in the
+  written pickle string should override colluding values present in their new
+  namespace at unpickling time.
+  ([issue #214](https://github.com/cloudpipe/cloudpickle/issues/214))
+
+
 0.6.1
 =====
 
