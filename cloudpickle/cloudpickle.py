@@ -273,8 +273,6 @@ class CloudPickler(Pickler):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         Pickler.__init__(self, file, protocol=protocol)
-        # map ids to dictionary. used to ensure that functions can share global env
-        self.globals_ref = {}
 
     def dump(self, obj):
         self.inject_addons()
@@ -658,17 +656,14 @@ class CloudPickler(Pickler):
         # save the dict
         dct = func.__dict__
 
-        base_globals = self.globals_ref.get(id(func.__globals__), None)
-        if base_globals is None:
-            # For functions defined in a well behaved module use
-            # vars(func.__module__) for base_globals. This is necessary to
-            # share the global variables across multiple pickled functions from
-            # this module.
-            if func.__module__ is not None:
-                base_globals = func.__module__
-            else:
-                base_globals = {}
-        self.globals_ref[id(func.__globals__)] = base_globals
+        # For functions defined in a well behaved module use
+        # vars(func.__module__) for base_globals. This is necessary to
+        # share the global variables across multiple pickled functions from
+        # this module.
+        if func.__module__ is not None:
+            base_globals = func.__module__
+        else:
+            base_globals = {}
 
         return (code, f_globals, defaults, closure, dct, base_globals)
 
