@@ -4,7 +4,7 @@ import abc
 import collections
 import base64
 import functools
-from io import BytesIO
+import io
 import itertools
 import logging
 import math
@@ -12,18 +12,15 @@ from operator import itemgetter, attrgetter
 import pickle
 import platform
 import random
+import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
 import types
 import unittest
 import weakref
 import os
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
 
 import pytest
 
@@ -69,15 +66,15 @@ def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
     return pickle.loads(cloudpickle.dumps(obj, protocol=protocol))
 
 
-class CloudPicklerTest(unittest.TestCase):
-    def setUp(self):
-        self.file_obj = StringIO()
-        self.cloudpickler = cloudpickle.CloudPickler(self.file_obj, 2)
-
-
 class CloudPickleTest(unittest.TestCase):
 
     protocol = cloudpickle.DEFAULT_PROTOCOL
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp(prefix="tmp_cloudpickle_test_")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
 
     def test_itemgetter(self):
         d = range(10)
@@ -367,7 +364,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_load_namespace(self):
         obj = 1, 2, 3, 4
-        bio = BytesIO()
+        bio = io.BytesIO()
         cloudpickle.dump(obj, bio)
         bio.seek(0)
         returned_obj = cloudpickle.load(bio)
@@ -464,7 +461,7 @@ class CloudPickleTest(unittest.TestCase):
         '''
         exec(textwrap.dedent(code), mod.__dict__)
 
-        pickled_module_path = 'mod_f.pkl'
+        pickled_module_path = os.path.join(self.tmpdir, 'mod_f.pkl')
 
         child_process_script = '''
         import pickle
@@ -506,7 +503,7 @@ class CloudPickleTest(unittest.TestCase):
         # correctly serialized. This notably checks that the globals are
         # accessible and that there is no issue with the builtins (see #211)
 
-        pickled_func_path = 'local_func_g.pkl'
+        pickled_func_path = os.path.join(self.tmpdir, 'local_func_g.pkl')
 
         child_process_script = '''
         import pickle
@@ -549,8 +546,10 @@ class CloudPickleTest(unittest.TestCase):
         # the pickled dynamic module, and then re-pickle it under a new name.
         # Finally, it will create a child process that will load the re-pickled
         # dynamic module.
-        parent_process_module_file = 'dynamic_module_from_parent_process.pkl'
-        child_process_module_file = 'dynamic_module_from_child_process.pkl'
+        parent_process_module_file = os.path.join(
+            self.tmpdir, 'dynamic_module_from_parent_process.pkl')
+        child_process_module_file = os.path.join(
+            self.tmpdir, 'dynamic_module_from_child_process.pkl')
         child_process_script = '''
             import pickle
             import textwrap
@@ -767,10 +766,8 @@ class CloudPickleTest(unittest.TestCase):
     def test_multiprocess(self):
         # running a function pickled by another process (a la dask.distributed)
         def scope():
-            import curses.textpad
             def example():
                 x = xml.etree.ElementTree.Comment
-                x = curses.textpad.Textbox
             return example
         global xml
         import xml.etree.ElementTree
@@ -791,10 +788,10 @@ class CloudPickleTest(unittest.TestCase):
         # (unlike test_submodule)
         global etree
         def scope():
-            import curses.textpad as foobar
+            import xml.etree as foobar
             def example():
                 x = etree.Comment
-                x = foobar.Textbox
+                x = foobar.ElementTree
             return example
         example = scope()
         import xml.etree.ElementTree as etree
@@ -828,12 +825,12 @@ class CloudPickleTest(unittest.TestCase):
         dumped = cloudpickle.dumps(logger)
 
         code = """if 1:
-            import cloudpickle, logging
+            import base64, cloudpickle, logging
 
             logging.basicConfig(level=logging.INFO)
-            logger = cloudpickle.loads(%(dumped)r)
+            logger = cloudpickle.loads(base64.b32decode(b'{}'))
             logger.info('hello')
-            """ % locals()
+            """.format(base64.b32encode(dumped).decode('ascii'))
         proc = subprocess.Popen([sys.executable, "-c", code],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
@@ -1145,6 +1142,11 @@ class CloudPickleTest(unittest.TestCase):
         '''
         exec(textwrap.dedent(code), mod.__dict__)
 
+        with_initial_globals_file = os.path.join(
+            self.tmpdir, 'function_with_initial_globals.pkl')
+        with_modified_globals_file = os.path.join(
+            self.tmpdir, 'function_with_modified_globals.pkl')
+
         try:
             # Simple sanity check on the function's output
             assert mod.func_defined_in_dynamic_module() == "initial value"
@@ -1159,7 +1161,7 @@ class CloudPickleTest(unittest.TestCase):
             # when unpickling the second function whatever the global variable
             # GLOBAL_STATE's value at the time of pickling.
 
-            with open('function_with_initial_globals.pkl', 'wb') as f:
+            with open(with_initial_globals_file, 'wb') as f:
                 cloudpickle.dump(mod.func_defined_in_dynamic_module, f)
 
             # Change the mod's global variable
@@ -1168,14 +1170,14 @@ class CloudPickleTest(unittest.TestCase):
             # At this point, mod.func_defined_in_dynamic_module()
             # returns the updated value. Let's pickle it again.
             assert mod.func_defined_in_dynamic_module() == 'changed value'
-            with open('function_with_modified_globals.pkl', 'wb') as f:
+            with open(with_modified_globals_file, 'wb') as f:
                 cloudpickle.dump(mod.func_defined_in_dynamic_module, f,
                                  protocol=self.protocol)
 
             child_process_code = """
                 import pickle
 
-                with open('function_with_initial_globals.pkl','rb') as f:
+                with open({with_initial_globals_file!r},'rb') as f:
                     func_with_initial_globals = pickle.load(f)
 
                 # At this point, a module called 'mod' should exist in
@@ -1186,7 +1188,7 @@ class CloudPickleTest(unittest.TestCase):
 
                 # Load a function with initial global variable that was
                 # pickled after a change in the global variable
-                with open('function_with_modified_globals.pkl','rb') as f:
+                with open({with_initial_globals_file!r},'rb') as f:
                     func_with_modified_globals = pickle.load(f)
 
                 # assert the this unpickling did not modify the value of
@@ -1198,16 +1200,17 @@ class CloudPickleTest(unittest.TestCase):
                 assert func_with_initial_globals('new value') == 'new value'
                 assert func_with_modified_globals() == 'new value'
 
-                with open('function_with_initial_globals.pkl','rb') as f:
+                with open({with_initial_globals_file!r},'rb') as f:
                     func_with_initial_globals = pickle.load(f)
                 assert func_with_initial_globals() == 'new value'
                 assert func_with_modified_globals() == 'new value'
-            """
+            """.format(with_initial_globals_file=with_initial_globals_file,
+                       with_modified_globals_file=with_modified_globals_file)
             assert_run_python_script(textwrap.dedent(child_process_code))
 
         finally:
-            os.unlink('function_with_initial_globals.pkl')
-            os.unlink('function_with_modified_globals.pkl')
+            os.unlink(with_initial_globals_file)
+            os.unlink(with_modified_globals_file)
 
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")

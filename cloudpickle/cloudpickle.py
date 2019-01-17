@@ -42,21 +42,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
-import io
 import dis
-import sys
-import types
+from functools import partial
+import importlib
+import io
+import itertools
+import logging
 import opcode
+import operator
 import pickle
 import struct
-import logging
-import weakref
-import operator
-import importlib
-import itertools
+import sys
 import traceback
-from functools import partial
-
+import types
+import weakref
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor

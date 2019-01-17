@@ -2,6 +2,5 @@
 flake8
 pytest
 pytest-cov
-mock
 # Code coverage uploader for Travis:
 codecov
