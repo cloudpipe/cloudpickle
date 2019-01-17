@@ -55,7 +55,6 @@ import operator
 import importlib
 import itertools
 import traceback
-import six
 from functools import partial
 
 
@@ -71,11 +70,13 @@ if sys.version < '3':
         from cStringIO import StringIO
     except ImportError:
         from StringIO import StringIO
+    string_types = (basestring,)  # noqa
     PY3 = False
 else:
     types.ClassType = type
     from pickle import _Pickler as Pickler
     from io import BytesIO as StringIO
+    string_types = (str,)
     PY3 = True
 
 
@@ -506,7 +507,7 @@ class CloudPickler(Pickler):
             # pickle string length optimization: member descriptors of obj are
             # created automatically from obj's __slots__ attribute, no need to
             # save them in obj's state
-            if isinstance(obj.__slots__, six.string_types):
+            if isinstance(obj.__slots__, string_types):
                 clsdict.pop(obj.__slots__)
             else:
                 for k in obj.__slots__:
