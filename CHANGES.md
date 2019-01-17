@@ -1,3 +1,11 @@
+0.7.0
+=====
+
+- Correctly serialize dynamically defined classes that have a `__slots__`
+  attribute.
+  ([issue #225](https://github.com/cloudpipe/cloudpickle/issues/225))
+
+
 0.6.1
 =====
 
