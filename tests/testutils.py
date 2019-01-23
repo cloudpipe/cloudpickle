@@ -67,7 +67,7 @@ def subprocess_pickle_echo(input_data, protocol=None):
     try:
         comm_kwargs = {}
         if timeout_supported:
-            comm_kwargs['timeout'] = 5
+            comm_kwargs['timeout'] = 60
         out, err = proc.communicate(pickled_b32, **comm_kwargs)
         if proc.returncode != 0 or len(err):
             message = "Subprocess returned %d: " % proc.returncode
