@@ -2,13 +2,14 @@ import sys
 import os
 import os.path as op
 import tempfile
+import base64
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
-
 from cloudpickle import dumps
 from pickle import loads
 
+TIMEOUT = 60
 try:
-    from suprocess import TimeoutExpired
+    from subprocess import TimeoutExpired
     timeout_supported = True
 except ImportError:
     # no support for timeout in Python 2
@@ -41,7 +42,7 @@ def _make_cwd_env():
     return cloudpickle_repo_folder, env
 
 
-def subprocess_pickle_echo(input_data, protocol=None):
+def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
     """Echo function with a child Python process
 
     Pickle the input data into a buffer, send it to a subprocess via
@@ -53,25 +54,42 @@ def subprocess_pickle_echo(input_data, protocol=None):
 
     """
     pickled_input_data = dumps(input_data, protocol=protocol)
+    # Under Windows + Python 2.7, subprocess / communicate truncate the data
+    # on some specific bytes. To avoid this issue, let's use the pure ASCII
+    # Base32 encoding to encapsulate the pickle message sent to the child
+    # process.
+    pickled_b32 = base64.b32encode(pickled_input_data)
+
     # run then pickle_echo(protocol=protocol) in __main__:
     cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
-    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env)
+    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
+                 bufsize=4096)
     try:
         comm_kwargs = {}
         if timeout_supported:
-            comm_kwargs['timeout'] = 5
-        out, err = proc.communicate(pickled_input_data, **comm_kwargs)
+            comm_kwargs['timeout'] = timeout
+        out, err = proc.communicate(pickled_b32, **comm_kwargs)
         if proc.returncode != 0 or len(err):
             message = "Subprocess returned %d: " % proc.returncode
             message += err.decode('utf-8')
             raise RuntimeError(message)
-        return loads(out)
+        return loads(base64.b32decode(out))
     except TimeoutExpired:
         proc.kill()
         out, err = proc.communicate()
         message = u"\n".join([out.decode('utf-8'), err.decode('utf-8')])
         raise RuntimeError(message)
+
+
+def _read_all_bytes(stream_in, chunk_size=4096):
+    all_data = b""
+    while True:
+        data = stream_in.read(chunk_size)
+        all_data += data
+        if len(data) < chunk_size:
+            break
+    return all_data
 
 
 def pickle_echo(stream_in=None, stream_out=None, protocol=None):
@@ -87,14 +105,15 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     if hasattr(stream_out, 'buffer'):
         stream_out = stream_out.buffer
 
-    input_bytes = stream_in.read()
+    input_bytes = base64.b32decode(_read_all_bytes(stream_in))
     stream_in.close()
-    unpickled_content = loads(input_bytes)
-    stream_out.write(dumps(unpickled_content, protocol=protocol))
+    obj = loads(input_bytes)
+    repickled_bytes = dumps(obj, protocol=protocol)
+    stream_out.write(base64.b32encode(repickled_bytes))
     stream_out.close()
 
 
-def assert_run_python_script(source_code, timeout=5):
+def assert_run_python_script(source_code, timeout=TIMEOUT):
     """Utility to help check pickleability of objects defined in __main__
 
     The script provided in the source code should return 0 and not print

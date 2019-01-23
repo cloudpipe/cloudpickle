@@ -1,36 +1,48 @@
 language: python
+dist: xenial
 
 matrix:
   include:
-    - python: 2.7
-    - python: 3.5
-    - python: 3.6
-    - python: 3.7
-      sudo: required
-      dist: xenial
-    - python: "pypy"
+    - os: windows
+      language: sh
+      env: PYTHON_ROOT="/c/Python37" PYTHON_CHOCO_PKG="python3"
+    - os: windows
+      language: sh
+      env: PYTHON_ROOT="/c/Python27" PYTHON_CHOCO_PKG="python2"
+    - os: linux
+      dist: trusty
+      python: "pypy3"
+    - os: linux
+      python: 3.7
+    - os: linux
+      python: 3.6
+    - os: linux
+      python: 3.5
+    - os: linux
+      python: 2.7
 
-
-# This disables sudo, but makes builds start much faster
-# See http://blog.travis-ci.com/2014-12-17-faster-builds-with-container-based-infrastructure/
-before_install: bash ./ci/before_install.sh
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
+        choco install -y $PYTHON_CHOCO_PKG;
+        export PATH="$PYTHON_ROOT:$PYTHON_ROOT/Scripts:$PATH";
+        python -m pip install --upgrade pip;
+    fi
 install:
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
   - pip install .
   - pip install --upgrade -r dev-requirements.txt
   - pip install tornado
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
+        pip install numpy scipy;
+    fi
   - pip list
 before_script:
-  - pip install flake8
   # stop the build if there are Python syntax errors or undefined names
   - flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
   # exit-zero treats all errors as warnings.  The GitHub editor is 127 chars wide
   - flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
   - python ci/install_coverage_subprocess_pth.py
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
-  - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' py.test -r s
+  - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
 after_success:
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then source activate testenv; fi
   - coverage combine --append
   - codecov
