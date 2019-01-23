@@ -8,7 +8,7 @@ from cloudpickle import dumps
 from pickle import loads
 
 try:
-    from suprocess import TimeoutExpired
+    from subprocess import TimeoutExpired
     timeout_supported = True
 except ImportError:
     # no support for timeout in Python 2
