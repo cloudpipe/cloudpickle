@@ -968,7 +968,7 @@ def dumps(obj, protocol=None):
 # including pickle's unloading functions in this namespace
 load = pickle.load
 loads = pickle.loads
-# alias CloudPickler in the namespace as Pickler for consistency with Python pickle API
+# alias CloudPickler in the namespace as Pickler for consistency with Python's pickle API
 Pickler = CloudPickler
 
 
