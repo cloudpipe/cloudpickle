@@ -66,6 +66,11 @@ def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
     return pickle.loads(cloudpickle.dumps(obj, protocol=protocol))
 
 
+def _escape(raw_filepath):
+    # Ugly hack to embed filepaths in code templates for windows
+    return raw_filepath.replace("\\", r"\\\\")
+
+
 class CloudPickleTest(unittest.TestCase):
 
     protocol = cloudpickle.DEFAULT_PROTOCOL
@@ -462,7 +467,6 @@ class CloudPickleTest(unittest.TestCase):
         exec(textwrap.dedent(code), mod.__dict__)
 
         pickled_module_path = os.path.join(self.tmpdir, 'mod_f.pkl')
-
         child_process_script = '''
         import pickle
         from cloudpickle.cloudpickle import _dynamic_modules_globals
@@ -487,7 +491,7 @@ class CloudPickleTest(unittest.TestCase):
         '''
 
         child_process_script = child_process_script.format(
-                pickled_module_path=pickled_module_path)
+                pickled_module_path=_escape(pickled_module_path))
 
         try:
             with open(pickled_module_path, 'wb') as f:
@@ -515,7 +519,7 @@ class CloudPickleTest(unittest.TestCase):
         '''
 
         child_process_script = child_process_script.format(
-                pickled_func_path=pickled_func_path)
+                pickled_func_path=_escape(pickled_func_path))
 
         try:
 
@@ -583,10 +587,10 @@ class CloudPickleTest(unittest.TestCase):
                 child_process_module_file=child_process_module_file)
 
         child_process_script = child_process_script.format(
-                parent_process_module_file=parent_process_module_file,
-                child_process_module_file=child_process_module_file,
-                child_of_child_process_script=child_of_child_process_script,
-                protocol=self.protocol)
+            parent_process_module_file=_escape(parent_process_module_file),
+            child_process_module_file=_escape(child_process_module_file),
+            child_of_child_process_script=_escape(child_of_child_process_script),
+            protocol=self.protocol)
 
         try:
             with open(parent_process_module_file, 'wb') as fid:
@@ -1204,8 +1208,9 @@ class CloudPickleTest(unittest.TestCase):
                     func_with_initial_globals = pickle.load(f)
                 assert func_with_initial_globals() == 'new value'
                 assert func_with_modified_globals() == 'new value'
-            """.format(with_initial_globals_file=with_initial_globals_file,
-                       with_modified_globals_file=with_modified_globals_file)
+            """.format(
+                with_initial_globals_file=_escape(with_initial_globals_file),
+                with_modified_globals_file=_escape(with_modified_globals_file))
             assert_run_python_script(textwrap.dedent(child_process_code))
 
         finally:

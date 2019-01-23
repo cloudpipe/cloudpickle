@@ -30,6 +30,17 @@ def make_local_function():
     return g
 
 
+def _make_cwd_env():
+    """Helper to prepare environment for the child processes"""
+    cloudpickle_repo_folder = op.normpath(
+        op.join(op.dirname(__file__), '..'))
+    env = os.environ.copy()
+    pythonpath = "{src}{sep}tests{pathsep}{src}".format(
+        src=cloudpickle_repo_folder, sep=os.sep, pathsep=os.pathsep)
+    env['PYTHONPATH'] = pythonpath
+    return cloudpickle_repo_folder, env
+
+
 def subprocess_pickle_echo(input_data, protocol=None):
     """Echo function with a child Python process
 
@@ -43,11 +54,7 @@ def subprocess_pickle_echo(input_data, protocol=None):
     """
     pickled_input_data = dumps(input_data, protocol=protocol)
     cmd = [sys.executable, __file__]  # run then pickle_echo() in __main__
-    cloudpickle_repo_folder = op.normpath(
-        op.join(op.dirname(__file__), '..'))
-    cwd = cloudpickle_repo_folder
-    pythonpath = "{src}/tests:{src}".format(src=cloudpickle_repo_folder)
-    env = {'PYTHONPATH': pythonpath}
+    cwd, env = _make_cwd_env()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env)
     try:
         comm_kwargs = {}
@@ -98,13 +105,11 @@ def assert_run_python_script(source_code, timeout=5):
         with open(source_file, 'wb') as f:
             f.write(source_code.encode('utf-8'))
         cmd = [sys.executable, source_file]
-        cloudpickle_repo_folder = op.normpath(
-            op.join(op.dirname(__file__), '..'))
-        pythonpath = "{src}/tests:{src}".format(src=cloudpickle_repo_folder)
+        cwd, env = _make_cwd_env()
         kwargs = {
-            'cwd': cloudpickle_repo_folder,
+            'cwd': cwd,
             'stderr': STDOUT,
-            'env': {'PYTHONPATH': pythonpath},
+            'env': env,
         }
         # If coverage is running, pass the config file to the subprocess
         coverage_rc = os.environ.get("COVERAGE_PROCESS_START")
