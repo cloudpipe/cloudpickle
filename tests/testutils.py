@@ -7,6 +7,7 @@ from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 from cloudpickle import dumps
 from pickle import loads
 
+TIMEOUT = 60
 try:
     from subprocess import TimeoutExpired
     timeout_supported = True
@@ -41,7 +42,7 @@ def _make_cwd_env():
     return cloudpickle_repo_folder, env
 
 
-def subprocess_pickle_echo(input_data, protocol=None):
+def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
     """Echo function with a child Python process
 
     Pickle the input data into a buffer, send it to a subprocess via
@@ -67,7 +68,7 @@ def subprocess_pickle_echo(input_data, protocol=None):
     try:
         comm_kwargs = {}
         if timeout_supported:
-            comm_kwargs['timeout'] = 60
+            comm_kwargs['timeout'] = timeout
         out, err = proc.communicate(pickled_b32, **comm_kwargs)
         if proc.returncode != 0 or len(err):
             message = "Subprocess returned %d: " % proc.returncode
@@ -112,7 +113,7 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     stream_out.close()
 
 
-def assert_run_python_script(source_code, timeout=5):
+def assert_run_python_script(source_code, timeout=TIMEOUT):
     """Utility to help check pickleability of objects defined in __main__
 
     The script provided in the source code should return 0 and not print
