@@ -56,7 +56,8 @@ def subprocess_pickle_echo(input_data, protocol=None):
     # run then pickle_echo(protocol=protocol) in __main__:
     cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
-    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env)
+    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
+                 shell=True)
     try:
         comm_kwargs = {}
         if timeout_supported:
