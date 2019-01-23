@@ -28,11 +28,12 @@ before_install:
         python -m pip install --upgrade pip;
     fi
 install:
-  - echo $PATH
   - pip install .
   - pip install --upgrade -r dev-requirements.txt
   - pip install tornado
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then pip install numpy scipy; fi
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
+        pip install numpy scipy;
+    fi
   - pip list
 before_script:
   # stop the build if there are Python syntax errors or undefined names
