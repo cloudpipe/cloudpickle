@@ -3,7 +3,7 @@ import os
 import os.path as op
 import tempfile
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
-
+from subprocess import STARTUPINFO, STARTF_USESTDHANDLES, STARTF_USESHOWWINDOW
 from cloudpickle import dumps
 from pickle import loads
 
@@ -56,7 +56,13 @@ def subprocess_pickle_echo(input_data, protocol=None):
     # run then pickle_echo(protocol=protocol) in __main__:
     cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
-    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env)
+    if sys.platform == "win32":
+        startupinfo = STARTUPINFO()
+        startupinfo.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW
+    else:
+        startupinfo = None
+    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
+                 startupinfo=startupinfo)
     try:
         comm_kwargs = {}
         if timeout_supported:
