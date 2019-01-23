@@ -2,8 +2,7 @@ import sys
 import os
 import os.path as op
 import tempfile
-import subprocess
-import time
+import base64
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 from cloudpickle import dumps
 from pickle import loads
@@ -54,32 +53,42 @@ def subprocess_pickle_echo(input_data, protocol=None):
 
     """
     pickled_input_data = dumps(input_data, protocol=protocol)
+    # Under Windows + Python 2.7, subprocess / communicate truncate the data
+    # on some specific bytes. To avoid this issue, let's use the pure ASCII
+    # Base32 encoding to encapsulate the pickle message sent to the child
+    # process.
+    pickled_b32 = base64.b32encode(pickled_input_data)
+
     # run then pickle_echo(protocol=protocol) in __main__:
     cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
-    if sys.platform == "win32":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags = (subprocess.STARTF_USESTDHANDLES |
-                               subprocess.STARTF_USESHOWWINDOW)
-    else:
-        startupinfo = None
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
-                 startupinfo=startupinfo)
+                 bufsize=4096)
     try:
         comm_kwargs = {}
         if timeout_supported:
             comm_kwargs['timeout'] = 5
-        out, err = proc.communicate(pickled_input_data, **comm_kwargs)
+        out, err = proc.communicate(pickled_b32, **comm_kwargs)
         if proc.returncode != 0 or len(err):
             message = "Subprocess returned %d: " % proc.returncode
             message += err.decode('utf-8')
             raise RuntimeError(message)
-        return loads(out)
+        return loads(base64.b32decode(out))
     except TimeoutExpired:
         proc.kill()
         out, err = proc.communicate()
         message = u"\n".join([out.decode('utf-8'), err.decode('utf-8')])
         raise RuntimeError(message)
+
+
+def _read_all_bytes(stream_in, chunk_size=4096):
+    all_data = b""
+    while True:
+        data = stream_in.read(chunk_size)
+        all_data += data
+        if len(data) < chunk_size:
+            break
+    return all_data
 
 
 def pickle_echo(stream_in=None, stream_out=None, protocol=None):
@@ -95,15 +104,11 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     if hasattr(stream_out, 'buffer'):
         stream_out = stream_out.buffer
 
-    for i in range(10):
-        input_bytes = stream_in.read()
-        if len(input_bytes) > 0:
-            break
-        # Workaround windows / Python 2.7 issue with empty stdin
-        time.sleep(1)
+    input_bytes = base64.b32decode(_read_all_bytes(stream_in))
     stream_in.close()
-    unpickled_content = loads(input_bytes)
-    stream_out.write(dumps(unpickled_content, protocol=protocol))
+    obj = loads(input_bytes)
+    repickled_bytes = dumps(obj, protocol=protocol)
+    stream_out.write(base64.b32encode(repickled_bytes))
     stream_out.close()
 
 
