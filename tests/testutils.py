@@ -2,8 +2,9 @@ import sys
 import os
 import os.path as op
 import tempfile
+import subprocess
+import time
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
-from subprocess import STARTUPINFO, STARTF_USESTDHANDLES, STARTF_USESHOWWINDOW
 from cloudpickle import dumps
 from pickle import loads
 
@@ -57,8 +58,9 @@ def subprocess_pickle_echo(input_data, protocol=None):
     cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
     if sys.platform == "win32":
-        startupinfo = STARTUPINFO()
-        startupinfo.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags = (subprocess.STARTF_USESTDHANDLES |
+                               subprocess.STARTF_USESHOWWINDOW)
     else:
         startupinfo = None
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
@@ -93,7 +95,12 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     if hasattr(stream_out, 'buffer'):
         stream_out = stream_out.buffer
 
-    input_bytes = stream_in.read()
+    for i in range(10):
+        input_bytes = stream_in.read()
+        if len(input_bytes) > 0:
+            break
+        # Workaround windows / Python 2.7 issue with empty stdin
+        time.sleep(1)
     stream_in.close()
     unpickled_content = loads(input_bytes)
     stream_out.write(dumps(unpickled_content, protocol=protocol))
