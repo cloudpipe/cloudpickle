@@ -64,7 +64,7 @@ DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
 
 if sys.version < '3':
-    from pickle import Pickler
+    from pickle import Pickler as _Pickler
     try:
         from cStringIO import StringIO
     except ImportError:
@@ -73,7 +73,7 @@ if sys.version < '3':
     PY3 = False
 else:
     types.ClassType = type
-    from pickle import _Pickler as Pickler
+    from pickle import _Pickler
     from io import BytesIO as StringIO
     string_types = (str,)
     PY3 = True
@@ -266,21 +266,21 @@ else:
                 yield op, instr.arg
 
 
-class CloudPickler(Pickler):
+class CloudPickler(_Pickler):
 
-    dispatch = Pickler.dispatch.copy()
+    dispatch = _Pickler.dispatch.copy()
 
     def __init__(self, file, protocol=None):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
-        Pickler.__init__(self, file, protocol=protocol)
+        _Pickler.__init__(self, file, protocol=protocol)
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
     def dump(self, obj):
         self.inject_addons()
         try:
-            return Pickler.dump(self, obj)
+            return _Pickler.dump(self, obj)
         except RuntimeError as e:
             if 'recursion' in e.args[0]:
                 msg = """Could not pickle object as excessively deep recursion required."""
@@ -709,7 +709,7 @@ class CloudPickler(Pickler):
             return self.save_dynamic_class(obj)
 
         try:
-            return Pickler.save_global(self, obj, name=name)
+            return _Pickler.save_global(self, obj, name=name)
         except Exception:
             if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
                 if obj in _BUILTIN_TYPE_NAMES:
@@ -965,9 +965,11 @@ def dumps(obj, protocol=None):
         file.close()
 
 
-# including pickles unloading functions in this namespace
+# including pickle's unloading functions in this namespace
 load = pickle.load
 loads = pickle.loads
+# alias CloudPickler in the namespace as Pickler for consistency with Python pickle API
+Pickler = CloudPickler
 
 
 # hack for __import__ not working as desired
