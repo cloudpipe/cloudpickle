@@ -53,7 +53,8 @@ def subprocess_pickle_echo(input_data, protocol=None):
 
     """
     pickled_input_data = dumps(input_data, protocol=protocol)
-    cmd = [sys.executable, __file__]  # run then pickle_echo() in __main__
+    # run then pickle_echo(protocol=protocol) in __main__:
+    cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env)
     try:
@@ -133,4 +134,5 @@ def assert_run_python_script(source_code, timeout=5):
 
 
 if __name__ == '__main__':
-    pickle_echo()
+    protocol = int(sys.argv[sys.argv.index('--protocol') + 1])
+    pickle_echo(protocol=protocol)
