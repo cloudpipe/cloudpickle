@@ -20,6 +20,24 @@ matrix:
       python: 3.5
     - os: linux
       python: 2.7
+    - os: linux
+      if: type = cron
+      # The pytest major version is constrained to 3 because running the
+      # distributed test suite with pytest 4 fails for now
+      env: PROJECT=distributed
+           TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock"
+           PROJECT_URL=https://github.com/dask/distributed.git
+      python: 3.7
+    - os: linux
+      if: type = cron
+      env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
+           PROJECT_URL=https://github.com/tomMoral/loky.git
+      python: 3.7
+    - os: linux
+      if: type = cron
+      env: PROJECT=joblib TEST_REQUIREMENTS="pytest numpy distributed"
+           PROJECT_URL=https://github.com/joblib/joblib.git
+      python: 3.7
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
@@ -34,6 +52,18 @@ install:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
         pip install numpy scipy;
     fi
+  - if [[ $TRAVIS_EVENT_TYPE == "cron" ]]; then
+        pip install $TEST_REQUIREMENTS
+        pushd ..
+        git clone $PROJECT_URL
+        if [[ $PROJECT == "joblib" ]]; then
+            pushd joblib/joblib/externals
+            source vendor_cloudpickle.sh ../../../cloudpickle
+            popd
+        fi
+        pip install ./$PROJECT
+        popd
+    fi
   - pip list
 before_script:
   # stop the build if there are Python syntax errors or undefined names
@@ -43,6 +73,11 @@ before_script:
   - python ci/install_coverage_subprocess_pth.py
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+  - if [[ $TRAVIS_EVENT_TYPE == "cron" ]]; then
+        pushd ../$PROJECT
+        python -mpytest -vl
+        popd
+    fi
 after_success:
   - coverage combine --append
   - codecov
