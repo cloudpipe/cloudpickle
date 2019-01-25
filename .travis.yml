@@ -57,7 +57,7 @@ install:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
         pip install numpy scipy;
     fi
-  - if [[ $TRAVIS_EVENT_TYPE == "cron" ]]; then
+  - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
         git clone $PROJECT_URL;
@@ -78,7 +78,7 @@ before_script:
   - python ci/install_coverage_subprocess_pth.py
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-  - if [[ $TRAVIS_EVENT_TYPE == "cron" ]]; then
+  - if [[ $PROJECT != "" ]]; then
         pushd ../$PROJECT;
         python -mpytest -vl;
         popd;
