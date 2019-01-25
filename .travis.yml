@@ -60,7 +60,7 @@ install:
             pushd joblib/joblib/externals;
             source vendor_cloudpickle.sh ../../../cloudpickle;
             popd;
-        fi
+        fi;
         pip install ./$PROJECT;
         popd;
     fi
