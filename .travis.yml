@@ -33,7 +33,7 @@ matrix:
       sudo: required
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
-           PROJECT_URL=https://github.com/dask/distributed.git
+           PROJECT_URL=https://github.com/pierreglaser/distributed.git
       python: 3.6
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
@@ -60,7 +60,7 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
-        git clone $PROJECT_URL;
+        git clone --branch fix-test-listen-args $PROJECT_URL;
         if [[ $PROJECT == "joblib" ]]; then
             pushd joblib/joblib/externals;
             source vendor_cloudpickle.sh ../../../cloudpickle;
