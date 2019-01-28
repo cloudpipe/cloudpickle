@@ -81,10 +81,8 @@ before_script:
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - if [[ $PROJECT != "" ]]; then
-        TEST_CMD="python -mpytest -vl $PYTEST_ARGS";
         pushd ../$PROJECT;
-        echo $TEST_CMD;
-        $TEST_CMD;
+        python -mpytest -vl -k 'not test_connection_args and not test_listen_args';
         TEST_RETURN_CODE=$?;
         popd;
         if [[ "$TEST_RETURN_CODE" != "0" ]]; then
