@@ -35,7 +35,7 @@ matrix:
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
            PROJECT_URL=https://github.com/dask/distributed.git
-           PYTEST_ARGS='-k ''not test_connection_args and not test_listen_args'''
+           PYTEST_ARGS='-k "not test_connection_args and not test_listen_args"'
       dist: xenial
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
