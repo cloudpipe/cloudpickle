@@ -35,7 +35,7 @@ matrix:
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock"
            PROJECT_URL=https://github.com/dask/distributed.git
-      python: 3.7
+      python: 3.6
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
            PROJECT_URL=https://github.com/tomMoral/loky.git
