@@ -81,7 +81,7 @@ before_script:
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - if [[ $PROJECT != "" ]]; then
-        TEST_CMD="python -mpytest -vl"
+        TEST_CMD="python -mpytest -vl";
         if [[ "$PYTEST_FILTER" != "" ]]; then
             TEST_CMD="$TEST_CMD -k $PYTEST_FILTER";
         fi;
