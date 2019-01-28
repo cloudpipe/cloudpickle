@@ -82,7 +82,8 @@ script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - if [[ $PROJECT != "" ]]; then
         pushd ../$PROJECT;
-        python -mpytest -vl $PYTEST_ARGS;
+        CMD="python -mpytest -vl $PYTEST_ARGS";
+        echo $CMD
         TEST_RETURN_CODE=$?;
         popd;
         if [[ "$TEST_RETURN_CODE" != "0" ]]; then
