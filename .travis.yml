@@ -34,7 +34,7 @@ matrix:
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
            PROJECT_URL=https://github.com/pierreglaser/distributed.git
-      python: 3.6
+      dist: xenial
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
            PROJECT_URL=https://github.com/tomMoral/loky.git
