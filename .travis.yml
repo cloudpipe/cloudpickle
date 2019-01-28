@@ -36,7 +36,6 @@ matrix:
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
            PROJECT_URL=https://github.com/dask/distributed.git
            PYTEST_ARGS="-k not test_connection_args and not test_listen_args"
-      dist: xenial
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
            PROJECT_URL=https://github.com/tomMoral/loky.git
@@ -80,14 +79,21 @@ before_script:
   - python ci/install_coverage_subprocess_pth.py
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-  - if [[ $PROJECT != "" ]]; then
-        pushd ../$PROJECT;
-        pytest -vl "$PYTEST_ARGS";
-        TEST_RETURN_CODE=$?;
-        popd;
-        if [[ "$TEST_RETURN_CODE" != "0" ]]; then
-            exit $TEST_RETURN_CODE;
-        fi;
+  - |
+    if [[ $PROJECT != "" ]]; then
+      pushd ../$PROJECT
+      # pytest hangs if given an empty quoted string (it will happen
+      # if PYTEST_ARGS was not defined) so we have to split the cases.
+      if [[ "$PYTEST_ARGS" != "" ]]; then
+        pytest -vl "$PYTEST_ARGS"
+      else
+        pytest -vl
+      fi
+      TEST_RETURN_CODE=$?
+      popd
+      if [[ "$TEST_RETURN_CODE" != "0" ]]; then
+        exit $TEST_RETURN_CODE
+      fi
     fi
 after_success:
   - coverage combine --append
