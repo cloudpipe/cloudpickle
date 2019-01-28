@@ -31,6 +31,7 @@ matrix:
       # setting sudo to "enabled" to run the tests on a full virtual machine
       # instead of a container. See dask/distributed #1563
       sudo: required
+      dist: trusty
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock"
            PROJECT_URL=https://github.com/dask/distributed.git
