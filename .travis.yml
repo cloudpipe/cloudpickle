@@ -85,8 +85,8 @@ script:
         if [[ "$PYTEST_FILTER" != "" ]]; then
             TEST_CMD="$TEST_CMD -k $PYTEST_FILTER";
         fi;
-        $TEST_CMD;
         pushd ../$PROJECT;
+        $TEST_CMD;
         TEST_RETURN_CODE=$?;
         popd;
         if [[ "$TEST_RETURN_CODE" != "0" ]]; then
