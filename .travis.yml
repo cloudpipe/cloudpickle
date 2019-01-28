@@ -83,7 +83,6 @@ script:
   - if [[ $PROJECT != "" ]]; then
         pushd ../$PROJECT;
         CMD="python -mpytest -vl $PYTEST_ARGS";
-        echo $CMD
         TEST_RETURN_CODE=$?;
         popd;
         if [[ "$TEST_RETURN_CODE" != "0" ]]; then
