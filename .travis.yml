@@ -78,7 +78,11 @@ script:
   - if [[ $PROJECT != "" ]]; then
         pushd ../$PROJECT;
         python -mpytest -vl;
+        TEST_RETURN_CODE=$?;
         popd;
+        if [[ "$TEST_RETURN_CODE" != "0" ]]; then
+            exit $TEST_RETURN_CODE;
+        fi;
     fi
 after_success:
   - coverage combine --append
