@@ -35,7 +35,7 @@ matrix:
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
            PROJECT_URL=https://github.com/dask/distributed.git
-           PYTEST_ARGS='-k "not test_connection_args and not test_listen_args"'
+           PYTEST_FILTER="'not test_connection_args and not test_listen_args'"
       dist: xenial
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
@@ -81,8 +81,12 @@ before_script:
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - if [[ $PROJECT != "" ]]; then
+        TEST_CMD="python -mpytest -vl"
+        if [[ "$PYTEST_FILTER" != "" ]]; then
+            TEST_CMD="$TEST_CMD -k $PYTEST_FILTER";
+        fi;
+        $TEST_CMD
         pushd ../$PROJECT;
-        python -mpytest -vl -k 'not test_connection_args and not test_listen_args';
         TEST_RETURN_CODE=$?;
         popd;
         if [[ "$TEST_RETURN_CODE" != "0" ]]; then
