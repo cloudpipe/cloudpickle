@@ -29,7 +29,7 @@ matrix:
       # Side note: for distributed, the pytest major version is constrained to
       # 3 because running it's test suite with pytest 4 fails for now. Also,
       # two failing tests related to openssl and not to cloudpickle are
-      # skipped
+      # skipped.
       python: 3.7
       sudo: required
       env: PROJECT=distributed
