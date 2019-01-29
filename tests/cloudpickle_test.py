@@ -1192,7 +1192,7 @@ class CloudPickleTest(unittest.TestCase):
 
                 # Load a function with initial global variable that was
                 # pickled after a change in the global variable
-                with open({with_initial_globals_file!r},'rb') as f:
+                with open({with_modified_globals_file!r},'rb') as f:
                     func_with_modified_globals = pickle.load(f)
 
                 # assert the this unpickling did not modify the value of
