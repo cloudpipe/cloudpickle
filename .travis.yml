@@ -84,8 +84,16 @@ script:
       pushd ../$PROJECT
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
-      pytest -vl
+      if [[ "$PYTEST_ARGS" != "" ]]; then
+        pytest -vl "$PYTEST_ARGS"
+      else
+        pytest -vl
+      fi
+      TEST_RETURN_CODE=$?
       popd
+      if [[ "$TEST_RETURN_CODE" != "0" ]]; then
+        exit $TEST_RETURN_CODE
+      fi
     fi
 after_success:
   - coverage combine --append
