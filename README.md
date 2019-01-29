@@ -67,7 +67,7 @@ Running the tests
 
   or alternatively for a specific environment:
 
-      tox -e py27
+      tox -e py37
 
 
 - With `py.test` to only run the tests for your current version of
