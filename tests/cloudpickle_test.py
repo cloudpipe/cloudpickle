@@ -1085,6 +1085,8 @@ class CloudPickleTest(unittest.TestCase):
 
         cloned_f0 = {clone_func}(f0, protocol={protocol})
         cloned_f1 = {clone_func}(f1, protocol={protocol})
+
+        # pickled_f1 contains VARIABLE's current value ("default_value") in it.
         pickled_f1 = dumps(f1, protocol={protocol})
 
         # Change the value of the global variable
@@ -1094,9 +1096,13 @@ class CloudPickleTest(unittest.TestCase):
         result_f1 = cloned_f1()
         assert result_f1 == "changed_by_f0", result_f1
 
-        # Ensure that unpickling the global variable does not change its value
+        # Each time a function f is depickled, cloudpickle sets the values of
+        # its globals (that are potentially shared with other functions present
+        # in f's new environment) to the ones stored in f's pickle string.
+        # Thus, calling loads(pickled_f1) will reset VARIABLE from
+        # "changed_by_f0" to "default_value".
         result_pickled_f1 = loads(pickled_f1)()
-        assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
+        assert result_pickled_f1 == "default_value", result_pickled_f1
         """
         for clone_func in ['local_clone', 'subprocess_pickle_echo']:
             code = code_template.format(protocol=self.protocol,
@@ -1130,10 +1136,13 @@ class CloudPickleTest(unittest.TestCase):
             assert result_cloned_f1 == "changed_by_f0", result_cloned_f1
             assert f1() == result_cloned_f1
 
-            # Ensure that unpickling the global variable does not change its
-            # value
+            # Each time a function f is depickled, cloudpickle sets the values
+            # of its globals (that are potentially shared with other functions
+            # present in f's new environment) to the one stored in f's pickle
+            # string. Thus, calling loads(pickled_f1) will reset VARIABLE from
+            # "changed_by_f0" to "default_value".
             result_pickled_f1 = cloudpickle.loads(pickled_f1)()
-            assert result_pickled_f1 == "changed_by_f0", result_pickled_f1
+            assert result_pickled_f1 == "default_value", result_pickled_f1
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
 
@@ -1204,19 +1213,19 @@ class CloudPickleTest(unittest.TestCase):
                 with open({with_modified_globals_file!r},'rb') as f:
                     func_with_modified_globals = pickle.load(f)
 
-                # assert the this unpickling did not modify the value of
-                # the local
-                assert func_with_modified_globals() == 'initial value'
+                # assert that unpickling this function has overridden the
+                # previous value of GLOBAL_STATE
+                assert func_with_modified_globals() == 'changed value'
 
                 # Update the value from the child process and check that
-                # unpickling again does not reset our change.
+                # unpickling again resets our change.
                 assert func_with_initial_globals('new value') == 'new value'
                 assert func_with_modified_globals() == 'new value'
 
                 with open({with_initial_globals_file!r},'rb') as f:
                     func_with_initial_globals = pickle.load(f)
-                assert func_with_initial_globals() == 'new value'
-                assert func_with_modified_globals() == 'new value'
+                assert func_with_initial_globals() == 'initial value'
+                assert func_with_modified_globals() == 'initial value'
             """.format(
                 with_initial_globals_file=_escape(with_initial_globals_file),
                 with_modified_globals_file=_escape(with_modified_globals_file))
