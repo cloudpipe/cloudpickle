@@ -20,6 +20,33 @@ matrix:
       python: 3.5
     - os: linux
       python: 2.7
+    - os: linux
+      # The PROJECT environment variable refers to a downstream project that
+      # depends on cloudpickle (for example: distributed, joblib, loky). For
+      # each project, a matrix item is created, that will run the $PROJECT
+      # test suite with the latest cloudpickle, to check for breaking changes
+      # introduced by cloudpickle.
+      # Side note: for distributed, the pytest major version is constrained to
+      # 3 because running it's test suite with pytest 4 fails for now. Also,
+      # two failing tests related to openssl and not to cloudpickle are
+      # skipped
+      python: 3.7
+      sudo: required
+      env: PROJECT=distributed
+           TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
+           PROJECT_URL=https://github.com/dask/distributed.git
+           PYTEST_ARGS="-k not test_connection_args and not test_listen_args"
+      if: commit_message =~ /(\[ci downstream\]|\[ci distributed\])/
+    - os: linux
+      env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
+           PROJECT_URL=https://github.com/tomMoral/loky.git
+      python: 3.7
+      if: commit_message =~ /(\[ci downstream\]|\[ci loky\])/
+    - os: linux
+      env: PROJECT=joblib TEST_REQUIREMENTS="pytest numpy distributed"
+           PROJECT_URL=https://github.com/joblib/joblib.git
+      python: 3.7
+      if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
@@ -34,6 +61,18 @@ install:
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
         pip install numpy scipy;
     fi
+  - if [[ $PROJECT != "" ]]; then
+        pip install $TEST_REQUIREMENTS;
+        pushd ..;
+        git clone $PROJECT_URL;
+        if [[ $PROJECT == "joblib" ]]; then
+            pushd joblib/joblib/externals;
+            source vendor_cloudpickle.sh ../../../cloudpickle;
+            popd;
+        fi;
+        pip install ./$PROJECT;
+        popd;
+    fi
   - pip list
 before_script:
   # stop the build if there are Python syntax errors or undefined names
@@ -43,6 +82,22 @@ before_script:
   - python ci/install_coverage_subprocess_pth.py
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+  - |
+    if [[ $PROJECT != "" ]]; then
+      pushd ../$PROJECT
+      # pytest hangs if given an empty quoted string (it will happen
+      # if PYTEST_ARGS was not defined) so we have to split the cases.
+      if [[ "$PYTEST_ARGS" != "" ]]; then
+        pytest -vl "$PYTEST_ARGS"
+      else
+        pytest -vl
+      fi
+      TEST_RETURN_CODE=$?
+      popd
+      if [[ "$TEST_RETURN_CODE" != "0" ]]; then
+        exit $TEST_RETURN_CODE
+      fi
+    fi
 after_success:
   - coverage combine --append
   - codecov
