@@ -1096,10 +1096,16 @@ def _fill_function(*args):
     else:
         raise ValueError('Unexpected _fill_value arguments: %r' % (args,))
 
-    # Only set global variables that do not exist.
-    for k, v in state['globals'].items():
-        if k not in func.__globals__:
-            func.__globals__[k] = v
+    # - At pickling time, any dynamic global variable used by func is
+    #   serialized by value (in state['globals']).
+    # - At unpickling time, func's  __globals__ will first mirror the globals
+    #   already existing in func's new module (predicted from func's __module__
+    #   attribute), and then be updated with state['globals'].
+
+    # That means that if any collision happens, the serialized global variables
+    # shipped with func will always override the globals already existing in
+    # func's new environment
+    func.__globals__.update(state['globals'])
 
     func.__defaults__ = state['defaults']
     func.__dict__ = state['dict']
