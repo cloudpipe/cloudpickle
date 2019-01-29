@@ -4,6 +4,9 @@
 - Add support for pickling interactively defined dataclasses.
   ([issue #245](https://github.com/cloudpipe/cloudpickle/pull/245))
 
+- Global variables contained in pickle strings will override existing
+  variables when loaded in their new environment.
+
 
 0.7.0
 =====
