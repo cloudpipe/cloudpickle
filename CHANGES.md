@@ -6,7 +6,7 @@
 
 - Global variables contained in pickle strings will override existing
   variables when loaded in their new environment. This restores the (previously
-  unstested) behavior of cloudpickle prior to changes done in 0.6 and 0.6.1.
+  untested) behavior of cloudpickle prior to changes done in 0.6 and 0.6.1.
 
 
 0.7.0
