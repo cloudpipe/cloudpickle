@@ -1098,13 +1098,13 @@ def _fill_function(*args):
 
     # - At pickling time, any dynamic global variable used by func is
     #   serialized by value (in state['globals']).
-    # - At unpickling time, func's  __globals__ will first mirror the globals
-    #   already existing in func's new module (predicted from func's __module__
-    #   attribute), and then be updated with state['globals'].
+    # - At unpickling time, func's __globals__ attribute is initialized by
+    #   first retrieving the globals namespace from func's module by looking up
+    #   its __module__ attribute and then updated with state['globals'].
 
     # That means that if any collision happens, the serialized global variables
     # shipped with func will always override the globals already existing in
-    # func's new environment
+    # func's new environment.
     func.__globals__.update(state['globals'])
 
     func.__defaults__ = state['defaults']
