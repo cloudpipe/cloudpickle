@@ -1029,6 +1029,12 @@ class CloudPickleTest(unittest.TestCase):
         def f4(x):
             return foo.method(x)
 
+        def f5(x):
+            # Recursive call to a dynamically defined function.
+            if x <= 0:
+                return f4(x)
+            return f5(x - 1) + 1
+
         cloned = subprocess_pickle_echo(lambda x: x**2, protocol={protocol})
         assert cloned(3) == 9
 
@@ -1052,6 +1058,9 @@ class CloudPickleTest(unittest.TestCase):
 
         cloned = subprocess_pickle_echo(f4, protocol={protocol})
         assert cloned(2) == f4(2)
+
+        cloned = subprocess_pickle_echo(f5, protocol={protocol})
+        assert cloned(7) == f5(7) == 7
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
