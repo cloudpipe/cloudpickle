@@ -6,7 +6,9 @@
 
 - Global variables contained in pickle strings will override existing
   variables when loaded in their new environment. This restores the (previously
-  untested) behavior of cloudpickle prior to changes done in 0.6 and 0.6.1.
+  untested) behavior of cloudpickle prior to changes done in 0.5.4 for
+  functions defined in the `__main__` module,  and 0.6.0/1 for other dynamic
+  functions.
 
 
 0.7.0
