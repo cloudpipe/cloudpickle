@@ -89,7 +89,7 @@ before_script:
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
-    if [[ $PROJECT != "" && $PROJECT != 'ray']]; then
+    if [[ $PROJECT != "" && $PROJECT != 'ray' ]]; then
       pushd ../$PROJECT
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
