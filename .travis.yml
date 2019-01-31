@@ -48,7 +48,7 @@ matrix:
     #   python: 3.7
     #   if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="cython==0.29.0 cmake gym opencv-python pyyaml pandas==0.23.4 requests feather-format lxml openpyxl xlrd py-spy setproctitle pytest-timeout flaky ray tensorflow"
+      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle pytest-timeout ray"
            PROJECT_URL=https://github.com/ray-project/ray.git
       python: 3.5
 
@@ -68,14 +68,14 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
-        git clone $PROJECT_URL;
-        if [[ $PROJECT == "joblib" ]]; then
-            pushd joblib/joblib/externals;
-            source vendor_cloudpickle.sh ../../../cloudpickle;
-            popd;
-        fi;
         if [[ $PROJECT != "ray" ]]; then
-            pip install ./$PROJECT;
+            git clone $PROJECT_URL;
+            if [[ $PROJECT == "joblib" ]]; then
+                pushd joblib/joblib/externals;
+                source vendor_cloudpickle.sh ../../../cloudpickle;
+                popd;
+            fi;
+                pip install ./$PROJECT;
         fi;
         popd;
     fi
@@ -89,7 +89,7 @@ before_script:
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
-    if [[ $PROJECT != "" ]]; then
+    if [[ $PROJECT != "" && $PROJECT != 'ray']]; then
       pushd ../$PROJECT
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
@@ -103,6 +103,8 @@ script:
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
         exit $TEST_RETURN_CODE
       fi
+    else
+      echo python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()"
     fi
 after_success:
   - coverage combine --append
