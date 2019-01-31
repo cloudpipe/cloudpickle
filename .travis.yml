@@ -48,8 +48,8 @@ matrix:
     #   python: 3.7
     #   if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="cython==0.29.0 cmake tensorflow gym opencv-python pyyaml pandas==0.23.4 requests feather-format lxml openpyxl xlrd py-spy setproctitle pytest-timeout flaky"
-           PROJECT_URL=https://github.com/ray-project/ray.git
+      env: PROJECT=ray TEST_REQUIREMENTS="cython==0.29.0 cmake tensorflow gym opencv-python pyyaml pandas==0.23.4 requests feather-format lxml openpyxl xlrd py-spy setproctitle pytest-timeout flaky ray"
+           PYTEST_ARGS="-v --durations=10"
       python: 3.7
 
 before_install:
@@ -68,7 +68,9 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
-        git clone $PROJECT_URL;
+        if [[ $PROJECT != 'ray' ]]; then
+            git clone $PROJECT_URL;
+        fi;
         if [[ $PROJECT == "joblib" ]]; then
             pushd joblib/joblib/externals;
             source vendor_cloudpickle.sh ../../../cloudpickle;
