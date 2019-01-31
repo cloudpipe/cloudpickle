@@ -104,7 +104,7 @@ script:
         exit $TEST_RETURN_CODE
       fi
     else
-      echo python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()"
+      python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()"
     fi
 after_success:
   - coverage combine --append
