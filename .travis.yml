@@ -105,7 +105,7 @@ script:
       fi
     else
       RAY_DIR = $(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")
-      pytest RAY_DIR/ray/test/test_ray_init.py
+      pytest RAY_DIR/test/test_ray_init.py
     fi
 after_success:
   - coverage combine --append
