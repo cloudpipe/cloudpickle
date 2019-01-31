@@ -104,8 +104,8 @@ script:
         exit $TEST_RETURN_CODE
       fi
     else
-      RAY_DIR = $(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")
-      pytest RAY_DIR/test/test_ray_init.py
+      RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")"
+      pytest $RAY_DIR/test/test_ray_init.py
     fi
 after_success:
   - coverage combine --append
