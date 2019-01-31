@@ -68,14 +68,14 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
-        if [[ $PROJECT != 'ray' ]]; then
-            git clone $PROJECT_URL;
+        git clone $PROJECT_URL;
         if [[ $PROJECT == "joblib" ]]; then
             pushd joblib/joblib/externals;
             source vendor_cloudpickle.sh ../../../cloudpickle;
             popd;
         fi;
-        pip install ./$PROJECT;
+        if [[ $PROJECT != 'ray' ]]; then
+            pip install ./$PROJECT;
         fi;
         popd;
     fi
