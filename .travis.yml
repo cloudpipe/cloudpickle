@@ -70,13 +70,13 @@ install:
         pushd ..;
         if [[ $PROJECT != 'ray' ]]; then
             git clone $PROJECT_URL;
-        fi;
         if [[ $PROJECT == "joblib" ]]; then
             pushd joblib/joblib/externals;
             source vendor_cloudpickle.sh ../../../cloudpickle;
             popd;
         fi;
         pip install ./$PROJECT;
+        fi;
         popd;
     fi
   - pip list
