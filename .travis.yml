@@ -105,6 +105,8 @@ script:
       fi
     else
       RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")"
+      rm $RAY_DIR/cloudpickle/cloudpickle.py
+      cp cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py
       pytest $RAY_DIR/test/test_ray_init.py
     fi
 after_success:
