@@ -79,6 +79,9 @@ else:
     PY3 = True
 
 
+# Backward compatibility for cloudpickle from 0.5.4 to 0.6.1, in which
+# functions from the same dynamic module would share the same globals in their
+# depickling environment.
 # Container for the global namespace to ensure consistent unpickling of
 # functions defined in dynamic modules (modules not registed in sys.modules).
 _dynamic_modules_globals = weakref.WeakValueDictionary()
