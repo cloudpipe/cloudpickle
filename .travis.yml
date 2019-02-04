@@ -50,6 +50,7 @@ matrix:
     - os: linux
       env: PROJECT=ray TEST_REQUIREMENTS="setproctitle pytest-timeout ray"
            PROJECT_URL=https://github.com/ray-project/ray.git
+           PYTEST_ARGS="--duration 10 $PROJECT/test/mini_test.py"
       python: 3.5
 
 before_install:
@@ -68,14 +69,18 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
-        if [[ $PROJECT != "ray" ]]; then
-            git clone $PROJECT_URL;
-            if [[ $PROJECT == "joblib" ]]; then
-                pushd joblib/joblib/externals;
-                source vendor_cloudpickle.sh ../../../cloudpickle;
-                popd;
-            fi;
-                pip install ./$PROJECT;
+        git clone $PROJECT_URL;
+        if [[ $PROJECT == "joblib" ]]; then
+            pushd joblib/joblib/externals;
+            source vendor_cloudpickle.sh ../../../cloudpickle;
+            popd;
+        fi;
+        if [[ $PROJECT == "ray" ]]; then
+            RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")"
+            rm $RAY_DIR/cloudpickle/cloudpickle.py
+            cp cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py
+        else
+            pip install ./$PROJECT;
         fi;
         popd;
     fi
@@ -89,7 +94,7 @@ before_script:
 script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
-    if [[ $PROJECT != "" && $PROJECT != 'ray' ]]; then
+    if [[ $PROJECT != "" ]]; then
       pushd ../$PROJECT
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
@@ -103,11 +108,6 @@ script:
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
         exit $TEST_RETURN_CODE
       fi
-    else
-      RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")"
-      rm $RAY_DIR/cloudpickle/cloudpickle.py
-      cp cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py
-      pytest $RAY_DIR/test/test_ray_init.py
     fi
 after_success:
   - coverage combine --append
