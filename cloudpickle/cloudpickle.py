@@ -1146,6 +1146,9 @@ def _make_skel_func(code, cell_count, base_globals=None):
     if base_globals is None:
         base_globals = {}
     elif isinstance(base_globals, str):
+        # Backward compatibility for cloudpickle from 0.5.4 to 0.6.1, in which
+        # the globals of a depickled function were retrieved (if possible) by
+        # using the globals of the module with name base_globals
         base_globals_name = base_globals
         try:
             # First try to reuse the globals from the module containing the
