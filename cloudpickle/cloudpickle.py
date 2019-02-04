@@ -73,7 +73,8 @@ if sys.version_info[0] < 3:  # pragma: no branch
     PY3 = False
 else:
     types.ClassType = type
-    from pickle import _Pickler as Pickler
+    # from pickle import _Pickler as Pickler
+    from pickle import Pickler
     from io import BytesIO as StringIO
     string_types = (str,)
     PY3 = True
@@ -708,6 +709,13 @@ class CloudPickler(Pickler):
 
     dispatch[type] = save_global
     dispatch[types.ClassType] = save_global
+
+    def hook(self, obj):
+        typ = type(obj)
+        if isinstance(obj, types.FunctionType):
+            return self.save_function_tuple(obj)
+        if typ is not obj and isinstance(obj, (type, types.ClassType)):
+            return self.save_dynamic_class(obj)
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
