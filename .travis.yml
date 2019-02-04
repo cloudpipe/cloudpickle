@@ -50,7 +50,7 @@ matrix:
     - os: linux
       env: PROJECT=ray TEST_REQUIREMENTS="setproctitle pytest-timeout ray"
            PROJECT_URL=https://github.com/ray-project/ray.git
-           PYTEST_ARGS="--duration 10 test/mini_test.py"
+           PYTEST_ARGS="test/mini_test.py"
       python: 3.5
 
 before_install:
