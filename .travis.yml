@@ -70,9 +70,9 @@ install:
         pip install $TEST_REQUIREMENTS;
         pushd ..;
         if [[ $PROJECT == "ray" ]]; then
-            RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")"
-            rm $RAY_DIR/cloudpickle/cloudpickle.py
-            cp cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py
+            RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
+            rm $RAY_DIR/cloudpickle/cloudpickle.py;
+            cp cloudpickle/cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py;
         fi;
         git clone $PROJECT_URL;
         if [[ $PROJECT == "joblib" ]]; then
