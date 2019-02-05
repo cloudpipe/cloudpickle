@@ -266,6 +266,11 @@ else:
                 yield op, instr.arg
 
 
+def _normalize_dataclass_dict(clsdict):
+    dataclass_fields = clsdict.get('__dataclass_fields__', [])
+    for key in dataclass_fields:
+        dataclass_fields[key].metadata = dict(dataclass_fields[key].metadata)
+
 class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
@@ -542,6 +547,8 @@ class CloudPickler(Pickler):
         # Create and memoize an skeleton class with obj's name and bases.
         tp = type(obj)
         self.save_reduce(tp, (obj.__name__, obj.__bases__, type_kwargs), obj=obj)
+
+        _normalize_dataclass_dict(clsdict)
 
         # Now save the rest of obj's __dict__. Any references to obj
         # encountered while saving will point to the skeleton class.

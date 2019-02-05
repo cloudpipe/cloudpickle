@@ -1344,6 +1344,15 @@ class CloudPickleTest(unittest.TestCase):
                 with pytest.raises(AttributeError):
                     obj.non_registered_attribute = 1
 
+    def test_dataclass(self):
+        from dataclasses import dataclass
+
+        @dataclass
+        class DataClass:
+            field: int
+
+        pickle_depickle(DataClass, protocol=self.protocol)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
