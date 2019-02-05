@@ -266,15 +266,6 @@ else:
                 yield op, instr.arg
 
 
-def _normalize_dataclass_dict(clsdict):
-    """
-    Replace mappingproxy fields (non pickleable) in dataclass
-    __dict__ with dict.
-    """
-    dataclass_fields = clsdict.get('__dataclass_fields__', {})
-    for key in dataclass_fields:
-        dataclass_fields[key].metadata = dict(dataclass_fields[key].metadata)
-
 class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
@@ -551,8 +542,6 @@ class CloudPickler(Pickler):
         # Create and memoize an skeleton class with obj's name and bases.
         tp = type(obj)
         self.save_reduce(tp, (obj.__name__, obj.__bases__, type_kwargs), obj=obj)
-
-        _normalize_dataclass_dict(clsdict)
 
         # Now save the rest of obj's __dict__. Any references to obj
         # encountered while saving will point to the skeleton class.
@@ -914,6 +903,12 @@ class CloudPickler(Pickler):
         self.save_reduce(logging.getLogger, (), obj=obj)
 
     dispatch[logging.RootLogger] = save_root_logger
+
+    if hasattr(types, "MappingProxyType"):
+        def _save_mappingproxy(self, obj):
+            self.save_reduce(types.MappingProxyType, (dict(obj),), obj=obj)
+
+        dispatch[types.MappingProxyType] = _save_mappingproxy
 
     """Special functions for Add-on libraries"""
     def inject_addons(self):
