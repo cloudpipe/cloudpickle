@@ -267,6 +267,10 @@ else:
 
 
 def _normalize_dataclass_dict(clsdict):
+    """
+    Replace mappingproxy fields (non pickleable) in dataclass
+    __dict__ with dict.
+    """
     dataclass_fields = clsdict.get('__dataclass_fields__', [])
     for key in dataclass_fields:
         dataclass_fields[key].metadata = dict(dataclass_fields[key].metadata)
