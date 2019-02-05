@@ -1357,7 +1357,7 @@ class CloudPickleTest(unittest.TestCase):
         data = DataClass(x=42)
 
         pickle_depickle(DataClass, protocol=self.protocol)
-        assert data.x == pickle_depickle(data).x == 42
+        assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
