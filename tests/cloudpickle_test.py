@@ -1344,13 +1344,10 @@ class CloudPickleTest(unittest.TestCase):
                 with pytest.raises(AttributeError):
                     obj.non_registered_attribute = 1
 
-    @pytest.mark.skipif(sys.version_info < (3, 7),
-                        reason="dataclasses not implemented before 3.7")
     def test_dataclass(self):
-        from dataclasses import make_dataclass
+        dataclasses = pytest.importorskip("dataclasses")
 
-        DataClass = make_dataclass('DataClass', [('x', int)])
-
+        DataClass = dataclasses.make_dataclass('DataClass', [('x', int)])
         pickle_depickle(DataClass, protocol=self.protocol)
 
 
