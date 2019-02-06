@@ -683,8 +683,7 @@ class CloudPickler(Pickler):
         # pickle.dump/pickle.dumps (for example: pickle.dumps([f1, f2])). There
         # is no such limitation when using Cloudpickler.dump, as long as the
         # multiple invokations are bound to the same Cloudpickler.
-        base_globals = self.globals_ref.get(id(func.__globals__), {})
-        self.globals_ref[id(func.__globals__)] = base_globals
+        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
 
         return (code, f_globals, defaults, closure, dct, base_globals)
 
