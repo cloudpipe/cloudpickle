@@ -1083,26 +1083,33 @@ class CloudPickleTest(unittest.TestCase):
         def f1():
             return VARIABLE
 
-        cloned_f0 = {clone_func}(f0, protocol={protocol})
-        cloned_f1 = {clone_func}(f1, protocol={protocol})
+        # pickle f0 and f1 inside the same pickle_string
+        cloned_f0, cloned_f1 = {clone_func}([f0, f1], protocol={protocol})
 
-        # pickled_f1 contains VARIABLE's current value ("default_value") in it.
+        # pickle f1 another time, but in a new pickle string
         pickled_f1 = dumps(f1, protocol={protocol})
 
-        # Change the value of the global variable
+        # Change the value of the global variable in f0's new global namespace
         cloned_f0()
 
-        # Ensure that the global variable is the same for another function
-        result_f1 = cloned_f1()
-        assert result_f1 == "changed_by_f0", result_f1
+        # depickling f0 and f1 should not affect the globals of already
+        # existing modules
+        assert VARIABLE == "default_value", VARIABLE
 
-        # Each time a function f is depickled, cloudpickle sets the values of
-        # its globals (that are potentially shared with other functions present
-        # in f's new environment) to the ones stored in f's pickle string.
-        # Thus, calling loads(pickled_f1) will reset VARIABLE from
-        # "changed_by_f0" to "default_value".
-        result_pickled_f1 = loads(pickled_f1)()
-        assert result_pickled_f1 == "default_value", result_pickled_f1
+        # Ensure that cloned_f1 and cloned_f0 share the same globals, as f1 and
+        # f0 shared the same globals at pickling time, and cloned_f1 was
+        # depickled from the same pickle string as cloned_f0
+        shared_global_var = cloned_f1()
+        assert shared_global_var == "changed_by_f0", shared_global_var
+
+        # f1 is unpickled another time, but because it comes from another
+        # pickle string than pickled_f1 and pickled_f0, it will not share the
+        # same globals as the latter two.
+        cloned_f1_with_new_globals = loads(pickled_f1)
+
+        # get the value of cloned_f1_with_new_globals's VARIABLE
+        new_global_var = cloned_f1_with_new_globals()
+        assert new_global_var == "default_value", new_global_var
         """
         for clone_func in ['local_clone', 'subprocess_pickle_echo']:
             code = code_template.format(protocol=self.protocol,
@@ -1121,28 +1128,34 @@ class CloudPickleTest(unittest.TestCase):
             def f1():
                 return _TEST_GLOBAL_VARIABLE
 
-            cloned_f0 = cloudpickle.loads(cloudpickle.dumps(
-                f0, protocol=self.protocol))
-            cloned_f1 = cloudpickle.loads(cloudpickle.dumps(
-                f1, protocol=self.protocol))
+            # pickle f0 and f1 inside the same pickle_string
+            cloned_f0, cloned_f1 = pickle_depickle([f0, f1],
+                                                   protocol=self.protocol)
+
+            # pickle f1 another time, but in a new pickle string
             pickled_f1 = cloudpickle.dumps(f1, protocol=self.protocol)
 
-            # Change the value of the global variable
+            # Change the global variable's value in f0's new global namespace
             cloned_f0()
-            assert _TEST_GLOBAL_VARIABLE == "changed_by_f0"
 
-            # Ensure that the global variable is the same for another function
-            result_cloned_f1 = cloned_f1()
-            assert result_cloned_f1 == "changed_by_f0", result_cloned_f1
-            assert f1() == result_cloned_f1
+            # depickling f0 and f1 should not affect the globals of already
+            # existing modules
+            assert _TEST_GLOBAL_VARIABLE == "default_value"
 
-            # Each time a function f is depickled, cloudpickle sets the values
-            # of its globals (that are potentially shared with other functions
-            # present in f's new environment) to the one stored in f's pickle
-            # string. Thus, calling loads(pickled_f1) will reset VARIABLE from
-            # "changed_by_f0" to "default_value".
-            result_pickled_f1 = cloudpickle.loads(pickled_f1)()
-            assert result_pickled_f1 == "default_value", result_pickled_f1
+            # Ensure that cloned_f1 and cloned_f0 share thq same globals, as f1
+            # and f0 shared the same globals at pickling time, and cloned_f1
+            # was depickled from the same pickle string as cloned_f0
+            shared_global_var = cloned_f1()
+            assert shared_global_var == "changed_by_f0", shared_global_var
+
+            # f1 is unpickled another time, but because it comes from another
+            # pickle string than pickled_f1 and pickled_f0, it will not share
+            # the same globals as the latter two.
+            cloned_f1_with_new_globals = cloudpickle.loads(pickled_f1)
+
+            # get the value of cloned_f1_with_new_globals's VARIABLE
+            new_global_var = cloned_f1_with_new_globals()
+            assert new_global_var == "default_value", new_global_var
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
 
