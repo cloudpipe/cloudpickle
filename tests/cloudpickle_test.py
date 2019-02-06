@@ -1032,8 +1032,15 @@ class CloudPickleTest(unittest.TestCase):
         def f1():
             return VARIABLE
 
+        assert f0.__globals__ is f1.__globals__
+
         # pickle f0 and f1 inside the same pickle_string
         cloned_f0, cloned_f1 = {clone_func}([f0, f1], protocol={protocol})
+
+        # cloned_f0 and cloned_f1 now share a global namespace that is isolated
+        # from any previously existing namespace
+        assert cloned_f0.__globals__ is cloned_f1.__globals__
+        assert cloned_f0.__globals__ is not f0.__globals__
 
         # pickle f1 another time, but in a new pickle string
         pickled_f1 = dumps(f1, protocol={protocol})
@@ -1041,8 +1048,8 @@ class CloudPickleTest(unittest.TestCase):
         # Change the value of the global variable in f0's new global namespace
         cloned_f0()
 
-        # depickling f0 and f1 should not affect the globals of already
-        # existing modules
+        # thanks to cloudpickle isolation, depickling and calling f0 and f1
+        # should not affect the globals of already existing modules
         assert VARIABLE == "default_value", VARIABLE
 
         # Ensure that cloned_f1 and cloned_f0 share the same globals, as f1 and
@@ -1054,10 +1061,12 @@ class CloudPickleTest(unittest.TestCase):
         # f1 is unpickled another time, but because it comes from another
         # pickle string than pickled_f1 and pickled_f0, it will not share the
         # same globals as the latter two.
-        cloned_f1_with_new_globals = loads(pickled_f1)
+        new_cloned_f1 = loads(pickled_f1)
+        assert new_cloned_f1.__globals__ is not cloned_f1.__globals__
+        assert new_cloned_f1.__globals__ is not f1.__globals__
 
-        # get the value of cloned_f1_with_new_globals's VARIABLE
-        new_global_var = cloned_f1_with_new_globals()
+        # get the value of new_cloned_f1's VARIABLE
+        new_global_var = new_cloned_f1()
         assert new_global_var == "default_value", new_global_var
         """
         for clone_func in ['local_clone', 'subprocess_pickle_echo']:
@@ -1081,6 +1090,11 @@ class CloudPickleTest(unittest.TestCase):
             cloned_f0, cloned_f1 = pickle_depickle([f0, f1],
                                                    protocol=self.protocol)
 
+            # cloned_f0 and cloned_f1 now share a global namespace that is
+            # isolated from any previously existing namespace
+            assert cloned_f0.__globals__ is cloned_f1.__globals__
+            assert cloned_f0.__globals__ is not f0.__globals__
+
             # pickle f1 another time, but in a new pickle string
             pickled_f1 = cloudpickle.dumps(f1, protocol=self.protocol)
 
@@ -1091,7 +1105,7 @@ class CloudPickleTest(unittest.TestCase):
             # existing modules
             assert _TEST_GLOBAL_VARIABLE == "default_value"
 
-            # Ensure that cloned_f1 and cloned_f0 share thq same globals, as f1
+            # Ensure that cloned_f1 and cloned_f0 share the same globals, as f1
             # and f0 shared the same globals at pickling time, and cloned_f1
             # was depickled from the same pickle string as cloned_f0
             shared_global_var = cloned_f1()
