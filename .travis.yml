@@ -101,7 +101,7 @@ script:
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
       if [[ "$PYTEST_ARGS" != "" ]]; then
-        pytest -vl --root=$PROJeCT_DIR "$PYTEST_ARGS"
+        pytest -vl --root=$PROJECT_DIR "$PYTEST_ARGS"
       else
         pytest -vl
       fi
