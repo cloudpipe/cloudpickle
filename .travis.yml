@@ -48,9 +48,9 @@ matrix:
     #   python: 3.7
     #   if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle pytest-timeout ray"
+      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle ray"
            PROJECT_URL=https://github.com/ray-project/ray.git
-           PYTEST_ARGS="test/mini_test.py"
+           PYTEST_ARGS="--duration 10"
       python: 3.5
 
 before_install:
