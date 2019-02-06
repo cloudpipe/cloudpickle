@@ -68,12 +68,12 @@ install:
     fi
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
-        pushd ..;
         if [[ $PROJECT == "ray" ]]; then
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $RAY_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py;
         else
+            pushd ..;
             PROJECT_DIR="../$PROJECT";
             git clone $PROJECT_URL;
         fi;
@@ -84,8 +84,8 @@ install:
         fi;
         if [[ $PROJECT != "ray" ]]; then
             pip install ./$PROJECT;
+            popd;
         fi;
-        popd;
     fi
   - pip list
 before_script:
@@ -98,16 +98,14 @@ script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
     if [[ $PROJECT != "" ]]; then
-      pushd $PROJECT_DIR
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
       if [[ "$PYTEST_ARGS" != "" ]]; then
-        pytest -vl "$PYTEST_ARGS"
+        pytest -vl --root=$PROJeCT_DIR "$PYTEST_ARGS"
       else
         pytest -vl
       fi
       TEST_RETURN_CODE=$?
-      popd
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
         exit $TEST_RETURN_CODE
       fi
