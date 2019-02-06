@@ -1,3 +1,10 @@
+0.8.0
+=====
+
+- Add support for pickling interactively defined dataclasses.
+  ([issue #245](https://github.com/cloudpipe/cloudpickle/pull/245))
+
+
 0.7.0
 =====
 

@@ -1344,6 +1344,21 @@ class CloudPickleTest(unittest.TestCase):
                 with pytest.raises(AttributeError):
                     obj.non_registered_attribute = 1
 
+    @unittest.skipIf(not hasattr(types, "MappingProxyType"),
+                     "Old versions of Python do not have this type.")
+    def test_mappingproxy(self):
+        mp = types.MappingProxyType({"some_key": "some value"})
+        assert mp == pickle_depickle(mp, protocol=self.protocol)
+
+    def test_dataclass(self):
+        dataclasses = pytest.importorskip("dataclasses")
+
+        DataClass = dataclasses.make_dataclass('DataClass', [('x', int)])
+        data = DataClass(x=42)
+
+        pickle_depickle(DataClass, protocol=self.protocol)
+        assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 

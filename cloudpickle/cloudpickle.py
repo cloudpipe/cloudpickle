@@ -63,7 +63,7 @@ import weakref
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
 
-if sys.version < '3':
+if sys.version_info[0] < 3:  # pragma: no branch
     from pickle import Pickler
     try:
         from cStringIO import StringIO
@@ -128,7 +128,7 @@ def _make_cell_set_template_code():
     # NOTE: we are marking the cell variable as a free variable intentionally
     # so that we simulate an inner function instead of the outer function. This
     # is what gives us the ``nonlocal`` behavior in a Python 2 compatible way.
-    if not PY3:
+    if not PY3:  # pragma: no branch
         return types.CodeType(
             co.co_argcount,
             co.co_nlocals,
@@ -229,14 +229,14 @@ _BUILTIN_TYPE_CONSTRUCTORS = {
 }
 
 
-if sys.version_info < (3, 4):
+if sys.version_info < (3, 4):  # pragma: no branch
     def _walk_global_ops(code):
         """
         Yield (opcode, argument number) tuples for all
         global-referencing instructions in *code*.
         """
         code = getattr(code, 'co_code', b'')
-        if not PY3:
+        if not PY3:  # pragma: no branch
             code = map(ord, code)
 
         n = len(code)
@@ -293,7 +293,7 @@ class CloudPickler(Pickler):
 
     dispatch[memoryview] = save_memoryview
 
-    if not PY3:
+    if not PY3:  # pragma: no branch
         def save_buffer(self, obj):
             self.save(str(obj))
 
@@ -315,7 +315,7 @@ class CloudPickler(Pickler):
         """
         Save a code object
         """
-        if PY3:
+        if PY3:  # pragma: no branch
             args = (
                 obj.co_argcount, obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
                 obj.co_flags, obj.co_code, obj.co_consts, obj.co_names, obj.co_varnames,
@@ -393,7 +393,7 @@ class CloudPickler(Pickler):
         # So we pickle them here using save_reduce; have to do it differently
         # for different python versions.
         if not hasattr(obj, '__code__'):
-            if PY3:
+            if PY3:  # pragma: no branch
                 rv = obj.__reduce_ex__(self.proto)
             else:
                 if hasattr(obj, '__self__'):
@@ -730,7 +730,7 @@ class CloudPickler(Pickler):
         if obj.__self__ is None:
             self.save_reduce(getattr, (obj.im_class, obj.__name__))
         else:
-            if PY3:
+            if PY3:  # pragma: no branch
                 self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
             else:
                 self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
@@ -783,7 +783,7 @@ class CloudPickler(Pickler):
         save(stuff)
         write(pickle.BUILD)
 
-    if not PY3:
+    if not PY3:  # pragma: no branch
         dispatch[types.InstanceType] = save_inst
 
     def save_property(self, obj):
@@ -883,7 +883,7 @@ class CloudPickler(Pickler):
 
     try:               # Python 2
         dispatch[file] = save_file
-    except NameError:  # Python 3
+    except NameError:  # Python 3  # pragma: no branch
         dispatch[io.TextIOWrapper] = save_file
 
     dispatch[type(Ellipsis)] = save_ellipsis
@@ -903,6 +903,12 @@ class CloudPickler(Pickler):
         self.save_reduce(logging.getLogger, (), obj=obj)
 
     dispatch[logging.RootLogger] = save_root_logger
+
+    if hasattr(types, "MappingProxyType"):  # pragma: no branch
+        def save_mappingproxy(self, obj):
+            self.save_reduce(types.MappingProxyType, (dict(obj),), obj=obj)
+
+        dispatch[types.MappingProxyType] = save_mappingproxy
 
     """Special functions for Add-on libraries"""
     def inject_addons(self):
@@ -1213,7 +1219,7 @@ def _getobject(modname, attribute):
 
 """ Use copy_reg to extend global pickle definitions """
 
-if sys.version_info < (3, 4):
+if sys.version_info < (3, 4):  # pragma: no branch
     method_descriptor = type(str.upper)
 
     def _reduce_method_descriptor(obj):
