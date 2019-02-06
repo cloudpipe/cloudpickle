@@ -70,11 +70,13 @@ install:
         pip install $TEST_REQUIREMENTS;
         pushd ..;
         if [[ $PROJECT == "ray" ]]; then
-            RAY_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
+            PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $RAY_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py;
+        else
+            PROJECT_DIR="../$PROJECT";
+            git clone $PROJECT_URL;
         fi;
-        git clone $PROJECT_URL;
         if [[ $PROJECT == "joblib" ]]; then
             pushd joblib/joblib/externals;
             source vendor_cloudpickle.sh ../../../cloudpickle;
@@ -96,7 +98,7 @@ script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
     if [[ $PROJECT != "" ]]; then
-      pushd ../$PROJECT
+      pushd $PROJECT_DIR
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
       if [[ "$PYTEST_ARGS" != "" ]]; then
