@@ -677,7 +677,7 @@ class CloudPickler(Pickler):
         # unpickling time. Looking it up and storing it in globals_ref allow
         # functions sharing the same globals at pickling time to also
         # share them once unpickled, at one condition: since globals_ref is
-        # an attribute of a Cloudpickler instance, and that a new Pickler is
+        # an attribute of a Cloudpickler instance, and that a new CloudPickler is
         # created each time pickle.dump or pickle.dumps is called, functions
         # also need to be saved within the same invokation of
         # cloudpickle.dump/cloudpickle.dumps (for example: cloudpickle.dumps([f1, f2])). There
