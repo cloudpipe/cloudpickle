@@ -69,7 +69,7 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         if [[ $PROJECT == "ray" ]]; then
-            pip install ray
+            pip install ray;
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
