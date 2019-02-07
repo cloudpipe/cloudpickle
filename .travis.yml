@@ -73,7 +73,7 @@ install:
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle/cloudpickle.py $RAY_DIR/cloudpickle/cloudpickle.py;
             mv $PROJECT_DIR/test $PROJECT_DIR/tests;
-            PROJECT_DIR="$PROJECT_DIR";
+            PROJECT_DIR="$PROJECT_DIR/test";
         else
             pushd ..;
             PROJECT_DIR="../$PROJECT";
