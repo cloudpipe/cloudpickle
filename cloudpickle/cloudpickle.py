@@ -79,25 +79,6 @@ else:
     PY3 = True
 
 
-# Backward compatibility for cloudpickle from 0.5.4 to 0.6.1, in which
-# functions from the same dynamic module would share the same globals in their
-# depickling environment.
-# Container for the global namespace to ensure consistent unpickling of
-# functions defined in dynamic modules (modules not registed in sys.modules).
-_dynamic_modules_globals = weakref.WeakValueDictionary()
-
-
-class _DynamicModuleFuncGlobals(dict):
-    """Global variables referenced by a function defined in a dynamic module
-
-    To avoid leaking references we store such context in a WeakValueDictionary
-    instance.  However instances of python builtin types such as dict cannot
-    be used directly as values in such a construct, hence the need for a
-    derived class.
-    """
-    pass
-
-
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
@@ -1146,24 +1127,8 @@ def _make_skel_func(code, cell_count, base_globals=None):
         code and the correct number of cells in func_closure.  All other
         func attributes (e.g. func_globals) are empty.
     """
-    if base_globals is None:
+    if base_globals is None or isinstance(base_globals, str):
         base_globals = {}
-    elif isinstance(base_globals, str):
-        # Backward compatibility for cloudpickle from 0.5.4 to 0.6.1, in which
-        # the globals of a depickled function were retrieved (if possible) by
-        # using the globals of the module with name base_globals
-        base_globals_name = base_globals
-        try:
-            # First try to reuse the globals from the module containing the
-            # function. If it is not possible to retrieve it, fallback to an
-            # empty dictionary.
-            base_globals = vars(importlib.import_module(base_globals))
-        except ImportError:
-            base_globals = _dynamic_modules_globals.get(
-                    base_globals_name, None)
-            if base_globals is None:
-                base_globals = _DynamicModuleFuncGlobals()
-            _dynamic_modules_globals[base_globals_name] = base_globals
 
     base_globals['__builtins__'] = __builtins__
 
