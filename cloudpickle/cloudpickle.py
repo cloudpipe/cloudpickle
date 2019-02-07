@@ -1127,6 +1127,9 @@ def _make_skel_func(code, cell_count, base_globals=None):
         code and the correct number of cells in func_closure.  All other
         func attributes (e.g. func_globals) are empty.
     """
+    # This is backward-compatibility code: for cloudpickle versions between
+    # 0.5.4 and 0.7, base_globals could be a string or None. base_globals
+    # should now always be a dictionary.
     if base_globals is None or isinstance(base_globals, str):
         base_globals = {}
 
