@@ -676,11 +676,11 @@ class CloudPickler(Pickler):
         # base_globals represents the future global namespace of func at
         # unpickling time. Looking it up and storing it in globals_ref allow
         # functions sharing the same globals at pickling time to also
-        # share them at unpickling time, at one condition: since globals_ref is
+        # share them once unpickled, at one condition: since globals_ref is
         # an attribute of a Cloudpickler instance, and that a new Pickler is
         # created each time pickle.dump or pickle.dumps is called, functions
         # also need to be saved within the same invokation of
-        # pickle.dump/pickle.dumps (for example: pickle.dumps([f1, f2])). There
+        # cloudpickle.dump/cloudpickle.dumps (for example: cloudpickle.dumps([f1, f2])). There
         # is no such limitation when using Cloudpickler.dump, as long as the
         # multiple invokations are bound to the same Cloudpickler.
         base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
