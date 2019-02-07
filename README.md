@@ -7,16 +7,17 @@
 `cloudpickle` makes it possible to serialize Python constructs not supported
 by the default `pickle` module from the Python standard library.
 
-`cloudpickle` is especially useful for cluster computing where Python
+`cloudpickle` is especially useful for **cluster computing** where Python
 expressions are shipped over the network to execute on remote hosts, possibly
 close to the data.
 
-Among other things, `cloudpickle` supports pickling for lambda expressions,
-functions and classes defined interactively in the `__main__` module.
+Among other things, `cloudpickle` supports pickling for **lambda functions**
+along with **functions and classes defined interactively** in the
+`__main__` module (for instance in a script, a shell or a Jupyter notebook).
 
-`cloudpickle` uses `pickle.HIGHEST_PROTOCOL` by default: it is meant to
+**`cloudpickle` uses `pickle.HIGHEST_PROTOCOL` by default: it is meant to
 send objects between processes running the same version of Python. It is
-discouraged to use `cloudpickle` for long-term storage.
+discouraged to use `cloudpickle` for long-term storage.**
 
 Installation
 ------------
