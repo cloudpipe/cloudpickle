@@ -4,6 +4,11 @@
 - Add support for pickling interactively defined dataclasses.
   ([issue #245](https://github.com/cloudpipe/cloudpickle/pull/245))
 
+- Global variables referenced by functions pickled by cloudpickle are now
+  unpickled in a new and isolated namespace scoped by the CloudPickler
+  instance. This restores the (previously untested) behavior of cloudpickle
+  prior to changes done in 0.5.4 for functions defined in the `__main__`
+  module, and 0.6.0/1 for other dynamic functions.
 
 0.7.0
 =====
