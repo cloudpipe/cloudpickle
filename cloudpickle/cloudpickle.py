@@ -290,7 +290,7 @@ class CloudPickler(Pickler):
     @staticmethod
     def save_memoryview(obj):
         return bytes, obj.tobytes()
-    dispatch[memoryview] = save_memoryview
+    dispatch[memoryview] = save_memoryview.__func__
 
     if not PY3:  # pragma: no branch
         def save_buffer(self, obj):
