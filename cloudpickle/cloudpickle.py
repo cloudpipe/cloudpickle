@@ -667,11 +667,11 @@ class CloudPickler(Pickler):
         dispatched here.
         """
         if obj is type(None):
-            return self.save_reduce(type, (None,), obj=obj)
+            return type, (None,)
         elif obj is type(Ellipsis):
-            return self.save_reduce(type, (Ellipsis,), obj=obj)
+            return type, (Ellipsis,)
         elif obj is type(NotImplemented):
-            return self.save_reduce(type, (NotImplemented,), obj=obj)
+            return type, (NotImplemented,)
 
         if obj.__module__ == "__main__":
             return self.save_dynamic_class(obj)
@@ -847,15 +847,16 @@ class CloudPickler(Pickler):
         return _gen_ellipsis, ()
     dispatch[type(Ellipsis)] = save_ellipsis.__func__
 
-    def save_not_implemented(self, obj):
-        self.save_reduce(_gen_not_implemented, ())
+    @staticmethod
+    def save_not_implemented(obj):
+        return _gen_not_implemented, ()
 
     try:               # Python 2
         dispatch[file] = save_file
     except NameError:  # Python 3  # pragma: no branch
         dispatch[io.TextIOWrapper] = save_file
 
-    dispatch[type(NotImplemented)] = save_not_implemented
+    dispatch[type(NotImplemented)] = save_not_implemented.__func__
 
     def save_weakset(self, obj):
         self.save_reduce(weakref.WeakSet, (list(obj),))
