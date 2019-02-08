@@ -676,17 +676,22 @@ class CloudPickler(Pickler):
         if obj.__module__ == "__main__":
             return self.save_dynamic_class(obj)
 
-        if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
-            if obj in _BUILTIN_TYPE_NAMES:
+        try:
+            # all classes are caught in this function: this statement filters
+            # out classes that can be pickled by attribute
+            pickle.dumps(obj)  # equivalent of python save_global
+        except Exception:
+            if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
+                if obj in _BUILTIN_TYPE_NAMES:
                     return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
-            else:
-                return NotImplementedError
 
-        typ = type(obj)
-        if typ is not obj and isinstance(obj, (type, types.ClassType)):
-            return self.save_dynamic_class(obj)
+            typ = type(obj)
+            if typ is not obj and isinstance(obj, (type, types.ClassType)):
+                return self.save_dynamic_class(obj)
 
-        return Pickler.save_global(self, obj, name=name)
+        else:
+            # if pickle.dumps worked out fine, then simply pickle by attribute
+            return NotImplementedError
 
     hook_dispatch[type] = save_global
     hook_dispatch[types.ClassType] = save_global
@@ -887,11 +892,25 @@ class CloudPickler(Pickler):
 
 
 def hook(pickler, obj):
-    reducer = CloudPickler.hook_dispatch.get(type(obj))
+    # classes deriving from custom metaclasses won't get caught inside the
+    # hook_dispatch dict. We manually check is obj's comes from a custom
+    # metaclass, and in this case, fallback to save_global.
+    t = type(obj)
+
+    try:
+        issc = issubclass(t, type)
+    except TypeError:  # t is not a class (old Boost; see SF #502085)
+        issc = False
+    if issc:
+        return pickler.save_global(obj)
+
+    # else, do a classic lookup on the hook dispatch
+    reducer = CloudPickler.hook_dispatch.get(t)
     if reducer is None:
         return NotImplementedError
     else:
         return reducer(pickler, obj)
+
 
 # Tornado support
 
