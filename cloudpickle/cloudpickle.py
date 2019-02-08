@@ -355,7 +355,7 @@ class CloudPickler(Pickler):
             #
             # If the function we've received is in that cache, we just
             # serialize it as a lookup into the cache.
-            return self.save_reduce(_BUILTIN_TYPE_CONSTRUCTORS[obj], (), obj=obj)
+            return _BUILTIN_TYPE_CONSTRUCTORS[obj], ()
 
         if name is None:
             name = obj.__name__
