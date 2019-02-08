@@ -254,6 +254,7 @@ else:
 class CloudPickler(Pickler):
 
     dispatch = {}
+    hook_dispatch = {}
 
     def __init__(self, file, protocol=None):
         if protocol is None:
@@ -261,6 +262,8 @@ class CloudPickler(Pickler):
         Pickler.__init__(self, file, protocol=protocol)
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
+        self.dispatch_table = self.dispatch
+        self.global_hook = hook
 
     def dump(self, obj):
         self.inject_addons()
@@ -907,6 +910,13 @@ class CloudPickler(Pickler):
         """Plug in system. Register additional pickling functions if modules already loaded"""
         pass
 
+
+def hook(pickler, obj):
+    reducer = CloudPickler.hook_dispatch.get(type(obj))
+    if reducer is None:
+        return NotImplementedError
+    else:
+        return reducer(pickler, obj)
 
 # Tornado support
 
