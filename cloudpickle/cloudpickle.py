@@ -842,8 +842,10 @@ class CloudPickler(Pickler):
         self.save(retval)
         self.memoize(obj)
 
-    def save_ellipsis(self, obj):
-        self.save_reduce(_gen_ellipsis, ())
+    @staticmethod
+    def save_ellipsis(obj):
+        return _gen_ellipsis, ()
+    dispatch[type(Ellipsis)] = save_ellipsis.__func__
 
     def save_not_implemented(self, obj):
         self.save_reduce(_gen_not_implemented, ())
@@ -853,7 +855,6 @@ class CloudPickler(Pickler):
     except NameError:  # Python 3  # pragma: no branch
         dispatch[io.TextIOWrapper] = save_file
 
-    dispatch[type(Ellipsis)] = save_ellipsis
     dispatch[type(NotImplemented)] = save_not_implemented
 
     def save_weakset(self, obj):
