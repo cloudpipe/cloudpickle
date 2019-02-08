@@ -344,8 +344,6 @@ class CloudPickler(Pickler):
             # serialize it as a lookup into the cache.
             return self.save_reduce(_BUILTIN_TYPE_CONSTRUCTORS[obj], (), obj=obj)
 
-        write = self.write
-
         if name is None:
             name = obj.__name__
         try:
@@ -371,7 +369,8 @@ class CloudPickler(Pickler):
 
         if themodule:
             if lookedup_by_name is obj:
-                return self.save_global(obj, name)
+                # default to save_global
+                return NotImplementedError
 
         # a builtin_function_or_method which comes in as an attribute of some
         # object (e.g., itertools.chain.from_iterable) will end
@@ -396,26 +395,12 @@ class CloudPickler(Pickler):
         if (islambda(obj)
                 or getattr(obj.__code__, 'co_filename', None) == '<stdin>'
                 or themodule is None):
-            self.save_function_tuple(obj)
-            return
+            return self.save_function_tuple(obj)
         else:
             # func is nested
             if lookedup_by_name is None or lookedup_by_name is not obj:
-                self.save_function_tuple(obj)
-                return
+                return self.save_function_tuple(obj)
 
-        if obj.__dict__:
-            # essentially save_reduce, but workaround needed to avoid recursion
-            self.save(_restore_attr)
-            write(pickle.MARK + pickle.GLOBAL + modname + '\n' + name + '\n')
-            self.memoize(obj)
-            self.save(obj.__dict__)
-            write(pickle.TUPLE + pickle.REDUCE)
-        else:
-            write(pickle.GLOBAL + modname + '\n' + name + '\n')
-            self.memoize(obj)
-
-    dispatch[types.FunctionType] = save_function
 
     def _save_subimports(self, code, top_level_dependencies):
         """
@@ -462,6 +447,8 @@ class CloudPickler(Pickler):
                             # ensure unpickler executes this import
                             self.save(sys.modules[name])
                             # then discards the reference to it
+                            # XXX: if using the C Pickler, write is not part of
+                            # the public API anymore
                             self.write(pickle.POP)
 
     def save_dynamic_class(self, obj):
@@ -506,8 +493,8 @@ class CloudPickler(Pickler):
         if isinstance(__dict__, property):
             type_kwargs['__dict__'] = __dict__
 
-        save = self.save
-        write = self.write
+        # save = self.save
+        # write = self.write
 
         # We write pickle instructions explicitly here to handle the
         # possibility that the type object participates in a cycle with its own
@@ -522,24 +509,9 @@ class CloudPickler(Pickler):
         # of the type, (which is common for Python 2-style super() calls).
 
         # Push the rehydration function.
-        save(_rehydrate_skeleton_class)
-
-        # Mark the start of the args tuple for the rehydration function.
-        write(pickle.MARK)
-
-        # Create and memoize an skeleton class with obj's name and bases.
         tp = type(obj)
-        self.save_reduce(tp, (obj.__name__, obj.__bases__, type_kwargs), obj=obj)
-
-        # Now save the rest of obj's __dict__. Any references to obj
-        # encountered while saving will point to the skeleton class.
-        save(clsdict)
-
-        # Write a tuple of (skeleton_class, clsdict).
-        write(pickle.TUPLE)
-
-        # Call _rehydrate_skeleton_class(skeleton_class, clsdict)
-        write(pickle.REDUCE)
+        newargs = (tp, obj.__name__, obj.__bases__, type_kwargs, clsdict)
+        return _rehydrate_skeleton_class, newargs
 
     def save_function_tuple(self, func):
         """  Pickles an actual func object.
@@ -558,46 +530,42 @@ class CloudPickler(Pickler):
                              obj=func)
             return
 
-        save = self.save
-        write = self.write
+        # c Pickler do not expose save/write methods
+        # save = self.save
+        # write = self.write
+
+        # save_subimports is not useable with the C Pickler right now.
+        # self._save_subimports(
+        #     code,
+        #     itertools.chain(f_globals.values(), closure_values or ()),
+        # )
 
         code, f_globals, defaults, closure_values, dct, base_globals = self.extract_func_data(func)
 
-        save(_fill_function)  # skeleton function updater
-        write(pickle.MARK)    # beginning of tuple that _fill_function expects
-
-        self._save_subimports(
-            code,
-            itertools.chain(f_globals.values(), closure_values or ()),
-        )
-
-        # create a skeleton function object and memoize it
-        save(_make_skel_func)
-        save((
-            code,
-            len(closure_values) if closure_values is not None else -1,
-            base_globals,
-        ))
-        write(pickle.REDUCE)
-        self.memoize(func)
-
-        # save the rest of the func data needed by _fill_function
         state = {
             'globals': f_globals,
             'defaults': defaults,
             'dict': dct,
-            'closure_values': closure_values,
             'module': func.__module__,
             'name': func.__name__,
             'doc': func.__doc__,
         }
+
+
+        # it may seem weird  to add state to newargs, given the API of
+        # save_reduce, but functions do not implement a __setstate__ method, so
+        # we have to pack everything into the constructor args.
+        newargs = (code,
+                   closure_values,
+                   base_globals,
+                   state)
         if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
             state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
-        save(state)
-        write(pickle.TUPLE)
-        write(pickle.REDUCE)  # applies _fill_function on the tuple
+
+        return _fill_function, newargs
+
 
     _extract_code_globals_cache = (
         weakref.WeakKeyDictionary()
@@ -677,7 +645,7 @@ class CloudPickler(Pickler):
             return self.save_global(obj)
         return self.save_function(obj)
 
-    dispatch[types.BuiltinFunctionType] = save_builtin_function
+    hook_dispatch[types.BuiltinFunctionType] = save_builtin_function
 
     def save_global(self, obj, name=None, pack=struct.pack):
         """
@@ -696,29 +664,21 @@ class CloudPickler(Pickler):
         if obj.__module__ == "__main__":
             return self.save_dynamic_class(obj)
 
-        try:
-            return Pickler.save_global(self, obj, name=name)
-        except Exception:
-            if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
-                if obj in _BUILTIN_TYPE_NAMES:
-                    return self.save_reduce(
-                        _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
+        if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
+            if obj in _BUILTIN_TYPE_NAMES:
+                    return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
+            else:
+                return NotImplementedError
 
-            typ = type(obj)
-            if typ is not obj and isinstance(obj, (type, types.ClassType)):
-                return self.save_dynamic_class(obj)
-
-            raise
-
-    dispatch[type] = save_global
-    dispatch[types.ClassType] = save_global
-
-    def hook(self, obj):
         typ = type(obj)
-        if isinstance(obj, types.FunctionType):
-            return self.save_function_tuple(obj)
         if typ is not obj and isinstance(obj, (type, types.ClassType)):
             return self.save_dynamic_class(obj)
+
+        return Pickler.save_global(self, obj, name=name)
+
+    hook_dispatch[type] = save_global
+    hook_dispatch[types.ClassType] = save_global
+
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
@@ -1080,23 +1040,9 @@ def _fill_function(*args):
 
     The skeleton itself is create by _make_skel_func().
     """
-    if len(args) == 2:
-        func = args[0]
-        state = args[1]
-    elif len(args) == 5:
-        # Backwards compat for cloudpickle v0.4.0, after which the `module`
-        # argument was introduced
-        func = args[0]
-        keys = ['globals', 'defaults', 'dict', 'closure_values']
-        state = dict(zip(keys, args[1:]))
-    elif len(args) == 6:
-        # Backwards compat for cloudpickle v0.4.1, after which the function
-        # state was passed as a dict to the _fill_function it-self.
-        func = args[0]
-        keys = ['globals', 'defaults', 'dict', 'module', 'closure_values']
-        state = dict(zip(keys, args[1:]))
-    else:
-        raise ValueError('Unexpected _fill_value arguments: %r' % (args,))
+    code, closure, base_globals, state = args
+
+    func = _make_skel_func(code, closure, base_globals=base_globals)
 
     # - At pickling time, any dynamic global variable used by func is
     #   serialized by value (in state['globals']).
@@ -1122,6 +1068,7 @@ def _fill_function(*args):
     if 'qualname' in state:
         func.__qualname__ = state['qualname']
 
+    #XXX: change this
     cells = func.__closure__
     if cells is not None:
         for cell, value in zip(cells, state['closure_values']):
@@ -1140,7 +1087,7 @@ def _make_empty_cell():
     return (lambda: cell).__closure__[0]
 
 
-def _make_skel_func(code, cell_count, base_globals=None):
+def _make_skel_func(code, closure, base_globals=None):
     """ Creates a skeleton function object that contains just the provided
         code and the correct number of cells in func_closure.  All other
         func attributes (e.g. func_globals) are empty.
@@ -1161,11 +1108,13 @@ def _make_skel_func(code, cell_count, base_globals=None):
     return types.FunctionType(code, base_globals, None, None, closure)
 
 
-def _rehydrate_skeleton_class(skeleton_class, class_dict):
+def _rehydrate_skeleton_class(*args):
     """Put attributes from `class_dict` back on `skeleton_class`.
 
     See CloudPickler.save_dynamic_class for more info.
     """
+    tp, name, bases, kwargs, class_dict = args
+    skeleton_class = tp(name, bases, kwargs)
     registry = None
     for attrname, attr in class_dict.items():
         if attrname == "_abc_impl":
