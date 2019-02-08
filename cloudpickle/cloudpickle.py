@@ -74,7 +74,7 @@ if sys.version_info[0] < 3:  # pragma: no branch
 else:
     types.ClassType = type
     # from pickle import _Pickler as Pickler
-    from pickle import Pickler
+    from _pickle import Pickler
     from io import BytesIO as StringIO
     string_types = (str,)
     PY3 = True
