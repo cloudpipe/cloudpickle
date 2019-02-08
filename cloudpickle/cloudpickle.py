@@ -309,7 +309,8 @@ class CloudPickler(Pickler):
 
     dispatch[types.ModuleType] = save_module
 
-    def save_codeobject(self, obj):
+    @staticmethod
+    def save_codeobject(obj):
         """
         Save a code object
         """
@@ -326,9 +327,9 @@ class CloudPickler(Pickler):
                 obj.co_consts, obj.co_names, obj.co_varnames, obj.co_filename, obj.co_name,
                 obj.co_firstlineno, obj.co_lnotab, obj.co_freevars, obj.co_cellvars
             )
-        self.save_reduce(types.CodeType, args, obj=obj)
+        return types.CodeType, args
 
-    dispatch[types.CodeType] = save_codeobject
+    dispatch[types.CodeType] = save_codeobject.__func__
 
     def save_function(self, obj, name=None):
         """ Registered with the dispatch to handle all function types.
