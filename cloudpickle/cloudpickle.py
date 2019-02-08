@@ -410,6 +410,7 @@ class CloudPickler(Pickler):
             # func is nested
             if lookedup_by_name is None or lookedup_by_name is not obj:
                 return self.save_function_tuple(obj)
+    hook_dispatch[types.FunctionType] = save_function
 
 
     def _save_subimports(self, code, top_level_dependencies):
@@ -560,7 +561,6 @@ class CloudPickler(Pickler):
             'name': func.__name__,
             'doc': func.__doc__,
         }
-
 
         # it may seem weird  to add state to newargs, given the API of
         # save_reduce, but functions do not implement a __setstate__ method, so
@@ -1110,11 +1110,6 @@ def _make_skel_func(code, closure, base_globals=None):
 
     base_globals['__builtins__'] = __builtins__
 
-    closure = (
-        tuple(_make_empty_cell() for _ in range(cell_count))
-        if cell_count >= 0 else
-        None
-    )
     return types.FunctionType(code, base_globals, None, None, closure)
 
 
