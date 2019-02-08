@@ -629,12 +629,7 @@ class CloudPickler(Pickler):
         defaults = func.__defaults__
 
         # process closure
-        closure = (
-            list(map(_get_cell_contents, func.__closure__))
-            if func.__closure__ is not None
-            else None
-        )
-
+        closure =func.__closure__
         # save the dict
         dct = func.__dict__
 
@@ -1103,12 +1098,12 @@ def _fill_function(*args):
     if 'qualname' in state:
         func.__qualname__ = state['qualname']
 
-    #XXX: change this
-    cells = func.__closure__
-    if cells is not None:
-        for cell, value in zip(cells, state['closure_values']):
-            if value is not _empty_cell_value:
-                cell_set(cell, value)
+    # XXX: change this
+    # cells = func.__closure__
+    # if cells is not None:
+    #     for cell, value in zip(cells, state['closure_values']):
+    #         if value is not _empty_cell_value:
+    #             cell_set(cell, value)
 
     return func
 
