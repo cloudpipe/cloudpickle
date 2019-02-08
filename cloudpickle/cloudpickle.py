@@ -276,8 +276,14 @@ class CloudPickler(Pickler):
             else:
                 raise
 
-    def save_memoryview(self, obj):
-        self.save(obj.tobytes())
+    @staticmethod
+    def save_cell(obj):
+        try:
+            obj.cell_contents
+        except ValueError:  # cell is empty
+            return types.CellType, ()
+        else:
+            return types.CellType, (obj.cell_contents, )
 
     dispatch[memoryview] = save_memoryview
 
