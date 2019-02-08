@@ -400,7 +400,7 @@ class CloudPickler(Pickler):
                     rv = (getattr, (obj.__self__, name))
                 else:
                     raise pickle.PicklingError("Can't pickle %r" % obj)
-            return self.save_reduce(obj=obj, *rv)
+            return rv
 
         # if func is lambda, def'ed at prompt, is in main, or is nested, then
         # we'll pickle the actual function object rather than simply saving a
