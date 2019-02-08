@@ -264,6 +264,7 @@ class CloudPickler(Pickler):
         self.globals_ref = {}
         self.dispatch_table = self.dispatch
         self.global_hook = hook
+        self.proto = int(protocol)
 
     def dump(self, obj):
         self.inject_addons()
