@@ -253,7 +253,7 @@ else:
 
 class CloudPickler(Pickler):
 
-    dispatch = Pickler.dispatch.copy()
+    dispatch = {}
 
     def __init__(self, file, protocol=None):
         if protocol is None:
