@@ -759,12 +759,13 @@ class CloudPickler(Pickler):
 
     dispatch[property] = save_property
 
-    def save_classmethod(self, obj):
+    @classmethod
+    def save_classmethod(obj):
         orig_func = obj.__func__
-        self.save_reduce(type(obj), (orig_func,), obj=obj)
+        return type(obj), (orig_func,)
 
-    dispatch[classmethod] = save_classmethod
-    dispatch[staticmethod] = save_classmethod
+    dispatch[classmethod] = save_classmethod.__func__
+    dispatch[staticmethod] = save_classmethod.__func__
 
     def save_itemgetter(self, obj):
         """itemgetter serializer (needed for namedtuple support)"""
