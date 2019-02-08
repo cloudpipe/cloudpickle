@@ -287,6 +287,7 @@ class CloudPickler(Pickler):
 
     dispatch[types.CellType] = save_cell.__func__
 
+    @staticmethod
     def save_memoryview(obj):
         return bytes, obj.tobytes()
     dispatch[memoryview] = save_memoryview
