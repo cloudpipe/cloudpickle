@@ -285,6 +285,10 @@ class CloudPickler(Pickler):
         else:
             return types.CellType, (obj.cell_contents, )
 
+    dispatch[types.CellType] = save_cell.__func__
+
+    def save_memoryview(obj):
+        return bytes, obj.tobytes()
     dispatch[memoryview] = save_memoryview
 
     if not PY3:  # pragma: no branch
