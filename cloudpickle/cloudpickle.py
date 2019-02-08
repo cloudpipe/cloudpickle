@@ -785,7 +785,8 @@ class CloudPickler(Pickler):
     if type(operator.itemgetter) is type:
         dispatch[operator.itemgetter] = save_itemgetter
 
-    def save_attrgetter(self, obj):
+    @staticmethod
+    def save_attrgetter(obj):
         """attrgetter serializer"""
         class Dummy(object):
             def __init__(self, attrs, index=None):
@@ -802,10 +803,10 @@ class CloudPickler(Pickler):
                 return type(self)(attrs, index)
         attrs = []
         obj(Dummy(attrs))
-        return self.save_reduce(operator.attrgetter, tuple(attrs))
+        return operator.attrgetter, tuple(attrs)
 
     if type(operator.attrgetter) is type:
-        dispatch[operator.attrgetter] = save_attrgetter
+        dispatch[operator.attrgetter] = save_attrgetter.__func__
 
     def save_file(self, obj):
         """Save a file"""
