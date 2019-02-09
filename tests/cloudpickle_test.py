@@ -1368,6 +1368,30 @@ class CloudPickleTest(unittest.TestCase):
         pickle_depickle(DataClass, protocol=self.protocol)
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
+    def test_dynamically_defined_enum(self):
+        enum = pytest.importorskip("enum")
+
+        class Color(enum.Enum):
+            """3-element color space"""
+            RED = 1
+            GREEN = 2
+            BLUE = 3
+
+        green1, green2, ClonedColor = pickle_depickle(
+            [Color.GREEN, Color.GREEN, Color], protocol=self.protocol)
+        assert green1 is green2
+        assert green1 is ClonedColor.GREEN
+        assert green1 is not ClonedColor.BLUE
+
+        assert ClonedColor.__doc__ == Color.__doc__
+        assert ClonedColor.__module__ == Color.__module__
+        assert ClonedColor.__qualname__ == Color.__qualname__
+
+        # cloudpickle systematically creates new copies for locally defined
+        # classes that cannot be imported by name:
+        assert green1 is not Color.GREEN
+        assert ClonedColor is not Color
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
