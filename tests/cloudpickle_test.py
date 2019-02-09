@@ -1385,7 +1385,9 @@ class CloudPickleTest(unittest.TestCase):
 
         assert ClonedColor.__doc__ == Color.__doc__
         assert ClonedColor.__module__ == Color.__module__
-        assert ClonedColor.__qualname__ == Color.__qualname__
+
+        if hasattr(Color, "__qualname__"):
+            assert ClonedColor.__qualname__ == Color.__qualname__
 
         # cloudpickle systematically creates new copies for locally defined
         # classes that cannot be imported by name:
