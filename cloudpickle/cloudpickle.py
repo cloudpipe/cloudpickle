@@ -463,9 +463,9 @@ class CloudPickler(Pickler):
     def _save_dynamic_enum(self, obj):
         """Special handling for dynamic Enum subclasses
 
-        Use the Enum functional API as the EnumMeta metaclass has complex
-        initialization and and that make the Enum classes hold references to
-        their own instances.
+        Use the Enum functional API (inherited from EnumMeta.__call__) as the
+        EnumMeta metaclass has complex initialization that makes the Enum
+        subclasses hold references to their own instances.
         """
         # XXX: shall we pass type and start kwargs? If so how to retrieve the
         # correct info from obj.
