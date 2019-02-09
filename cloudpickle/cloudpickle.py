@@ -1184,10 +1184,9 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
 
 
 def _make_dynamic_enum(base, name, elements, extra):
-    doc = extra.pop("doc", None)
+    doc = extra.pop("doc")
     cls = base(name, elements, **extra)
-    if doc is not None:
-        cls.__doc__ = doc
+    cls.__doc__ = doc
     return cls
 
 
