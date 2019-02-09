@@ -55,17 +55,12 @@ import sys
 import traceback
 import types
 import weakref
+from enum import Enum
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
-
-
-try:
-    from enum import Enum
-except ImportError:
-    Enum = None
 
 
 if sys.version_info[0] < 3:  # pragma: no branch
@@ -492,7 +487,7 @@ class CloudPickler(Pickler):
         functions, or that otherwise can't be serialized as attribute lookups
         from global modules.
         """
-        if Enum is not None and issubclass(obj, Enum):
+        if issubclass(obj, Enum):
             return self._save_dynamic_enum(obj)
 
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict

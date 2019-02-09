@@ -21,6 +21,7 @@ import types
 import unittest
 import weakref
 import os
+from enum import Enum
 
 import pytest
 
@@ -1369,9 +1370,8 @@ class CloudPickleTest(unittest.TestCase):
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
     def test_dynamically_defined_enum(self):
-        enum = pytest.importorskip("enum")
 
-        class Color(enum.Enum):
+        class Color(Enum):
             """3-element color space"""
             RED = 1
             GREEN = 2
