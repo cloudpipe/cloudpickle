@@ -21,7 +21,7 @@ import types
 import unittest
 import weakref
 import os
-from enum import Enum
+from enum import Enum, IntEnum
 
 import pytest
 
@@ -1393,6 +1393,19 @@ class CloudPickleTest(unittest.TestCase):
         # classes that cannot be imported by name:
         assert green1 is not Color.GREEN
         assert ClonedColor is not Color
+
+        # Try again with a IntEnum defined with the functional API
+        DynamicColor = IntEnum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
+
+        green1, green2, ClonedDynamicColor = pickle_depickle(
+            [DynamicColor.GREEN, DynamicColor.GREEN, DynamicColor],
+            protocol=self.protocol)
+
+        assert green1 is green2
+        assert green1 is ClonedDynamicColor.GREEN
+        assert green1 is not ClonedDynamicColor.BLUE
+        assert ClonedDynamicColor.__module__ == DynamicColor.__module__
+        assert ClonedDynamicColor.__doc__ == DynamicColor.__doc__
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
