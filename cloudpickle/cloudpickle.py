@@ -475,11 +475,11 @@ class CloudPickler(Pickler):
         # XXX: shall we pass type and start kwargs? If so how to retrieve the
         # correct info from obj.
         elements = dict((e.name, e.value) for e in obj)
-        extra = {
-            "__doc__": obj.__doc__,
-            "__module__": obj.__module__,
-            "__qualname__": obj.__qualname__,
-        }
+        attrnames = ["__doc__", "__module__", "__qualname__"]
+        extra = dict(
+            (attrname[2:-2], getattr(obj, attrname))
+            for attrname in attrnames if hasattr(obj, attrname)
+        )
         self.save_reduce(_make_dynamic_enum,
                          (obj.__base__, obj.__name__, elements, extra),
                          obj=obj)
@@ -1189,9 +1189,10 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
 
 
 def _make_dynamic_enum(base, name, elements, extra):
-    cls = base(name, elements, module=extra["__module__"],
-               qualname=extra["__qualname__"])
-    cls.__doc__ = extra["__doc__"]
+    doc = extra.pop("doc", None)
+    cls = base(name, elements, **extra)
+    if doc is not None:
+        cls.__doc__ = doc
     return cls
 
 
