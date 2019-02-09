@@ -44,7 +44,6 @@ from __future__ import print_function
 
 import dis
 from functools import partial
-import importlib
 import io
 import itertools
 import logging
@@ -61,6 +60,12 @@ import weakref
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
+
+
+try:
+    from enum import Enum
+except ImportError:
+    Enum = None
 
 
 if sys.version_info[0] < 3:  # pragma: no branch
@@ -460,6 +465,25 @@ class CloudPickler(Pickler):
                             # then discards the reference to it
                             self.write(pickle.POP)
 
+    def _save_dynamic_enum(self, obj):
+        """Special handling for dynamic Enum subclasses
+
+        Use the Enum functional API as the EnumMeta metaclass has complex
+        initialization and and that make the Enum classes hold references to
+        their own instances.
+        """
+        # XXX: shall we pass type and start kwargs? If so how to retrieve the
+        # correct info from obj.
+        elements = dict((e.name, e.value) for e in obj)
+        extra = {
+            "__doc__": obj.__doc__,
+            "__module__": obj.__module__,
+            "__qualname__": obj.__qualname__,
+        }
+        self.save_reduce(_make_dynamic_enum,
+                         (obj.__base__, obj.__name__, elements, extra),
+                         obj=obj)
+
     def save_dynamic_class(self, obj):
         """
         Save a class that can't be stored as module global.
@@ -468,6 +492,9 @@ class CloudPickler(Pickler):
         functions, or that otherwise can't be serialized as attribute lookups
         from global modules.
         """
+        if Enum is not None and issubclass(obj, Enum):
+            return self._save_dynamic_enum(obj)
+
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
         clsdict.pop('__weakref__', None)
 
@@ -1159,6 +1186,13 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
             skeleton_class.register(subclass)
 
     return skeleton_class
+
+
+def _make_dynamic_enum(base, name, elements, extra):
+    cls = base(name, elements, module=extra["__module__"],
+               qualname=extra["__qualname__"])
+    cls.__doc__ = extra["__doc__"]
+    return cls
 
 
 def _is_dynamic(module):
