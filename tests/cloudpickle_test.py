@@ -1369,7 +1369,7 @@ class CloudPickleTest(unittest.TestCase):
         pickle_depickle(DataClass, protocol=self.protocol)
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
-    def test_dynamically_defined_enum(self):
+    def test_locally_defined_enum(self):
 
         class Color(Enum):
             """3-element color space"""
@@ -1406,6 +1406,28 @@ class CloudPickleTest(unittest.TestCase):
         assert green1 is not ClonedDynamicColor.BLUE
         assert ClonedDynamicColor.__module__ == DynamicColor.__module__
         assert ClonedDynamicColor.__doc__ == DynamicColor.__doc__
+
+    def test_interactively_defined_enum(self):
+        code = """if True:
+        from enum import Enum
+        from testutils import subprocess_pickle_echo
+
+        class Color(Enum):
+            RED = 1
+            GREEN = 2
+
+        green1, green2, ClonedColor = subprocess_pickle_echo(
+            [Color.GREEN, Color.GREEN, Color], protocol={protocol})
+        assert green1 is green2
+        assert green1 is ClonedColor.GREEN
+
+        # Check that the pickle that was return has been matched back to the
+        # interactively defined Color living in the __main__ module of the
+        # original Python process.
+        assert ClonedColor is Color
+        assert green1 is Color.GREEN
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
