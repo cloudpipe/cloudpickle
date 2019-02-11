@@ -470,13 +470,19 @@ class CloudPickler(Pickler):
         # XXX: shall we pass type and start kwargs? If so how to retrieve the
         # correct info from obj.
         elements = dict((e.name, e.value) for e in obj)
-        attrnames = ["__doc__", "__module__", "__qualname__"]
-        extra = dict(
-            (attrname[2:-2], getattr(obj, attrname))
-            for attrname in attrnames if hasattr(obj, attrname)
-        )
+
+        if obj.__doc__ is not obj.__base__.__doc__:
+            doc = obj.__doc__
+        else:
+            doc = None
+
+        extra = {}
+        if hasattr(obj, "__qualname__"):
+            extra["qualname"] = obj.__qualname__
+
         self.save_reduce(_make_dynamic_enum,
-                         (obj.__base__, obj.__name__, elements, extra),
+                         (obj.__base__, obj.__name__, elements, doc,
+                          obj.__module__, extra),
                          obj=obj)
 
     def save_dynamic_class(self, obj):
@@ -1146,10 +1152,22 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     return skeleton_class
 
 
-def _make_dynamic_enum(base, name, elements, extra):
-    doc = extra.pop("doc")
-    cls = base(name, elements, **extra)
-    cls.__doc__ = doc
+def _make_dynamic_enum(base, name, elements, doc, module, extra):
+    if module == "__main__":
+        # Special case: try to lookup enum from main module to make it possible
+        # to use physical comparison with enum instances returned by a remote
+        # function calls whose results are communicated back to the main Python
+        # process with cloudpickle.
+        try:
+            lookedup_enum = getattr(sys.modules["__main__"], name)
+            assert issubclass(lookedup_enum, Enum)
+            return lookedup_enum
+        except (KeyError, AttributeError):
+            # Fall-back to dynamic instanciation.
+            pass
+    cls = base(name, elements, module=module, **extra)
+    if doc is not None:
+        cls.__doc__ = doc
     return cls
 
 
