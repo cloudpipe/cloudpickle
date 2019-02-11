@@ -1124,6 +1124,78 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
 
+    def test_interactive_remote_function_calls(self):
+        code = """if True:
+        from testutils import subprocess_worker
+
+        def interactive_function(x):
+            return x + 1
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            assert w.run(interactive_function, 41) == 42
+
+            def wrapper_func(x):
+                return interactive_function(x)
+
+            def interactive_function(x):
+                return x - 1
+
+            assert w.run(wrapper_func, 41) == 40
+
+            def make_closure():
+                def f():
+                    return interactive_function(41)
+                return f
+
+            closure = make_closure()
+            assert w.run(closure) == 40
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
+    def test_interactive_remote_function_calls_side_effects(self):
+        code = """if True:
+        from testutils import subprocess_worker
+        import sys
+
+        GLOBAL_VARIABLE = 0
+
+        class CustomClass(object):
+
+            def mutate_globals(self):
+                global GLOBAL_VARIABLE
+                GLOBAL_VARIABLE += 1
+                return GLOBAL_VARIABLE
+
+        custom_object = CustomClass()
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            custom_object
+            assert w.run(custom_object.mutate_globals) == 1
+
+            # The caller global variable is unchanged
+            assert GLOBAL_VARIABLE == 0
+
+            # Calling the same function again starts again from zero: the
+            # worker process has no memory:
+
+            assert w.run(custom_object.mutate_globals) == 1
+
+            # The CustomClass is in the main process __main__ module but
+            # not in the worker process main module.
+
+            def is_in_main(name):
+                return hasattr(sys.modules["__main__"], name)
+
+            assert is_in_main("CustomClass")
+
+            # XXX: Is the following a bug or not?
+            # assert not w.run(is_in_main, "CustomClass")
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
     def test_function_pickle_compat_0_4_0(self):
