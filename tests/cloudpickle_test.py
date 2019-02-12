@@ -1125,7 +1125,7 @@ class CloudPickleTest(unittest.TestCase):
             _TEST_GLOBAL_VARIABLE = orig_value
 
     def test_interactive_remote_function_calls(self):
-        code = """if True:
+        code = """if __name__ == "__main__":
         from testutils import subprocess_worker
 
         def interactive_function(x):
@@ -1154,22 +1154,22 @@ class CloudPickleTest(unittest.TestCase):
         assert_run_python_script(code)
 
     def test_interactive_remote_function_calls_side_effects(self):
-        code = """if True:
+        code = """if __name__ == "__main__":
         from testutils import subprocess_worker
         import sys
 
-        GLOBAL_VARIABLE = 0
-
-        class CustomClass(object):
-
-            def mutate_globals(self):
-                global GLOBAL_VARIABLE
-                GLOBAL_VARIABLE += 1
-                return GLOBAL_VARIABLE
-
-        custom_object = CustomClass()
-
         with subprocess_worker(protocol={protocol}) as w:
+
+            GLOBAL_VARIABLE = 0
+
+            class CustomClass(object):
+
+                def mutate_globals(self):
+                    global GLOBAL_VARIABLE
+                    GLOBAL_VARIABLE += 1
+                    return GLOBAL_VARIABLE
+
+            custom_object = CustomClass()
 
             custom_object
             assert w.run(custom_object.mutate_globals) == 1
@@ -1190,8 +1190,7 @@ class CloudPickleTest(unittest.TestCase):
 
             assert is_in_main("CustomClass")
 
-            # XXX: Is the following a bug or not?
-            # assert not w.run(is_in_main, "CustomClass")
+            assert not w.run(is_in_main, "CustomClass")
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
