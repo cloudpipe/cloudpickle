@@ -154,7 +154,8 @@ class _Worker(object):
         return result
 
     def memsize(self):
-        workers_pids = list(self.pool._processes.keys())
+        workers_pids = [p.pid if hasattr(p, "pid") else p
+                        for p in list(self.pool._processes)]
         num_workers = len(workers_pids)
         if num_workers == 0:
             return 0
