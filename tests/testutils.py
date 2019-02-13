@@ -94,18 +94,6 @@ def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
         raise RuntimeError(message)
 
 
-def _read_bytes(stream_in, size):
-    all_data = b""
-    remaining = size
-    while True:
-        data = stream_in.read(remaining)
-        all_data += data
-        remaining -= len(data)
-        if remaining == 0:
-            break
-    return all_data
-
-
 def _read_all_bytes(stream_in, chunk_size=4096):
     all_data = b""
     while True:
@@ -139,27 +127,27 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
 
 def call_func(payload, protocol):
     """Remote function call that uses cloudpickle to transport everthing"""
-    func, args, kwargs = _unpack(payload)
+    func, args, kwargs = loads(payload)
     try:
         result = func(*args, **kwargs)
     except BaseException as e:
         result = e
-    return _pack(result, protocol=protocol)
+    return dumps(result, protocol=protocol)
 
 
 class _Worker(object):
     def __init__(self, protocol=None):
         self.protocol = protocol
         self.pool = ProcessPoolExecutor(max_workers=1)
-        self.pool.submit(id, 42).result()  # start the worker
+        self.pool.submit(id, 42).result()  # start the worker process
 
     def run(self, func, *args, **kwargs):
         """Synchronous remote function call"""
 
-        input_payload = _pack((func, args, kwargs), protocol=self.protocol)
+        input_payload = dumps((func, args, kwargs), protocol=self.protocol)
         result_payload = self.pool.submit(
             call_func, input_payload, self.protocol).result()
-        result = _unpack(result_payload)
+        result = loads(result_payload)
 
         if isinstance(result, BaseException):
             raise result
