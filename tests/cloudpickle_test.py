@@ -1197,6 +1197,8 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                        reason="Skip PyPy because memory grows too much")
     def test_interactive_remote_function_calls_no_memory_leak(self):
         code = """if __name__ == "__main__":
         from testutils import subprocess_worker
