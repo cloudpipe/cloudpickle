@@ -4,8 +4,12 @@ import os.path as op
 import tempfile
 import base64
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
-from cloudpickle import dumps
 from pickle import loads
+from contextlib import contextmanager
+from concurrent.futures import ProcessPoolExecutor
+
+import psutil
+from cloudpickle import dumps
 
 TIMEOUT = 60
 try:
@@ -42,6 +46,20 @@ def _make_cwd_env():
     return cloudpickle_repo_folder, env
 
 
+def _pack(input_data, protocol=None):
+    pickled_input_data = dumps(input_data, protocol=protocol)
+    # Under Windows + Python 2.7, subprocess / communicate truncate the data
+    # on some specific bytes. To avoid this issue, let's use the pure ASCII
+    # Base32 encoding to encapsulate the pickle message sent to the child
+    # process.
+    return base64.b32encode(pickled_input_data)
+
+
+def _unpack(packed_data):
+    decoded_data = base64.b32decode(packed_data)
+    return loads(decoded_data)
+
+
 def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
     """Echo function with a child Python process
 
@@ -53,18 +71,12 @@ def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
     [1, 'a', None]
 
     """
-    pickled_input_data = dumps(input_data, protocol=protocol)
-    # Under Windows + Python 2.7, subprocess / communicate truncate the data
-    # on some specific bytes. To avoid this issue, let's use the pure ASCII
-    # Base32 encoding to encapsulate the pickle message sent to the child
-    # process.
-    pickled_b32 = base64.b32encode(pickled_input_data)
-
     # run then pickle_echo(protocol=protocol) in __main__:
     cmd = [sys.executable, __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
                  bufsize=4096)
+    pickled_b32 = _pack(input_data, protocol=protocol)
     try:
         comm_kwargs = {}
         if timeout_supported:
@@ -74,7 +86,7 @@ def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
             message = "Subprocess returned %d: " % proc.returncode
             message += err.decode('utf-8')
             raise RuntimeError(message)
-        return loads(base64.b32decode(out))
+        return _unpack(out)
     except TimeoutExpired:
         proc.kill()
         out, err = proc.communicate()
@@ -111,6 +123,56 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     repickled_bytes = dumps(obj, protocol=protocol)
     stream_out.write(base64.b32encode(repickled_bytes))
     stream_out.close()
+
+
+def call_func(payload, protocol):
+    """Remote function call that uses cloudpickle to transport everthing"""
+    func, args, kwargs = loads(payload)
+    try:
+        result = func(*args, **kwargs)
+    except BaseException as e:
+        result = e
+    return dumps(result, protocol=protocol)
+
+
+class _Worker(object):
+    def __init__(self, protocol=None):
+        self.protocol = protocol
+        self.pool = ProcessPoolExecutor(max_workers=1)
+        self.pool.submit(id, 42).result()  # start the worker process
+
+    def run(self, func, *args, **kwargs):
+        """Synchronous remote function call"""
+
+        input_payload = dumps((func, args, kwargs), protocol=self.protocol)
+        result_payload = self.pool.submit(
+            call_func, input_payload, self.protocol).result()
+        result = loads(result_payload)
+
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    def memsize(self):
+        workers_pids = [p.pid if hasattr(p, "pid") else p
+                        for p in list(self.pool._processes)]
+        num_workers = len(workers_pids)
+        if num_workers == 0:
+            return 0
+        elif num_workers > 1:
+            raise RuntimeError("Unexpected number of workers: %d"
+                               % num_workers)
+        return psutil.Process(workers_pids[0]).memory_info().rss
+
+    def close(self):
+        self.pool.shutdown(wait=True)
+
+
+@contextmanager
+def subprocess_worker(protocol=None):
+    worker = _Worker(protocol=protocol)
+    yield worker
+    worker.close()
 
 
 def assert_run_python_script(source_code, timeout=TIMEOUT):

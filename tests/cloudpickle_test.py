@@ -1124,6 +1124,117 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
 
+    def test_interactive_remote_function_calls(self):
+        code = """if __name__ == "__main__":
+        from testutils import subprocess_worker
+
+        def interactive_function(x):
+            return x + 1
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            assert w.run(interactive_function, 41) == 42
+
+            # Define a new function that will call an updated version of
+            # the previously called function:
+
+            def wrapper_func(x):
+                return interactive_function(x)
+
+            def interactive_function(x):
+                return x - 1
+
+            # The change in the definition of interactive_function in the main
+            # module of the main process should be reflected transparently
+            # in the worker process: the worker process does not recall the
+            # previous definition of `interactive_function`:
+
+            assert w.run(wrapper_func, 41) == 40
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
+    def test_interactive_remote_function_calls_no_side_effect(self):
+        code = """if __name__ == "__main__":
+        from testutils import subprocess_worker
+        import sys
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            GLOBAL_VARIABLE = 0
+
+            class CustomClass(object):
+
+                def mutate_globals(self):
+                    global GLOBAL_VARIABLE
+                    GLOBAL_VARIABLE += 1
+                    return GLOBAL_VARIABLE
+
+            custom_object = CustomClass()
+            assert w.run(custom_object.mutate_globals) == 1
+
+            # The caller global variable is unchanged in the main process.
+
+            assert GLOBAL_VARIABLE == 0
+
+            # Calling the same function again starts again from zero. The
+            # worker process is stateless: it has no memory of the past call:
+
+            assert w.run(custom_object.mutate_globals) == 1
+
+            # The symbols defined in the main process __main__ module are
+            # not set in the worker process main module to leave the worker
+            # as stateless as possible:
+
+            def is_in_main(name):
+                return hasattr(sys.modules["__main__"], name)
+
+            assert is_in_main("CustomClass")
+            assert not w.run(is_in_main, "CustomClass")
+
+            assert is_in_main("GLOBAL_VARIABLE")
+            assert not w.run(is_in_main, "GLOBAL_VARIABLE")
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+                        reason="Skip PyPy because memory grows too much")
+    def test_interactive_remote_function_calls_no_memory_leak(self):
+        code = """if __name__ == "__main__":
+        from testutils import subprocess_worker
+        import struct
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            reference_size = w.memsize()
+            assert reference_size > 0
+
+
+            def make_big_closure(i):
+                # Generate a byte string of size 1MB
+                itemsize = len(struct.pack("l", 1))
+                data = struct.pack("l", i) * (int(1e6) // itemsize)
+                def process_data():
+                    return len(data)
+                return process_data
+
+            for i in range(100):
+                func = make_big_closure(i)
+                result = w.run(func)
+                assert result == int(1e6), result
+
+            import gc
+            w.run(gc.collect)
+
+            # By this time the worker process has processed worth of 100MB of
+            # data passed in the closures its memory size should now have
+            # grown by more than a few MB.
+            growth = w.memsize() - reference_size
+            assert growth < 1e7, growth
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
     @pytest.mark.skipif(sys.version_info >= (3, 0),
                         reason="hardcoded pickle bytes for 2.7")
     def test_function_pickle_compat_0_4_0(self):
