@@ -1209,16 +1209,19 @@ class CloudPickleTest(unittest.TestCase):
             reference_size = w.memsize()
             assert reference_size > 0
 
+
             def make_big_closure(i):
                 # Generate a byte string of size 1MB
-                data = struct.pack("l", i) * (int(1e6) // 8)
+                itemsize = len(struct.pack("l", 1))
+                data = struct.pack("l", i) * (int(1e6) // itemsize)
                 def process_data():
                     return len(data)
                 return process_data
 
             for i in range(100):
                 func = make_big_closure(i)
-                assert w.run(func) == int(1e6)
+                result = w.run(func)
+                assert result == int(1e6), result
 
             import gc
             w.run(gc.collect)
