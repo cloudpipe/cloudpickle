@@ -254,7 +254,7 @@ else:
 class CloudPickler(Pickler):
 
     dispatch = {}
-    hook_dispatch = {}
+    callback_dispatch = {}
 
     def __init__(self, file, protocol=None):
         if protocol is None:
@@ -413,7 +413,7 @@ class CloudPickler(Pickler):
             # func is nested
             if lookedup_by_name is None or lookedup_by_name is not obj:
                 return self.save_function_tuple(obj)
-    hook_dispatch[types.FunctionType] = save_function
+    callback_dispatch[types.FunctionType] = save_function
 
 
     def _save_subimports(self, code, top_level_dependencies):
@@ -653,7 +653,7 @@ class CloudPickler(Pickler):
             return self.save_global(obj)
         return self.save_function(obj)
 
-    hook_dispatch[types.BuiltinFunctionType] = save_builtin_function
+    callback_dispatch[types.BuiltinFunctionType] = save_builtin_function
 
     def save_global(self, obj, name=None, pack=struct.pack):
         """
@@ -689,8 +689,8 @@ class CloudPickler(Pickler):
             # if pickle.dumps worked out fine, then simply pickle by attribute
             return NotImplementedError
 
-    hook_dispatch[type] = save_global
-    hook_dispatch[types.ClassType] = save_global
+    callback_dispatch[type] = save_global
+    callback_dispatch[types.ClassType] = save_global
 
 
     def save_instancemethod(self, obj):
@@ -889,7 +889,7 @@ class CloudPickler(Pickler):
 
 
 def hook(pickler, obj):
-    # classes deriving from custom metaclasses won't get caught inside the
+    # Classes deriving from custom metaclasses won't get caught inside the
     # hook_dispatch dict. We manually check is obj's comes from a custom
     # metaclass, and in this case, fallback to save_global.
     t = type(obj)
@@ -901,8 +901,8 @@ def hook(pickler, obj):
     if issc:
         return pickler.save_global(obj)
 
-    # else, do a classic lookup on the hook dispatch
-    reducer = CloudPickler.hook_dispatch.get(t)
+    # Else, do a classic lookup on the hook dispatch
+    reducer = CloudPickler.callback_dispatch.get(t)
     if reducer is None:
         return NotImplementedError
     else:
