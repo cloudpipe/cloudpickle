@@ -1216,12 +1216,16 @@ class CloudPickleTest(unittest.TestCase):
 
             for i in range(100):
                 func = make_big_closure(i)
-                assert w.run(func) == int(1e6) // 8
+                assert w.run(func) == int(1e6)
+
+            import gc
+            w.run(gc.collect)
 
             # By this time the worker process has processed worth of 100MB of
             # data passed in the closures its memory size should now have
             # grown by more than a few MB.
-            assert w.memsize() - reference_size < 1e7
+            growth = w.memsize() - reference_size
+            assert growth < 1e7, growth
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
