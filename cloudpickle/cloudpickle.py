@@ -979,43 +979,6 @@ def _restore_attr(obj, attr):
     return obj
 
 
-def _get_module_builtins():
-    return pickle.__builtins__
-
-
-def print_exec(stream):
-    ei = sys.exc_info()
-    traceback.print_exception(ei[0], ei[1], ei[2], None, stream)
-
-
-def _modules_to_main(modList):
-    """Force every module in modList to be placed into main"""
-    if not modList:
-        return
-
-    main = sys.modules['__main__']
-    for modname in modList:
-        if type(modname) is str:
-            try:
-                mod = __import__(modname)
-            except Exception:
-                sys.stderr.write('warning: could not import %s\n.  '
-                                 'Your function may unexpectedly error due to this import failing;'
-                                 'A version mismatch is likely.  Specific error was:\n' % modname)
-                print_exec(sys.stderr)
-            else:
-                setattr(main, mod.__name__, mod)
-
-
-# object generators:
-def _genpartial(func, args, kwds):
-    if not args:
-        args = ()
-    if not kwds:
-        kwds = {}
-    return partial(func, *args, **kwds)
-
-
 def _gen_ellipsis():
     return Ellipsis
 
@@ -1186,15 +1149,6 @@ def _is_dynamic(module):
         except ImportError:
             return True
         return False
-
-
-"""Constructors for 3rd party libraries
-Note: These can never be renamed due to client compatibility issues"""
-
-
-def _getobject(modname, attribute):
-    mod = __import__(modname, fromlist=[attribute])
-    return mod.__dict__[attribute]
 
 
 """ Use copy_reg to extend global pickle definitions """
