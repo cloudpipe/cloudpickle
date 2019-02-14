@@ -1408,7 +1408,7 @@ class CloudPickleTest(unittest.TestCase):
         assert ClonedDynamicColor.__doc__ == DynamicColor.__doc__
 
     def test_interactively_defined_enum(self):
-        code = """if True:
+        code = """if __name__ == "__main__":
         from enum import Enum
         from testutils import subprocess_worker
 
