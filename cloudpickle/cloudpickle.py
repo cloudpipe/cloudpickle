@@ -1151,15 +1151,6 @@ def _is_dynamic(module):
         return False
 
 
-"""Constructors for 3rd party libraries
-Note: These can never be renamed due to client compatibility issues"""
-
-
-def _getobject(modname, attribute):
-    mod = __import__(modname, fromlist=[attribute])
-    return mod.__dict__[attribute]
-
-
 """ Use copy_reg to extend global pickle definitions """
 
 if sys.version_info < (3, 4):  # pragma: no branch
