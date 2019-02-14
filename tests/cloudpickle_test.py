@@ -1410,22 +1410,36 @@ class CloudPickleTest(unittest.TestCase):
     def test_interactively_defined_enum(self):
         code = """if True:
         from enum import Enum
-        from testutils import subprocess_pickle_echo
+        from testutils import subprocess_worker
 
-        class Color(Enum):
-            RED = 1
-            GREEN = 2
+        with subprocess_worker(protocol={protocol}) as w:
 
-        green1, green2, ClonedColor = subprocess_pickle_echo(
-            [Color.GREEN, Color.GREEN, Color], protocol={protocol})
-        assert green1 is green2
-        assert green1 is ClonedColor.GREEN
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
 
-        # Check that the pickle that was return has been matched back to the
-        # interactively defined Color living in the __main__ module of the
-        # original Python process.
-        assert ClonedColor is Color
-        assert green1 is Color.GREEN
+            def check_positive(x):
+                return Color.GREEN if x >= 0 else Color.RED
+
+            result = w.run(check_positive, 1)
+
+            # Check that the returned enum instance is reconciled with the
+            # locally defined Color enum type definition:
+
+            assert result is Color.GREEN
+
+            # Check that changing the defintion of the Enum class is taken
+            # into account on the worker for subsequent calls:
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+
+            def check_positive(x):
+                return Color.BLUE if x >= 0 else Color.RED
+
+            result = w.run(check_positive, 1)
+            assert result is Color.BLUE
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
