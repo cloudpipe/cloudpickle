@@ -55,6 +55,8 @@ import sys
 import traceback
 import types
 import weakref
+import uuid
+import threading
 from enum import Enum
 
 # cloudpickle is meant for inter process communication: we expect all
@@ -62,6 +64,10 @@ from enum import Enum
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
+
+_DYNAMIC_CLASS_TRACKER_BY_CLASS = weakref.WeakKeyDictionary()
+_DYNAMIC_CLASS_TRACKER_BY_ID = weakref.WeakValueDictionary()
+_DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
 
 if sys.version_info[0] < 3:  # pragma: no branch
     from pickle import Pickler
@@ -77,6 +83,25 @@ else:
     from io import BytesIO as StringIO
     string_types = (str,)
     PY3 = True
+
+
+def _ensure_tracking(class_def):
+    with _DYNAMIC_CLASS_TRACKER_LOCK:
+        class_tracker_id = _DYNAMIC_CLASS_TRACKER_BY_CLASS.get(class_def)
+        if class_tracker_id is None:
+            class_tracker_id = uuid.uuid4().hex
+            _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
+            _DYNAMIC_CLASS_TRACKER_BY_ID[class_tracker_id] = class_def
+    return class_tracker_id
+
+
+def _lookup_class_or_track(class_tracker_id, class_def):
+    if class_tracker_id is not None:
+        with _DYNAMIC_CLASS_TRACKER_LOCK:
+            class_def = _DYNAMIC_CLASS_TRACKER_BY_ID.setdefault(
+                class_tracker_id, class_def)
+            _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
+    return class_def
 
 
 def _make_cell_set_template_code():
@@ -467,6 +492,8 @@ class CloudPickler(Pickler):
         EnumMeta metaclass has complex initialization that makes the Enum
         subclasses hold references to their own instances.
         """
+        class_tracker_id = _ensure_tracking(obj)
+
         # XXX: shall we pass type and start kwargs? If so how to retrieve the
         # correct info from obj.
         elements = dict((e.name, e.value) for e in obj)
@@ -482,7 +509,7 @@ class CloudPickler(Pickler):
 
         self.save_reduce(_make_dynamic_enum,
                          (obj.__base__, obj.__name__, elements, doc,
-                          obj.__module__, extra),
+                          obj.__module__, class_tracker_id, extra),
                          obj=obj)
 
     def save_dynamic_class(self, obj):
@@ -496,7 +523,10 @@ class CloudPickler(Pickler):
         if issubclass(obj, Enum):
             return self._save_dynamic_enum(obj)
 
+        class_tracker_id = _ensure_tracking(obj)
+
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
+        clsdict["_cloudpickle_class_tracker_id"] = class_tracker_id
         clsdict.pop('__weakref__', None)
 
         # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
@@ -1177,6 +1207,8 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     See CloudPickler.save_dynamic_class for more info.
     """
     registry = None
+    class_tracker_id = class_dict.pop("_cloudpickle_class_tracker_id", None)
+
     for attrname, attr in class_dict.items():
         if attrname == "_abc_impl":
             registry = attr
@@ -1186,26 +1218,15 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
         for subclass in registry:
             skeleton_class.register(subclass)
 
-    return skeleton_class
+    return _lookup_class_or_track(class_tracker_id, skeleton_class)
 
 
-def _make_dynamic_enum(base, name, elements, doc, module, extra):
-    if module == "__main__":
-        # Special case: try to lookup enum from main module to make it possible
-        # to use physical comparison with enum instances returned by a remote
-        # function calls whose results are communicated back to the main Python
-        # process with cloudpickle.
-        try:
-            lookedup_enum = getattr(sys.modules["__main__"], name)
-            assert issubclass(lookedup_enum, Enum)
-            return lookedup_enum
-        except (KeyError, AttributeError):
-            # Fall-back to dynamic instanciation.
-            pass
-    cls = base(name, elements, module=module, **extra)
+def _make_dynamic_enum(base, name, elements, doc, module, class_tracker_id,
+                       extra):
+    class_def = base(name, elements, module=module, **extra)
     if doc is not None:
-        cls.__doc__ = doc
-    return cls
+        class_def.__doc__ = doc
+    return _lookup_class_or_track(class_tracker_id, class_def)
 
 
 def _is_dynamic(module):

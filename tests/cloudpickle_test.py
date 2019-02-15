@@ -1198,6 +1198,32 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
+    def test_interactive_remote_dynamic_type_and_instances(self):
+        code = """if __name__ == "__main__":
+        from testutils import subprocess_worker
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            class CustomCounter:
+                def __init__(self):
+                    self.count = 0
+                def increment(self):
+                    self.count += 1
+                    return self
+
+            counter = CustomCounter().increment()
+            assert counter.count == 1
+
+            returned_counter = w.run(counter.increment)
+            assert returned_counter.count == 2, returned_counter.count
+
+            # Check that the class definition of the returned instance was
+            # matched back to the original class defintion living in __main__
+            assert isinstance(returned_counter, CustomCounter)
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
     @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
                         reason="Skip PyPy because memory grows too much")
     def test_interactive_remote_function_calls_no_memory_leak(self):
@@ -1383,16 +1409,13 @@ class CloudPickleTest(unittest.TestCase):
         assert green1 is ClonedColor.GREEN
         assert green1 is not ClonedColor.BLUE
 
-        assert ClonedColor.__doc__ == Color.__doc__
-        assert ClonedColor.__module__ == Color.__module__
+        # cloudpickle systematically tracks procenance of class definitions
+        # and ensure reconcylation in case of round trips:
+        assert green1 is Color.GREEN
+        assert ClonedColor is Color
 
-        if hasattr(Color, "__qualname__"):
-            assert ClonedColor.__qualname__ == Color.__qualname__
-
-        # cloudpickle systematically creates new copies for locally defined
-        # classes that cannot be imported by name:
-        assert green1 is not Color.GREEN
-        assert ClonedColor is not Color
+        green3 = pickle_depickle(Color.GREEN, protocol=self.protocol)
+        assert green3 is Color.GREEN
 
         # Try again with a IntEnum defined with the functional API
         DynamicColor = IntEnum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
@@ -1404,8 +1427,7 @@ class CloudPickleTest(unittest.TestCase):
         assert green1 is green2
         assert green1 is ClonedDynamicColor.GREEN
         assert green1 is not ClonedDynamicColor.BLUE
-        assert ClonedDynamicColor.__module__ == DynamicColor.__module__
-        assert ClonedDynamicColor.__doc__ == DynamicColor.__doc__
+        assert ClonedDynamicColor is DynamicColor
 
     def test_interactively_defined_enum(self):
         code = """if __name__ == "__main__":
