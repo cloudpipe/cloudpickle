@@ -3,50 +3,50 @@ dist: xenial
 
 matrix:
   include:
-    - os: windows
-      language: sh
-      env: PYTHON_ROOT="/c/Python37" PYTHON_CHOCO_PKG="python3"
-    - os: windows
-      language: sh
-      env: PYTHON_ROOT="/c/Python27" PYTHON_CHOCO_PKG="python2"
-    - os: linux
-      dist: trusty
-      python: "pypy3"
-    - os: linux
-      python: 3.7
-    - os: linux
-      python: 3.6
-    - os: linux
-      python: 3.5
-    - os: linux
-      python: 2.7
-    - os: linux
-      # The PROJECT environment variable refers to a downstream project that
-      # depends on cloudpickle (for example: distributed, joblib, loky). For
-      # each project, a matrix item is created, that will run the $PROJECT
-      # test suite with the latest cloudpickle, to check for breaking changes
-      # introduced by cloudpickle.
-      # Side note: for distributed, the pytest major version is constrained to
-      # 3 because running it's test suite with pytest 4 fails for now. Also,
-      # two failing tests related to openssl and not to cloudpickle are
-      # skipped
-      python: 3.7
-      sudo: required
-      env: PROJECT=distributed
-           TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
-           PROJECT_URL=https://github.com/dask/distributed.git
-           PYTEST_ARGS="-k not test_connection_args and not test_listen_args"
-      if: commit_message =~ /(\[ci downstream\]|\[ci distributed\])/
-    - os: linux
-      env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
-           PROJECT_URL=https://github.com/tomMoral/loky.git
-      python: 3.7
-      if: commit_message =~ /(\[ci downstream\]|\[ci loky\])/
-    - os: linux
-      env: PROJECT=joblib TEST_REQUIREMENTS="pytest numpy distributed"
-           PROJECT_URL=https://github.com/joblib/joblib.git
-      python: 3.7
-      if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
+    # - os: windows
+    #   language: sh
+    #   env: PYTHON_ROOT="/c/Python37" PYTHON_CHOCO_PKG="python3"
+    # - os: windows
+    #   language: sh
+    #   env: PYTHON_ROOT="/c/Python27" PYTHON_CHOCO_PKG="python2"
+    # - os: linux
+    #   dist: trusty
+    #   python: "pypy3"
+    # - os: linux
+    #   python: 3.7
+    # - os: linux
+    #   python: 3.6
+    # - os: linux
+    #   python: 3.5
+    # - os: linux
+    #   python: 2.7
+    # - os: linux
+    #   # The PROJECT environment variable refers to a downstream project that
+    #   # depends on cloudpickle (for example: distributed, joblib, loky). For
+    #   # each project, a matrix item is created, that will run the $PROJECT
+    #   # test suite with the latest cloudpickle, to check for breaking changes
+    #   # introduced by cloudpickle.
+    #   # Side note: for distributed, the pytest major version is constrained to
+    #   # 3 because running it's test suite with pytest 4 fails for now. Also,
+    #   # two failing tests related to openssl and not to cloudpickle are
+    #   # skipped
+    #   python: 3.7
+    #   sudo: required
+    #   env: PROJECT=distributed
+    #        TEST_REQUIREMENTS="pytest==3.6 numpy pandas mock bokeh"
+    #        PROJECT_URL=https://github.com/dask/distributed.git
+    #        PYTEST_ARGS="-k not test_connection_args and not test_listen_args"
+    #   if: commit_message =~ /(\[ci downstream\]|\[ci distributed\])/
+    # - os: linux
+    #   env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
+    #        PROJECT_URL=https://github.com/tomMoral/loky.git
+    #   python: 3.7
+    #   if: commit_message =~ /(\[ci downstream\]|\[ci loky\])/
+    # - os: linux
+    #   env: PROJECT=joblib TEST_REQUIREMENTS="pytest numpy distributed"
+    #        PROJECT_URL=https://github.com/joblib/joblib.git
+    #   python: 3.7
+    #   if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
       env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis"
            PROJECT_URL=https://github.com/ray-project/ray.git
@@ -110,7 +110,7 @@ script:
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
         exit $TEST_RETURN_CODE
       fi
-      popd
+      # popd
     fi
 after_success:
   - coverage combine --append
