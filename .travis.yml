@@ -110,7 +110,7 @@ script:
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
         exit $TEST_RETURN_CODE
       fi
-      # popd
+      popd
     fi
 after_success:
   - coverage combine --append
