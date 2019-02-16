@@ -1,3 +1,11 @@
+0.9.0
+=====
+
+- Track the provenance of dynamic classes and enums so as to preseve the
+  usual `isinstance` relationship between pickled objects and their
+  original class defintions.
+  ([issue #246](https://github.com/cloudpipe/cloudpickle/pull/246))
+
 0.8.0
 =====
 
@@ -9,7 +17,6 @@
   instance. This restores the (previously untested) behavior of cloudpickle
   prior to changes done in 0.5.4 for functions defined in the `__main__`
   module, and 0.6.0/1 for other dynamic functions.
-
 
 0.7.0
 =====
