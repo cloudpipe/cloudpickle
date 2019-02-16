@@ -925,21 +925,18 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
     def test_namedtuple(self):
-
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
-        t = MyTuple(1, 2, 3)
+        t1 = MyTuple(1, 2, 3)
+        t2 = MyTuple(3, 2, 1)
 
-        depickled_t, depickled_MyTuple = pickle_depickle(
-            [t, MyTuple], protocol=self.protocol)
-        self.assertTrue(isinstance(depickled_t, depickled_MyTuple))
+        depickled_t1, depickled_MyTuple, depickled_t2 = pickle_depickle(
+            [t1, MyTuple, t2], protocol=self.protocol)
 
-        self.assertEqual((depickled_t.a, depickled_t.b, depickled_t.c),
-                         (1, 2, 3))
-        self.assertEqual((depickled_t[0], depickled_t[1], depickled_t[2]),
-                         (1, 2, 3))
-
-        self.assertEqual(depickled_MyTuple.__name__, 'MyTuple')
-        self.assertTrue(issubclass(depickled_MyTuple, tuple))
+        assert isinstance(depickled_t1, MyTuple)
+        assert depickled_t1 == t1
+        assert depickled_MyTuple is MyTuple
+        assert isinstance(depickled_t2, MyTuple)
+        assert depickled_t2 == t2
 
     def test_builtin_type__new__(self):
         # Functions occasionally take the __new__ of these types as default
@@ -1221,6 +1218,68 @@ class CloudPickleTest(unittest.TestCase):
             # matched back to the original class defintion living in __main__
             assert isinstance(returned_counter, CustomCounter)
 
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
+    def test_interactive_remote_dynamic_type_and_futures(self):
+        """Simulate objects stored on workers to check isinstance semantics
+
+        Such instances stored in the memory of running worker processes are
+        similar to dask-distributed futures for instance.
+        """
+        code = """if __name__ == "__main__":
+        import cloudpickle, uuid
+        from testutils import subprocess_worker
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            class A:
+                '''Original class defintion'''
+                pass
+
+            def store(x):
+                storage = getattr(cloudpickle, "_test_storage", None)
+                if storage is None:
+                    storage = cloudpickle._test_storage = dict()
+                obj_id = uuid.uuid4().hex
+                storage[obj_id] = x
+                return obj_id
+
+            def lookup(obj_id):
+                return cloudpickle._test_storage[obj_id]
+
+            id1 = w.run(store, A())
+
+            # The stored object on the worker is matched to the class
+            # definition singleton thanks to provenance tracking:
+            assert w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
+
+            # Retrieving the object from the worker yields a local copy that
+            # is matched back the local class definition this instance stems
+            # from.
+            assert isinstance(w.run(lookup, id1), A)
+
+            # Changing the local class definitions should be reflected in
+            # all subsequent calls. In particular the old instances do not
+            # map back to the new class definition, neither locally, nor on the
+            # worker:
+
+            class A:
+                '''Modified class defintion'''
+                pass
+
+            assert not w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
+            retrieved1 = w.run(lookup, id1)
+            assert not isinstance(retrieved1, A)
+            assert retrieved1.__class__ is not A
+            assert retrieved1.__class__.__doc__ == "Original class defintion"
+
+            # New instances on the other hand are proper instances of the new
+            # class definition everywhere:
+
+            id2 = w.run(store, A())
+            assert w.run(lambda obj_id: isinstance(lookup(obj_id), A), id2)
+            assert isinstance(w.run(lookup, id2), A)
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
