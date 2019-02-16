@@ -1216,7 +1216,20 @@ class CloudPickleTest(unittest.TestCase):
 
             # Check that the class definition of the returned instance was
             # matched back to the original class defintion living in __main__
+
             assert isinstance(returned_counter, CustomCounter)
+
+            # Check that memoization does not break provenance tracking:
+
+            def echo(*args):
+                return args
+
+            C1, C2, c1, c2 = w.run(echo, CustomCounter, CustomCounter,
+                                   CustomCounter(), returned_counter)
+            assert C1 is CustomCounter
+            assert C2 is CustomCounter
+            assert isinstance(c1, CustomCounter)
+            assert isinstance(c2, CustomCounter)
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
@@ -1476,6 +1489,7 @@ class CloudPickleTest(unittest.TestCase):
         green3 = pickle_depickle(Color.GREEN, protocol=self.protocol)
         assert green3 is Color.GREEN
 
+    def test_locally_defined_intenum(self):
         # Try again with a IntEnum defined with the functional API
         DynamicColor = IntEnum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
 
