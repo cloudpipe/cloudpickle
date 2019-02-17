@@ -69,9 +69,9 @@ except ImportError:
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
-# Track the provenance of reconstructed dynamic classes to make it possible
-# to reconcyle instances with a singleton class definition when appropriate
-# and preserve the usual "isinstance" semantics of Python objects.
+# Track the provenance of reconstructed dynamic classes to make it possible to
+# recontruct instances from the matching singleton class definition when
+# appropriate and preserve the usual "isinstance" semantics of Python objects.
 _DYNAMIC_CLASS_TRACKER_BY_CLASS = weakref.WeakKeyDictionary()
 _DYNAMIC_CLASS_TRACKER_BY_ID = weakref.WeakValueDictionary()
 _DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
@@ -586,10 +586,10 @@ class CloudPickler(Pickler):
         write(pickle.MARK)
 
         # Create and memoize an skeleton class with obj's name and bases.
-        extra = {"class_tracker_id": _ensure_tracking(obj)}
         tp = type(obj)
         self.save_reduce(_make_skeleton_class,
-                         (tp, obj.__name__, obj.__bases__, type_kwargs, extra),
+                         (tp, obj.__name__, obj.__bases__, type_kwargs,
+                          _ensure_tracking(obj), {}),
                          obj=obj)
 
         # Now save the rest of obj's __dict__. Any references to obj
@@ -1172,8 +1172,17 @@ def _make_skel_func(code, cell_count, base_globals=None):
 
 
 def _make_skeleton_class(type_constructor, name, bases, type_kwargs,
-                         extra):
-    class_tracker_id = extra.get("class_tracker_id")
+                         class_tracker_id, extra):
+    """Build dynamic class with an empty __dict__ to be filled once memoized
+
+    If class_tracker_id is not None, try to lookup an existing class definition
+    matching that id. If none is found, track a newly reconstructed class
+    definition under that id so that other instances stemming from the same
+    class id will also reuse this class definition.
+
+    The extra variable is meant to be a dict use for forward compatibility
+    shall the need arise.
+    """
     skeleton_class = type_constructor(name, bases, type_kwargs)
     return _lookup_class_or_track(class_tracker_id, skeleton_class)
 
@@ -1184,7 +1193,6 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     See CloudPickler.save_dynamic_class for more info.
     """
     registry = None
-
     for attrname, attr in class_dict.items():
         if attrname == "_abc_impl":
             registry = attr

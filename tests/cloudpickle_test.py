@@ -1214,7 +1214,7 @@ class CloudPickleTest(unittest.TestCase):
             assert returned_counter.count == 2, returned_counter.count
 
             # Check that the class definition of the returned instance was
-            # matched back to the original class defintion living in __main__
+            # matched back to the original class definition living in __main__.
 
             assert isinstance(returned_counter, CustomCounter)
 
@@ -1246,7 +1246,7 @@ class CloudPickleTest(unittest.TestCase):
         with subprocess_worker(protocol={protocol}) as w:
 
             class A:
-                '''Original class defintion'''
+                '''Original class definition'''
                 pass
 
             def store(x):
@@ -1262,29 +1262,30 @@ class CloudPickleTest(unittest.TestCase):
 
             id1 = w.run(store, A())
 
-            # The stored object on the worker is matched to the class
-            # definition singleton thanks to provenance tracking:
+            # The stored object on the worker is matched to a singleton class
+            # definition thanks to provenance tracking:
             assert w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
 
             # Retrieving the object from the worker yields a local copy that
-            # is matched back the local class definition this instance stems
-            # from.
+            # is matched back the local class definition this instance
+            # originally stems from.
             assert isinstance(w.run(lookup, id1), A)
 
-            # Changing the local class definitions should be reflected in
-            # all subsequent calls. In particular the old instances do not
-            # map back to the new class definition, neither locally, nor on the
-            # worker:
+            # Changing the local class definition should be taken into account
+            # in all subsequent calls. In particular the old instances on the
+            # worker do not map back to the new class definition, neither on
+            # the worker itself, nor locally on the main program when the old
+            # instance is retrieved:
 
             class A:
-                '''Modified class defintion'''
+                '''Updated class definition'''
                 pass
 
             assert not w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
             retrieved1 = w.run(lookup, id1)
             assert not isinstance(retrieved1, A)
             assert retrieved1.__class__ is not A
-            assert retrieved1.__class__.__doc__ == "Original class defintion"
+            assert retrieved1.__class__.__doc__ == "Original class definition"
 
             # New instances on the other hand are proper instances of the new
             # class definition everywhere:
@@ -1324,9 +1325,10 @@ class CloudPickleTest(unittest.TestCase):
             import gc
             w.run(gc.collect)
 
-            # By this time the worker process has processed worth of 100MB of
-            # data passed in the closures its memory size should now have
-            # grown by more than a few MB.
+            # By this time the worker process has processed 100MB worth of data
+            # passed in the closures. The worker memory size should not have
+            # grown by more than a few MB as closures are garbage collected at
+            # the end of each remote function call.
             growth = w.memsize() - reference_size
             assert growth < 1e7, growth
 
@@ -1525,7 +1527,7 @@ class CloudPickleTest(unittest.TestCase):
 
             assert result is Color.GREEN
 
-            # Check that changing the defintion of the Enum class is taken
+            # Check that changing the definition of the Enum class is taken
             # into account on the worker for subsequent calls:
 
             class Color(Enum):
