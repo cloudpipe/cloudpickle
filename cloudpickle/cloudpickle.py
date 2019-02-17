@@ -57,7 +57,12 @@ import types
 import weakref
 import uuid
 import threading
-from enum import Enum
+
+
+try:
+    from enum import Enum
+except ImportError:
+    Enum = None
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
@@ -522,7 +527,7 @@ class CloudPickler(Pickler):
         functions, or that otherwise can't be serialized as attribute lookups
         from global modules.
         """
-        if issubclass(obj, Enum):
+        if Enum is not None and issubclass(obj, Enum):
             return self._save_dynamic_enum(obj)
 
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
