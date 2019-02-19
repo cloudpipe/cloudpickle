@@ -1194,7 +1194,7 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
-    def test_interactive_remote_dynamic_type_and_instances(self):
+    def test_interactive_dynamic_type_and_remote_instances(self):
         code = """if __name__ == "__main__":
         from testutils import subprocess_worker
 
@@ -1233,7 +1233,7 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
-    def test_interactive_remote_dynamic_type_and_futures(self):
+    def test_interactive_dynamic_type_and_stored_remote_instances(self):
         """Simulate objects stored on workers to check isinstance semantics
 
         Such instances stored in the memory of running worker processes are
@@ -1290,9 +1290,24 @@ class CloudPickleTest(unittest.TestCase):
             # New instances on the other hand are proper instances of the new
             # class definition everywhere:
 
-            id2 = w.run(store, A())
+            a = A()
+            id2 = w.run(store, a)
             assert w.run(lambda obj_id: isinstance(lookup(obj_id), A), id2)
             assert isinstance(w.run(lookup, id2), A)
+
+            # Monkeypatch the class defintion in the main process to a new
+            # class method:
+            A.echo = lambda cls, x: x
+
+            # Calling this method on an instance will automatically update
+            # the remote class definition on the worker to propagate the monkey
+            # patch dynamically.
+            assert w.run(a.echo, 42) == 42
+
+            # The stored instance can therefore also access the new class
+            # method:
+            assert w.run(lambda obj_id: lookup(obj_id).echo(43), id2) == 43
+
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
