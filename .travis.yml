@@ -51,7 +51,6 @@ matrix:
       env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil"
            PROJECT_URL=https://github.com/ray-project/ray.git
            PYTEST_ARGS="--duration=10"
-      if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
       python: 3.7
 
 before_install:
