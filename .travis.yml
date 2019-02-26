@@ -69,8 +69,7 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         if [[ $PROJECT == "ray" ]]; then
-            wget https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.7.0.dev0-cp37-cp37m-manylinux1_x86_64.whl;
-            pip install ray-0.7.0.dev0-cp37-cp37m-manylinux1_x86_64.whl;
+            pip install ray;
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
