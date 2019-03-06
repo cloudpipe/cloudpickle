@@ -1100,9 +1100,6 @@ class CloudPickleTest(unittest.TestCase):
         cloned = pickle_depickle(func, protocol=self.protocol)
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
-    # @pytest.mark.skipif(sys.version_info >= (3, 8),
-    #                     reason="pickling namedtuple is broken on 3.8")
-
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
         t1 = MyTuple(1, 2, 3)
