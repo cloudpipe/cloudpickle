@@ -1486,7 +1486,10 @@ class CloudPickleTest(unittest.TestCase):
     def test_locally_defined_enum(self):
         enum = pytest.importorskip("enum")
 
-        class Color(str, enum.Enum):
+        class StringEnum(str, enum.Enum):
+            """Enum when all members are also (and must be) strings"""
+
+        class Color(StringEnum):
             """3-element color space"""
             RED = "1"
             GREEN = "2"
