@@ -72,6 +72,10 @@ def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
 
     """
     # run then pickle_echo(protocol=protocol) in __main__:
+
+    # Protect stderr from any warning, as we will assume an error will happen
+    # if it is not empty. A concrete example is pytest using the imp module,
+    # which is deprecated in python 3.8
     cmd = [sys.executable, '-W ignore', __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
