@@ -658,8 +658,13 @@ def class_setstate(obj, state, slotstate):
 # This set of functions aim at deciding whether an object can be properly
 # pickler by the c Pickler, or if it needs to be serialized using cloudpickle's
 # reducers.
-def hook(pickler, obj):
-    """Custom reducing instructions for un-picklable functions and classes
+def reduce_global(pickler, obj):
+    """Custom reducing callback for functions and classes
+
+    This function is the analog of a custom save_global. However, the C Pickler
+    API does not expose low-level instructions such as save or write. Instead,
+    we return a reduce value the the Pickler will internally serialize via
+    save_reduce.
     """
     # Classes deriving from custom, dynamic metaclasses won't get caught inside
     # the hook_dispatch dict. In the legacy cloudpickle, this was not really a
@@ -680,6 +685,7 @@ def hook(pickler, obj):
     elif isinstance(obj, types.FunctionType):
         return function_reduce(obj, pickler.globals_ref)
     else:
+        # fallback to save_global
         return NotImplementedError
 
 
@@ -695,22 +701,18 @@ class CloudPickler(Pickler):
     """
 
     dispatch = {}
-    dispatch[types.CellType] = cell_reduce
-    dispatch[types.ModuleType] = module_reduce
-    dispatch[types.MethodType] = method_reduce
+    dispatch[classmethod] = classmethod_reduce
+    dispatch[io.TextIOWrapper] = file_reduce
     dispatch[logging.Logger] = logger_reduce
     dispatch[logging.RootLogger] = root_logger_reduce
-    dispatch[types.CodeType] = code_reduce
-    dispatch[classmethod] = classmethod_reduce
-    dispatch[staticmethod] = classmethod_reduce
-    dispatch[weakref.WeakSet] = weakset_reduce
-    dispatch[types.ModuleType] = module_reduce
-    dispatch[types.MappingProxyType] = mappingproxy_reduce
     dispatch[memoryview] = memoryview_reduce
-    # dispatch[io.TextIOWrapper] = file_reduce
-
-    # dispatch[operator.attrgetter] = attrgetter_reduce
-    # dispatch[operator.itemgetter] = itemgetter_reduce
+    dispatch[staticmethod] = classmethod_reduce
+    dispatch[types.CellType] = cell_reduce
+    dispatch[types.CodeType] = code_reduce
+    dispatch[types.ModuleType] = module_reduce
+    dispatch[types.MethodType] = method_reduce
+    dispatch[types.MappingProxyType] = mappingproxy_reduce
+    dispatch[weakref.WeakSet] = weakset_reduce
 
     def __init__(self, file, protocol=None):
         if protocol is None:
@@ -721,7 +723,7 @@ class CloudPickler(Pickler):
         # global namespace at unpickling time.
         self.globals_ref = {}
         self.dispatch_table = self.dispatch
-        self.global_hook = hook
+        self.global_hook = reduce_global
         self.proto = int(protocol)
 
     def dump(self, obj):
