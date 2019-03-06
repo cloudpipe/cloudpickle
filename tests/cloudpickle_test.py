@@ -961,7 +961,7 @@ class CloudPickleTest(unittest.TestCase):
             logger = cloudpickle.loads(base64.b32decode(b'{}'))
             logger.info('hello')
             """.format(base64.b32encode(dumped).decode('ascii'))
-        proc = subprocess.Popen([sys.executable, "-c", code],
+        proc = subprocess.Popen([sys.executable, "-W ignore", "-c", code],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
         out, _ = proc.communicate()
