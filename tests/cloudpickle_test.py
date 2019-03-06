@@ -1486,20 +1486,25 @@ class CloudPickleTest(unittest.TestCase):
     def test_locally_defined_enum(self):
         enum = pytest.importorskip("enum")
 
-        class Color(enum.Enum):
+        class Color(str, enum.Enum):
             """3-element color space"""
-            RED = 1
-            GREEN = 2
-            BLUE = 3
+            RED = "1"
+            GREEN = "2"
+            BLUE = "3"
+
+            def is_green(self):
+                return self is Color.GREEN
 
         green1, green2, ClonedColor = pickle_depickle(
             [Color.GREEN, Color.GREEN, Color], protocol=self.protocol)
         assert green1 is green2
         assert green1 is ClonedColor.GREEN
         assert green1 is not ClonedColor.BLUE
+        assert isinstance(green1, str)
+        assert green1.is_green()
 
-        # cloudpickle systematically tracks procenance of class definitions
-        # and ensure reconcylation in case of round trips:
+        # cloudpickle systematically tracks provenance of class definitions
+        # and ensure reconciliation in case of round trips:
         assert green1 is Color.GREEN
         assert ClonedColor is Color
 

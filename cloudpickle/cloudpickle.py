@@ -492,44 +492,47 @@ class CloudPickler(Pickler):
                             # then discards the reference to it
                             self.write(pickle.POP)
 
-    def _save_dynamic_enum(self, obj):
+    def _save_dynamic_enum(self, obj, clsdict):
         """Special handling for dynamic Enum subclasses
 
-        Use the Enum functional API (inherited from EnumMeta.__call__) as the
+        Use a dedicated Enum constructor (inspired by EnumMeta.__call__) as the
         EnumMeta metaclass has complex initialization that makes the Enum
         subclasses hold references to their own instances.
         """
-        class_tracker_id = _ensure_tracking(obj)
-
-        # XXX: shall we pass type and start kwargs? If so how to retrieve the
-        # correct info from obj.
-        elements = dict((e.name, e.value) for e in obj)
+        members = dict((e.name, e.value) for e in obj)
 
         if obj.__doc__ is not obj.__base__.__doc__:
             doc = obj.__doc__
         else:
             doc = None
 
-        extra = {}
-        if hasattr(obj, "__qualname__"):
-            extra["qualname"] = obj.__qualname__
+        # Python 2.7 with enum34 can have no qualname:
+        qualname = getattr(obj, "__qualname__", None)
 
-        self.save_reduce(_make_dynamic_enum,
-                         (obj.__base__, obj.__name__, elements, doc,
-                          obj.__module__, class_tracker_id, extra),
+        # future compat: set to None for now but allow to be a dict with extra
+        # datastructures if needed in the future
+        extra = None
+        self.save_reduce(_make_skeleton_enum,
+                         (obj.__bases__, obj.__name__, qualname, members, doc,
+                          obj.__module__, _ensure_tracking(obj), extra),
                          obj=obj)
 
+        # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
+        # Those attributes are already handled by the metaclass.
+        for attrname in ["_generate_next_value_", "_member_names_",
+                         "_member_map_", "_member_type_",
+                         "_value2member_map_"]:
+            clsdict.pop(attrname)
+        for member in members:
+            clsdict.pop(member)
+
     def save_dynamic_class(self, obj):
-        """
-        Save a class that can't be stored as module global.
+        """Save a class that can't be stored as module global.
 
         This method is used to serialize classes that are defined inside
         functions, or that otherwise can't be serialized as attribute lookups
         from global modules.
         """
-        if Enum is not None and issubclass(obj, Enum):
-            return self._save_dynamic_enum(obj)
-
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
         clsdict.pop('__weakref__', None)
 
@@ -558,8 +561,8 @@ class CloudPickler(Pickler):
                 for k in obj.__slots__:
                     clsdict.pop(k, None)
 
-        # If type overrides __dict__ as a property, include it in the type kwargs.
-        # In Python 2, we can't set this attribute after construction.
+        # If type overrides __dict__ as a property, include it in the type
+        # kwargs. In Python 2, we can't set this attribute after construction.
         __dict__ = clsdict.pop('__dict__', None)
         if isinstance(__dict__, property):
             type_kwargs['__dict__'] = __dict__
@@ -586,11 +589,16 @@ class CloudPickler(Pickler):
         write(pickle.MARK)
 
         # Create and memoize an skeleton class with obj's name and bases.
-        tp = type(obj)
-        self.save_reduce(_make_skeleton_class,
-                         (tp, obj.__name__, obj.__bases__, type_kwargs,
-                          _ensure_tracking(obj), {}),
-                         obj=obj)
+        if Enum is not None and issubclass(obj, Enum):
+            # Special handling of Enum subclasses
+            self._save_dynamic_enum(obj, clsdict)
+        else:
+            # "Regular" class definition:
+            tp = type(obj)
+            self.save_reduce(_make_skeleton_class,
+                             (tp, obj.__name__, obj.__bases__, type_kwargs,
+                              _ensure_tracking(obj), {}),
+                             obj=obj)
 
         # Now save the rest of obj's __dict__. Any references to obj
         # encountered while saving will point to the skeleton class.
@@ -1205,12 +1213,27 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     return skeleton_class
 
 
-def _make_dynamic_enum(base, name, elements, doc, module, class_tracker_id,
-                       extra):
-    class_def = base(name, elements, module=module, **extra)
+def _make_skeleton_enum(bases, name, qualname, members, doc, module,
+                        class_tracker_id, extra):
+    # enum always inherit from their base Enum class at the last subclass
+    # position:
+    enum_base = bases[-1]
+    metacls = enum_base.__class__
+    _, first_enum = enum_base._get_mixins_(bases)
+    classdict = metacls.__prepare__(name, bases)
+
+    for member_name, member_value in members.items():
+        classdict[member_name] = member_value
+    enum_class = metacls.__new__(metacls, name, bases, classdict)
+    enum_class.__module__ = module
+
+    # Python 2.7 compat
+    if qualname is not None:
+        enum_class.__qualname__ = qualname
+
     if doc is not None:
-        class_def.__doc__ = doc
-    return _lookup_class_or_track(class_tracker_id, class_def)
+        enum_class.__doc__ = doc
+    return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
 def _is_dynamic(module):
