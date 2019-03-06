@@ -48,6 +48,33 @@ for k, v in types.__dict__.items():
         _BUILTIN_TYPE_NAMES[v] = k
 
 
+def _make__new__factory(type_):
+    def _factory():
+        return type_.__new__
+
+    return _factory
+
+
+# NOTE: These need to be module globals so that they're pickleable as globals.
+_get_dict_new = _make__new__factory(dict)
+_get_frozenset_new = _make__new__factory(frozenset)
+_get_list_new = _make__new__factory(list)
+_get_set_new = _make__new__factory(set)
+_get_tuple_new = _make__new__factory(tuple)
+_get_object_new = _make__new__factory(object)
+
+# Pre-defined set of builtin_function_or_method instances that can be
+# serialized.
+_BUILTIN_TYPE_CONSTRUCTORS = {
+    dict.__new__: _get_dict_new,
+    frozenset.__new__: _get_frozenset_new,
+    set.__new__: _get_set_new,
+    list.__new__: _get_list_new,
+    tuple.__new__: _get_tuple_new,
+    object.__new__: _get_object_new,
+}
+
+
 # Shorthands similar to pickle.dump/pickle.dumps
 
 
@@ -461,7 +488,17 @@ def function_reduce(obj, globals_ref):
     from an attribute lookup of a file-backed module. If this check fails, then
     a custom reducer is called.
     """
-    # XXX: should we implement the cache of builtin-type constructors?
+    if obj in _BUILTIN_TYPE_CONSTRUCTORS:
+        # We keep a special-cased cache of built-in type constructors at
+        # global scope, because these functions are structured very
+        # differently in different python versions and implementations (for
+        # example, they're instances of types.BuiltinFunctionType in
+        # CPython, but they're ordinary types.FunctionType instances in
+        # PyPy).
+        #
+        # If the function we've received is in that cache, we just
+        # serialize it as a lookup into the cache.
+        return _BUILTIN_TYPE_CONSTRUCTORS[obj], ()
 
     name = obj.__name__
     try:
