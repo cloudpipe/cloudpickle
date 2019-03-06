@@ -24,9 +24,6 @@ load, loads = _pickle.load, _pickle.loads
 # XXX: Uncovered code in cloudpickle is currently removed, as they lack a
 # specific use case justifying their presence. Functions/Methods removed:
 # - _restore_attr
-# - _get_module_builtins
-# - print_exec
-# - _modules_to_main
 # - _gen_ellipsis
 # - everyting after (if obj.__dict__) in save_global
 
@@ -212,7 +209,7 @@ def extract_code_globals(code, globals_):
     return code_globals
 
 
-# COLLECTION OF OBJECTS __getnewargs__-like methods
+# COLLECTION OF OBJECTS __getnewargs__-LIKE METHODS
 # -------------------------------------------------
 
 
@@ -284,10 +281,10 @@ def file_reconstructor(retval):
 # COLLECTION OF OBJECTS STATE GETTERS
 # -----------------------------------
 def function_getstate(func):
-    # * Put func's dynamic attributes (stored in func.__dict__) in state. These
+    # - Put func's dynamic attributes (stored in func.__dict__) in state. These
     #   attributes will be restored at unpickling time using
     #   f.__dict__.update(state)
-    # * Put func's members into slotstate. Such attributes will be restored at
+    # - Put func's members into slotstate. Such attributes will be restored at
     #   unpickling time by iterating over slotstate and calling setattr(func,
     #   slotname, slotvalue)
     slotstate = {
@@ -324,8 +321,8 @@ def function_getstate(func):
 # obj.__reduce__), some do not. The following methods were created to "fill
 # these holes".
 
-# XXX: no itemgetter/attrgetter reducer support implemented as the test seem to
-# pass even without them
+# XXX: no itemgetter/attrgetter reducer support implemented as the tests seem
+# to pass even without them
 
 
 def builtin_type_reduce(obj):
@@ -427,7 +424,6 @@ def memoryview_reduce(obj):
 
 
 def module_reduce(obj):
-    """Module reducer"""
     if _is_dynamic(obj):
         return dynamic_module_reconstructor, (obj.__name__, vars(obj))
     else:
@@ -454,8 +450,7 @@ def dynamic_function_reduce(func, globals_ref):
     """Reduce a function that is not pickleable via attribute loookup.
     """
     # XXX: should globals_ref be a global variable instead? The reason is
-    # purely cosmetic. There is no risk of references leaking, we would have to
-    # limit the growing of globals_ref, by making it a lru cache for example.
+    # purely cosmetic.
     newargs = function_getnewargs(func, globals_ref)
     state = function_getstate(func)
     return types.FunctionType, newargs, state, None, None, function_setstate
@@ -494,8 +489,8 @@ def function_reduce(obj, globals_ref):
         lookedup_by_name = None
 
     if lookedup_by_name is obj:  # in this case, module is None
-        # if obj exists in a static module, let the builtin pickle saving
-        # routines save obj
+        # if obj exists in a filesytem-backed module, let the builtin pickle
+        # saving routines save obj
         return NotImplementedError
 
     # XXX: the special handling of builtin_function_or_method is removed as
@@ -512,8 +507,8 @@ def function_reduce(obj, globals_ref):
     ):
         return dynamic_function_reduce(obj, globals_ref=globals_ref)
 
-    # TODO:this is cleanable: the if/else conditions + the NotImplementedError
-    # cover all cases.
+    # this whole code section may be cleanable: the if/else conditions + the
+    # NotImplementedError look like they cover nearly all cases.
     else:
         # func is nested
         if lookedup_by_name is None or lookedup_by_name is not obj:
@@ -693,17 +688,12 @@ def hook(pickler, obj):
 class CloudPickler(Pickler):
     """Fast C Pickler extension with additional reducing routines
 
+       Cloudpickler's extensions exist into into:
 
-   Cloudpickler's extensions exist into into:
-
-   * it's dispatch_table containing methods that are called only if ALL
-     built-in saving functions were previously discarded.
-   * it's callback_dispatch, containing methods that are called only if ALL
-     built-in saving functions except save_global were previously discarded.
-
-    Both tables contains reducers, that take a single argument (obj), and
-    preturn a tuple with all the necessary data to re-construct obj.
-
+       * it's dispatch_table containing reducers that are called only if ALL
+         built-in saving functions were previously discarded.
+       * a special callback, invoked before standard function/class
+         builtin-saving method (save_global), to serialize dynamic functions
     """
 
     dispatch = {}
