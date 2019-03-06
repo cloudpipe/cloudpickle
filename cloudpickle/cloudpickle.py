@@ -519,7 +519,7 @@ class CloudPickler(Pickler):
         for attrname in ["_generate_next_value_", "_member_names_",
                          "_member_map_", "_member_type_",
                          "_value2member_map_"]:
-            clsdict.pop(attrname)
+            clsdict.pop(attrname, None)
         for member in members:
             clsdict.pop(member)
 
