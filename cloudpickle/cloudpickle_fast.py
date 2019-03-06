@@ -368,10 +368,7 @@ def classmethod_reduce(obj):
 
 def file_reduce(obj):
     """Save a file"""
-    try:
-        import StringIO as pystringIO  # we can't use cStringIO as it lacks the name attribute
-    except ImportError:
-        import io as pystringIO
+    import io
 
     if not hasattr(obj, "name") or not hasattr(obj, "mode"):
         raise pickle.PicklingError(
@@ -391,12 +388,13 @@ def file_reduce(obj):
         )
     if "r" not in obj.mode and "+" not in obj.mode:
         raise pickle.PicklingError(
-            "Cannot pickle files that are not opened for reading: %s" % obj.mode
+            "Cannot pickle files that are not opened for reading: %s"
+            % obj.mode
         )
 
     name = obj.name
 
-    retval = pystringIO.StringIO()
+    retval = io.StringIO()
 
     try:
         # Read the whole file
