@@ -509,12 +509,9 @@ class CloudPickler(Pickler):
         # Python 2.7 with enum34 can have no qualname:
         qualname = getattr(obj, "__qualname__", None)
 
-        # future compat: set to None for now but allow to be a dict with extra
-        # datastructures if needed in the future
-        extra = None
         self.save_reduce(_make_skeleton_enum,
                          (obj.__bases__, obj.__name__, qualname, members, doc,
-                          obj.__module__, _ensure_tracking(obj), extra),
+                          obj.__module__, _ensure_tracking(obj), None),
                          obj=obj)
 
         # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
@@ -597,7 +594,7 @@ class CloudPickler(Pickler):
             tp = type(obj)
             self.save_reduce(_make_skeleton_class,
                              (tp, obj.__name__, obj.__bases__, type_kwargs,
-                              _ensure_tracking(obj), {}),
+                              _ensure_tracking(obj), None),
                              obj=obj)
 
         # Now save the rest of obj's __dict__. Any references to obj
@@ -1188,8 +1185,8 @@ def _make_skeleton_class(type_constructor, name, bases, type_kwargs,
     definition under that id so that other instances stemming from the same
     class id will also reuse this class definition.
 
-    The extra variable is meant to be a dict use for forward compatibility
-    shall the need arise.
+    The "extra" variable is meant to be a dict (or None) that can be used for
+    forward compatibility shall the need arise.
     """
     skeleton_class = type_constructor(name, bases, type_kwargs)
     return _lookup_class_or_track(class_tracker_id, skeleton_class)
@@ -1215,7 +1212,20 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
 
 def _make_skeleton_enum(bases, name, qualname, members, doc, module,
                         class_tracker_id, extra):
-    # enum always inherit from their base Enum class at the last subclass
+    """Build dynamic enum with an empty __dict__ to be filled once memoized
+
+    The creation of the enum class is inspired by the code of
+    EnumMeta._create_.
+
+    If class_tracker_id is not None, try to lookup an existing enum definition
+    matching that id. If none is found, track a newly reconstructed enum
+    definition under that id so that other instances stemming from the same
+    class id will also reuse this enum definition.
+
+    The "extra" variable is meant to be a dict (or None) that can be used for
+    forward compatibility shall the need arise.
+    """
+    # enums always inherit from their base Enum class at the last subclass
     # position:
     enum_base = bases[-1]
     metacls = enum_base.__class__
