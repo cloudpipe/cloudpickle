@@ -533,6 +533,23 @@ class CloudPickler(Pickler):
         clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
         clsdict.pop('__weakref__', None)
 
+        # Filter inherited dict entries to make the pickle more lightweight
+        if len(obj.__bases__) == 1:
+            inherited_dict = obj.__bases__[0].__dict__
+        else:
+            inherited_dict = {}
+            for base in reversed(obj.__bases__):
+                inherited_dict.update(base.__dict__)
+        to_remove = []
+        for name, value in clsdict.items():
+            try:
+                if value is inherited_dict[name]:
+                    to_remove.append(name)
+            except KeyError:
+                pass
+        for name in to_remove:
+            clsdict.pop(name)
+
         # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
         # This is a fix which breaks the cache but this only makes the first
         # calls to issubclass slower.
