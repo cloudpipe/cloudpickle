@@ -190,7 +190,7 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
     try:
         with open(source_file, 'wb') as f:
             f.write(source_code.encode('utf-8'))
-        cmd = [sys.executable, source_file]
+        cmd = [sys.executable, '-W ignore', source_file]
         cwd, env = _make_cwd_env()
         kwargs = {
             'cwd': cwd,
