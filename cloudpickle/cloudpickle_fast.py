@@ -175,41 +175,39 @@ def _find_loaded_submodules(globals, closure, co_names):
     return referenced_submodules
 
 
-def extract_code_globals(code, globals):
+_extract_code_globals_cache = (
+    weakref.WeakKeyDictionary()
+    if not hasattr(sys, "pypy_version_info")
+    else {}
+)
+
+
+def extract_code_globals(code, globals_):
     """
     Find all globals names read or written to by codeblock co
     """
-    # XXX: there used to be a cache lookup based on the code object to get its
-    # corresponding global variable names. I removed it for the first version,
-    # I don't know if it is worth keeping it.
-    code_globals = {}
-    # PyPy "builtin-code" do not have this structure
-    if hasattr(code, "co_names"):
-        # first, find, potential submodules that are hard to identify
-        instructions = dis.get_instructions(code)
-        for ins in instructions:
-            varname = ins.argval
-            if ins.opcode in GLOBAL_OPS and varname in globals:
-                code_globals[varname] = globals[varname]
+    code_globals = _extract_code_globals_cache.get(code)
+    if code_globals is None:
+        code_globals = {}
+        # PyPy "builtin-code" do not have this structure
+        if hasattr(code, "co_names"):
+            # first, find, potential submodules that are hard to identify
+            instructions = dis.get_instructions(code)
+            for ins in instructions:
+                varname = ins.argval
+                if ins.opcode in GLOBAL_OPS and varname in globals_:
+                    code_globals[varname] = globals_[varname]
 
-        # co.co_consts refers to any constant variable used by co.
-        # lines such as print("foo") or a = 1 will result in a new addition to
-        # the co_consts tuple ("foo" or 1).
-        # However, name resolution is done at run-time, so assignment of the
-        # form a = b will not yield a new item in co_consts (as the compiler
-        # has no idea what b is at declaration time).
-
-        # Declaring a function inside another one using the "def ..." syntax
-        # generates a constant code object corresonding to the one of the
-        # nested function's. This code object is added into the co_consts
-        # attribute of the enclosing's function code. As the nested function
-        # may itself need global variables, we need to introspect its code,
-        # extract its globals, (look for code object in it's co_consts
-        # attribute..) and add the result to the global variables lists
-        if code.co_consts:
-            for c in code.co_consts:
-                if isinstance(c, types.CodeType):
-                    code_globals.update(extract_code_globals(c, globals))
+            # Declaring a function inside another one using the "def ..."
+            # syntax generates a constant code object corresonding to the one
+            # of the nested function's As the nested function may itself need
+            # global variables, we need to introspect its code, extract its
+            # globals, (look for code object in it's co_consts attribute..) and
+            # add the result to code_globals
+            if code.co_consts:
+                for c in code.co_consts:
+                    if isinstance(c, types.CodeType):
+                        code_globals.update(extract_code_globals(c, globals_))
 
     return code_globals
 
