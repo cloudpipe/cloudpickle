@@ -666,6 +666,13 @@ class CloudPickler(Pickler):
         # multiple invokations are bound to the same Cloudpickler.
         base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
 
+        if base_globals == {}:
+            # Add module attributes used to resolve relative imports
+            # instructions inside func.
+            for k in ["__package__", "__name__", "__path__", "__file__"]:
+                if k in func.__globals__:
+                    base_globals[k] = func.__globals__[k]
+
         return (code, f_globals, defaults, closure, dct, base_globals)
 
     def save_builtin_function(self, obj):
