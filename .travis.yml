@@ -73,7 +73,7 @@ install:
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
-            PROJECT_DIR="$PROJECT_DIR/test";
+            PROJECT_DIR="$PROJECT_DIR/tests";
         else
             pushd ..;
             PROJECT_DIR="../$PROJECT";
