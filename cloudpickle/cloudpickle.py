@@ -1259,8 +1259,8 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
     The "extra" variable is meant to be a dict (or None) that can be used for
     forward compatibility shall the need arise.
     """
-    # enums always inherit from their base Enum class at the last subclass
-    # position:
+    # enums always inherit from their base Enum class at the last position in
+    # the list of base classes:
     enum_base = bases[-1]
     metacls = enum_base.__class__
     _, first_enum = enum_base._get_mixins_(bases)
