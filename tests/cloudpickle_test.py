@@ -42,6 +42,7 @@ except ImportError:
 import cloudpickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
+from cloudpickle.cloudpickle import _extract_class_dict
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -69,6 +70,29 @@ def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
 def _escape(raw_filepath):
     # Ugly hack to embed filepaths in code templates for windows
     return raw_filepath.replace("\\", r"\\\\")
+
+
+def test_extract_class_dict():
+    class A(int):
+        def method(self):
+            return "a"
+
+    class B:
+        B_CONSTANT = 42
+
+        def method(self):
+            return "b"
+
+    class C(A, B):
+        C_CONSTANT = 43
+
+        def method_c(self):
+            return "c"
+
+    clsdict = _extract_class_dict(C)
+    assert sorted(clsdict.keys()) == ["C_CONSTANT", "method_c"]
+    assert clsdict["C_CONSTANT"] == 43
+    assert clsdict["method_c"](C()) == C().method_c()
 
 
 class CloudPickleTest(unittest.TestCase):

@@ -84,12 +84,18 @@ if sys.version_info[0] < 3:  # pragma: no branch
         from StringIO import StringIO
     string_types = (basestring,)  # noqa
     PY3 = False
+    PY2 = True
+    PY2_WRAPPER_DESCRIPTOR_TYPE = type(object.__init__)
+    PY2_METHOD_WRAPPER_TYPE = type(object.__eq__)
+    PY2_CLASS_DICT_BLACKLIST = (PY2_METHOD_WRAPPER_TYPE,
+                                PY2_WRAPPER_DESCRIPTOR_TYPE)
 else:
     types.ClassType = type
     from pickle import _Pickler as Pickler
     from io import BytesIO as StringIO
     string_types = (str,)
     PY3 = True
+    PY2 = False
 
 
 def _ensure_tracking(class_def):
@@ -144,7 +150,7 @@ def _make_cell_set_template_code():
     # NOTE: we are marking the cell variable as a free variable intentionally
     # so that we simulate an inner function instead of the outer function. This
     # is what gives us the ``nonlocal`` behavior in a Python 2 compatible way.
-    if not PY3:  # pragma: no branch
+    if PY2:  # pragma: no branch
         return types.CodeType(
             co.co_argcount,
             co.co_nlocals,
@@ -252,7 +258,7 @@ if sys.version_info < (3, 4):  # pragma: no branch
         global-referencing instructions in *code*.
         """
         code = getattr(code, 'co_code', b'')
-        if not PY3:  # pragma: no branch
+        if PY2:  # pragma: no branch
             code = map(ord, code)
 
         n = len(code)
@@ -282,6 +288,39 @@ else:
                 yield op, instr.arg
 
 
+def _extract_class_dict(cls):
+    """Retrieve a copy of the dict of a class without the inherited methods"""
+    clsdict = dict(cls.__dict__)  # copy dict proxy to a dict
+    if len(cls.__bases__) == 1:
+        inherited_dict = cls.__bases__[0].__dict__
+    else:
+        inherited_dict = {}
+        for base in reversed(cls.__bases__):
+            inherited_dict.update(base.__dict__)
+    to_remove = []
+    for name, value in clsdict.items():
+        try:
+            base_value = inherited_dict[name]
+            if value is base_value:
+                to_remove.append(name)
+            elif PY2:
+                # backward compat for Python 2
+                if hasattr(value, "im_func"):
+                    if value.im_func is getattr(base_value, "im_func", None):
+                        to_remove.append(name)
+                elif isinstance(value, PY2_CLASS_DICT_BLACKLIST):
+                    # On Python 2 we have no way to pickle those specific
+                    # methods types nor to check that they are actually
+                    # inherited. So we assume that they are always inherited
+                    # from builtin types.
+                    to_remove.append(name)
+        except KeyError:
+            pass
+    for name in to_remove:
+        clsdict.pop(name)
+    return clsdict
+
+
 class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
@@ -309,7 +348,7 @@ class CloudPickler(Pickler):
 
     dispatch[memoryview] = save_memoryview
 
-    if not PY3:  # pragma: no branch
+    if PY2:  # pragma: no branch
         def save_buffer(self, obj):
             self.save(str(obj))
 
@@ -530,25 +569,8 @@ class CloudPickler(Pickler):
         functions, or that otherwise can't be serialized as attribute lookups
         from global modules.
         """
-        clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
+        clsdict = _extract_class_dict(obj)
         clsdict.pop('__weakref__', None)
-
-        # Filter inherited dict entries to make the pickle more lightweight
-        if len(obj.__bases__) == 1:
-            inherited_dict = obj.__bases__[0].__dict__
-        else:
-            inherited_dict = {}
-            for base in reversed(obj.__bases__):
-                inherited_dict.update(base.__dict__)
-        to_remove = []
-        for name, value in clsdict.items():
-            try:
-                if value is inherited_dict[name]:
-                    to_remove.append(name)
-            except KeyError:
-                pass
-        for name in to_remove:
-            clsdict.pop(name)
 
         # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
         # This is a fix which breaks the cache but this only makes the first
@@ -854,7 +876,7 @@ class CloudPickler(Pickler):
         save(stuff)
         write(pickle.BUILD)
 
-    if not PY3:  # pragma: no branch
+    if PY2:  # pragma: no branch
         dispatch[types.InstanceType] = save_inst
 
     def save_property(self, obj):
