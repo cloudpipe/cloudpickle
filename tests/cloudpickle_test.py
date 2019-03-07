@@ -74,10 +74,12 @@ def _escape(raw_filepath):
 
 def test_extract_class_dict():
     class A(int):
+        """A docstring"""
         def method(self):
             return "a"
 
     class B:
+        """B docstring"""
         B_CONSTANT = 42
 
         def method(self):
@@ -90,8 +92,9 @@ def test_extract_class_dict():
             return "c"
 
     clsdict = _extract_class_dict(C)
-    assert sorted(clsdict.keys()) == ["C_CONSTANT", "method_c"]
+    assert sorted(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
     assert clsdict["C_CONSTANT"] == 43
+    assert clsdict["__doc__"] is None
     assert clsdict["method_c"](C()) == C().method_c()
 
 

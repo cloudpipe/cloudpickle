@@ -540,16 +540,11 @@ class CloudPickler(Pickler):
         """
         members = dict((e.name, e.value) for e in obj)
 
-        if obj.__doc__ is not obj.__base__.__doc__:
-            doc = obj.__doc__
-        else:
-            doc = None
-
         # Python 2.7 with enum34 can have no qualname:
         qualname = getattr(obj, "__qualname__", None)
 
         self.save_reduce(_make_skeleton_enum,
-                         (obj.__bases__, obj.__name__, qualname, members, doc,
+                         (obj.__bases__, obj.__name__, qualname, members,
                           obj.__module__, _ensure_tracking(obj), None),
                          obj=obj)
 
@@ -1249,7 +1244,7 @@ def _rehydrate_skeleton_class(skeleton_class, class_dict):
     return skeleton_class
 
 
-def _make_skeleton_enum(bases, name, qualname, members, doc, module,
+def _make_skeleton_enum(bases, name, qualname, members, module,
                         class_tracker_id, extra):
     """Build dynamic enum with an empty __dict__ to be filled once memoized
 
@@ -1280,8 +1275,6 @@ def _make_skeleton_enum(bases, name, qualname, members, doc, module,
     if qualname is not None:
         enum_class.__qualname__ = qualname
 
-    if doc is not None:
-        enum_class.__doc__ = doc
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
