@@ -52,6 +52,7 @@ matrix:
            PROJECT_URL=https://github.com/ray-project/ray.git
            PYTEST_ARGS="--duration=10"
       python: 3.7
+      if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
