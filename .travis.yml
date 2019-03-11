@@ -3,9 +3,9 @@ dist: xenial
 
 matrix:
   include:
-    # - os: windows
-    #   language: sh
-    #   env: PYTHON_ROOT="/c/Python37" PYTHON_CHOCO_PKG="python3"
+    - os: windows
+      language: sh
+      env: PYTHON_ROOT="/c/Python37" PYTHON_CHOCO_PKG="python3"
     # - os: windows
     #   language: sh
     #   env: PYTHON_ROOT="/c/Python27" PYTHON_CHOCO_PKG="python2"
