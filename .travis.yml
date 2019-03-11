@@ -74,7 +74,7 @@ install:
             pushd ..;
             git clone $PROJECT_URL;
             pushd ray/examples/cython;
-            pip install -e .;
+            pip install -e . ;
             popd;
             rm -rf ray;
             popd;
