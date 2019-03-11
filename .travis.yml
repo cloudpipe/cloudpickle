@@ -48,7 +48,7 @@ matrix:
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil flaky networkx tensorflow"
+      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil flaky networkx tensorflow scipy"
            PROJECT_URL=https://github.com/ray-project/ray.git
            PYTEST_ARGS="--duration=10"
       python: 3.7
@@ -70,12 +70,21 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         if [[ $PROJECT == "ray" ]]; then
+            # Install cython_examples
+            pushd ..;
+            git clone $PROJECT_URL;
+            pushd ray/examples/cython;
+            pip install -e .;
+            popd;
+            rm -rf ray;
+            popd;
+
+            # Install ray
             pip install ray;
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
             PROJECT_DIR="$PROJECT_DIR/tests";
-            rm $PROJECT_DIR/test_cython.py;
         else
             pushd ..;
             PROJECT_DIR="../$PROJECT";
