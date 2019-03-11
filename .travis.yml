@@ -70,15 +70,13 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         if [[ $PROJECT == "ray" ]]; then
-            # Install cython_examples
             pushd ..;
             git clone $PROJECT_URL;
             pushd ray/examples/cython;
             python setup.py install;
             popd;
-            rm -rf ray;
+            rm -rf ray/;
             popd;
-            # Install ray
             pip install ray;
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
