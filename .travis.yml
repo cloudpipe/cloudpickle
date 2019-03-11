@@ -50,7 +50,7 @@ matrix:
     - os: linux
       env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil flaky networkx tensorflow"
            PROJECT_URL=https://github.com/ray-project/ray.git
-           PYTEST_ARGS="--ignore=test_cython.py  --duration=10"
+           PYTEST_ARGS="--duration=10"
       python: 3.7
 
 before_install:
@@ -74,6 +74,7 @@ install:
             rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
             cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
             PROJECT_DIR="$PROJECT_DIR/tests";
+            rm $PROJECT_DIR/test_cython.py;
         else
             pushd ..;
             PROJECT_DIR="../$PROJECT";
