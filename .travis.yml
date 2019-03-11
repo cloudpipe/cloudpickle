@@ -48,7 +48,7 @@ matrix:
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil flaky networkx tensorflow scipy"
+      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil flaky networkx tensorflow scipy Cython==0.29"
            PROJECT_URL=https://github.com/ray-project/ray.git
            PYTEST_ARGS="--duration=10"
       python: 3.7
