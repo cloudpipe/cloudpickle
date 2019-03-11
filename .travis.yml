@@ -74,11 +74,10 @@ install:
             pushd ..;
             git clone $PROJECT_URL;
             pushd ray/examples/cython;
-            pip install -e . ;
+            pip install -e ./;
             popd;
             rm -rf ray;
             popd;
-
             # Install ray
             pip install ray;
             PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
