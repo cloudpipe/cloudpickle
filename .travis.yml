@@ -48,11 +48,25 @@ matrix:
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil flaky networkx tensorflow scipy Cython==0.29"
+      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil"
            PROJECT_URL=https://github.com/ray-project/ray.git
-           PYTEST_ARGS="--duration=10"
+           PYTEST_ARGS="--duration=10 -k test_mini or test_basic"
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
+      install:
+        - pip install .
+        - pip install --upgrade -r dev-requirements.txt
+        - pip install tornado
+        - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
+              pip install numpy scipy;
+          fi
+        - pip install $TEST_REQUIREMENTS;
+        - pip install ray==0.6.4;
+        - PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
+        - rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
+        - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
+        - PROJECT_DIR="$PROJECT_DIR/tests";
+        - pip list
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
@@ -69,31 +83,16 @@ install:
     fi
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
-        if [[ $PROJECT == "ray" ]]; then
-            pushd ..;
-            git clone $PROJECT_URL;
-            pushd ray/examples/cython;
-            python setup.py install;
-            popd;
-            rm -rf ray/;
-            popd;
-            pip install ray;
-            PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
-            rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
-            cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
-            PROJECT_DIR="$PROJECT_DIR/tests";
-        else
-            pushd ..;
-            PROJECT_DIR="../$PROJECT";
-            git clone $PROJECT_URL;
-            if [[ $PROJECT == "joblib" ]]; then
-                pushd joblib/joblib/externals;
-                source vendor_cloudpickle.sh ../../../cloudpickle;
-                popd;
-            fi;
-            pip install ./$PROJECT;
+        pushd ..;
+        PROJECT_DIR="../$PROJECT";
+        git clone $PROJECT_URL;
+        if [[ $PROJECT == "joblib" ]]; then
+            pushd joblib/joblib/externals;
+            source vendor_cloudpickle.sh ../../../cloudpickle;
             popd;
         fi;
+        pip install ./$PROJECT;
+        popd;
     fi
   - pip list
 before_script:
