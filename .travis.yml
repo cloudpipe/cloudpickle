@@ -67,6 +67,15 @@ matrix:
         - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
         - PROJECT_DIR="$PROJECT_DIR/tests";
         - pip list
+      script:
+        - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+        - pushd $PROJECT_DIR
+        - pytest -vl --duration=10 $PROJECT_DIR/test_mini.py $PROJECT_DIR/test_basic.py
+        - TEST_RETURN_CODE=$?
+        - if [[ "$TEST_RETURN_CODE" != "0" ]]; then
+            exit $TEST_RETURN_CODE
+          fi
+        - popd
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
@@ -105,7 +114,7 @@ script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
     if [[ $PROJECT != "" ]]; then
-      pushd $PROJECT_DIR
+      pushd "../$PROJECT"
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
       if [[ "$PYTEST_ARGS" != "" ]]; then
