@@ -93,7 +93,6 @@ install:
   - if [[ $PROJECT != "" ]]; then
         pip install $TEST_REQUIREMENTS;
         pushd ..;
-        PROJECT_DIR="../$PROJECT";
         git clone $PROJECT_URL;
         if [[ $PROJECT == "joblib" ]]; then
             pushd joblib/joblib/externals;
@@ -114,7 +113,7 @@ script:
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
   - |
     if [[ $PROJECT != "" ]]; then
-      pushd "../$PROJECT"
+      pushd ../$PROJECT
       # pytest hangs if given an empty quoted string (it will happen
       # if PYTEST_ARGS was not defined) so we have to split the cases.
       if [[ "$PYTEST_ARGS" != "" ]]; then
@@ -123,10 +122,10 @@ script:
         pytest -vl
       fi
       TEST_RETURN_CODE=$?
+      popd
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
         exit $TEST_RETURN_CODE
       fi
-      popd
     fi
 after_success:
   - coverage combine --append
