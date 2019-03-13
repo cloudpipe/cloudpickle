@@ -71,8 +71,8 @@ matrix:
         - pytest -vl --duration=10 $PROJECT_DIR/test_mini.py
         - TEST_RETURN_CODE=$?
         - if [[ "$TEST_RETURN_CODE" != "0" ]]; then
-            exit $TEST_RETURN_CODE
-          fi
+            exit $TEST_RETURN_CODE;
+          fi;
         - popd
 
 before_install:
