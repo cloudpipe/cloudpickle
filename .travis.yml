@@ -54,10 +54,6 @@ matrix:
       install:
         - pip install .
         - pip install --upgrade -r dev-requirements.txt
-        - pip install tornado
-        - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
-              pip install numpy scipy;
-          fi
         - pip install $TEST_REQUIREMENTS;
         - pip install ray==0.6.4;
         - PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
