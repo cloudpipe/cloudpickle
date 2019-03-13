@@ -48,9 +48,7 @@ matrix:
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle hypothesis psutil"
-           PROJECT_URL=https://github.com/ray-project/ray.git
-           PYTEST_ARGS="--duration=10 -k test_mini or test_basic"
+      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle psutil"
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
       install:
@@ -70,7 +68,7 @@ matrix:
       script:
         - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
         - pushd $PROJECT_DIR
-        - pytest -vl --duration=10 $PROJECT_DIR/test_mini.py $PROJECT_DIR/test_basic.py
+        - pytest -vl --duration=10 $PROJECT_DIR/test_mini.py
         - TEST_RETURN_CODE=$?
         - if [[ "$TEST_RETURN_CODE" != "0" ]]; then
             exit $TEST_RETURN_CODE
