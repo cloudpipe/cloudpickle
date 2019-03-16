@@ -260,6 +260,7 @@ class CloudPickler(Pickler):
         Pickler.__init__(self, file, protocol=protocol)
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
+        raise ValueError("Test Bug")
 
     def dump(self, obj):
         self.inject_addons()
