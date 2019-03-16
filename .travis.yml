@@ -48,28 +48,20 @@ matrix:
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
     - os: linux
-      env: PROJECT=ray TEST_REQUIREMENTS="setproctitle psutil"
+      env: PROJECT=ray
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
       install:
-        - pip install .
         - pip install --upgrade -r dev-requirements.txt
-        - pip install $TEST_REQUIREMENTS;
-        - pip install ray==0.6.4;
-        - PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")";
-        - rm $PROJECT_DIR/cloudpickle/cloudpickle.py;
-        - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py;
-        - PROJECT_DIR="$PROJECT_DIR/tests";
+        - pip install setproctitle psutil ray==0.6.4
+        - PROJECT_DIR="$(python -c "import os,ray,sys;print(os.path.dirname(ray.__file__));sys.stdout.flush()")"
+        - rm $PROJECT_DIR/cloudpickle/cloudpickle.py
+        - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
+        - PROJECT_DIR="$PROJECT_DIR/tests"
         - pip list
       script:
         - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-        - pushd $PROJECT_DIR
         - pytest -vl --duration=10 $PROJECT_DIR/test_mini.py
-        - TEST_RETURN_CODE=$?
-        - popd
-        - if [[ "$TEST_RETURN_CODE" != "0" ]]; then
-            exit $TEST_RETURN_CODE
-          fi
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
