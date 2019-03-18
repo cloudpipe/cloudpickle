@@ -59,7 +59,7 @@ matrix:
         - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
       script:
         - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-        - pytest -vl --duration=10 $PROJECT_DIR/tests/test_mini.py
+        - pytest -vl --duration=10 $PROJECT_DIR/tests/test_basic.py
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
