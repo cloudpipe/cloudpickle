@@ -53,7 +53,7 @@ matrix:
       if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
       install:
         - pip install --upgrade -r dev-requirements.txt
-        - pip install setproctitle psutil ray==0.6.4
+        - pip install setproctitle psutil py-spy ray==0.6.4
         - PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
         - rm $PROJECT_DIR/cloudpickle/cloudpickle.py
         - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
