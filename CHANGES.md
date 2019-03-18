@@ -1,3 +1,10 @@
+0.8.1
+=====
+
+- Fix a bug (already present before 0.5.3 and re-introduced in 0.8.0)
+  affecting relative import instructions inside depickled functions
+  ([issue #254](https://github.com/cloudpipe/cloudpickle/pull/254))
+
 0.8.0
 =====
 
