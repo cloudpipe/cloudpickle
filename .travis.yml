@@ -47,6 +47,23 @@ matrix:
            PROJECT_URL=https://github.com/joblib/joblib.git
       python: 3.7
       if: commit_message =~ /(\[ci downstream\]|\[ci joblib\])/
+    - os: linux
+      env: PROJECT=ray
+      python: 3.7
+      if: commit_message =~ /(\[ci downstream\]|\[ci ray\])/
+      install:
+        - pip install --upgrade -r dev-requirements.txt
+        - pip install setproctitle psutil ray==0.6.4
+        - PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
+        - rm $PROJECT_DIR/cloudpickle/cloudpickle.py
+        - cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
+      script:
+        - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+        - pytest -vl $PROJECT_DIR/tests/test_basic.py::test_simple_serialization
+        - pytest -vl $PROJECT_DIR/tests/test_basic.py::test_complex_serialization
+        - pytest -vl $PROJECT_DIR/tests/test_basic.py::test_ray_recursive_objects
+        - pytest -vl $PROJECT_DIR/tests/test_basic.py::test_serialization_final_fallback
+        - pytest -vl $PROJECT_DIR/tests/test_recursion.py
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
