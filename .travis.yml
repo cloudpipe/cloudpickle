@@ -26,14 +26,14 @@ matrix:
       # each project, a matrix item is created, that will run the $PROJECT
       # test suite with the latest cloudpickle, to check for breaking changes
       # introduced by cloudpickle.
-      # The tests ignored by the negative -k flag are known to also fail on
-      # the main dask distributed CI servers.
+      # The tests ignored by the negative -k flag are known to also be flaky on
+      # the main dask-distributed CI servers with stable versions of cloudpickle.
       python: 3.7
       sudo: required
       env: PROJECT=distributed
            TEST_REQUIREMENTS="pytest pytest-timeout numpy pandas mock bokeh"
            PROJECT_URL=https://github.com/dask/distributed.git
-           PYTEST_ADDOPTS="--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_defaults and not test_service_hosts and not test_logging_file_config\""
+           PYTEST_ADDOPTS="--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory\""
       if: commit_message =~ /(\[ci downstream\]|\[ci distributed\])/
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
