@@ -1263,7 +1263,6 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
     # the list of base classes:
     enum_base = bases[-1]
     metacls = enum_base.__class__
-    _, first_enum = enum_base._get_mixins_(bases)
     classdict = metacls.__prepare__(name, bases)
 
     for member_name, member_value in members.items():
