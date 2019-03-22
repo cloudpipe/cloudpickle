@@ -1368,6 +1368,30 @@ class CloudPickleTest(unittest.TestCase):
         pickle_depickle(DataClass, protocol=self.protocol)
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
+    def test_relative_import_inside_function(self):
+        # Make sure relative imports inside round-tripped functions is not
+        # broken.This was a bug in cloudpickle versions <= 0.5.3 and was
+        # re-introduced in 0.8.0.
+
+        # Both functions living inside modules and packages are tested.
+        def f():
+            # module_function belongs to mypkg.mod1, which is a module
+            from .mypkg import module_function
+            return module_function()
+
+        def g():
+            # package_function belongs to mypkg, which is a package
+            from .mypkg import package_function
+            return package_function()
+
+        for func, source in zip([f, g], ["module", "package"]):
+            # Make sure relative imports are initially working
+            assert func() == "hello from a {}!".format(source)
+
+            # Make sure relative imports still work after round-tripping
+            cloned_func = pickle_depickle(func, protocol=self.protocol)
+            assert cloned_func() == "hello from a {}!".format(source)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
