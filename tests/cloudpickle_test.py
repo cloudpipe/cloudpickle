@@ -1076,7 +1076,11 @@ class CloudPickleTest(unittest.TestCase):
         # some setup is required to allow pytest apimodules to be correctly
         # serializable.
         from cloudpickle import CloudPickler
-        CloudPickler.dispatch[type(py.builtin)] = cloudpickle.module_reduce
+        if sys.version_info[:2] >= (3, 8):
+            CloudPickler.dispatch[type(py.builtin)] = cloudpickle.module_reduce
+        else:
+            CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
+
         g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
 
         result = g()
