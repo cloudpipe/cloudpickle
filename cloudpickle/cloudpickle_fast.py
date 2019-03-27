@@ -469,7 +469,9 @@ def class_reduce(obj):
             return dynamic_class_reduce(obj)
 
     else:
-        # if pickle.dumps worked out fine, then simply pickle by attribute
+        # if pickle.dumps worked out fine, then simply fallback to the
+        # traditional pickle by attribute # implemented in the builtin
+        # `Pickler.save_global`.
         return NotImplementedError
 
 
