@@ -8,6 +8,7 @@ python versions 3.8+, a lot of backward-compatibilty code is also removed.
 import abc
 import dis
 import io
+import itertools
 import logging
 import opcode
 import _pickle
@@ -19,8 +20,9 @@ import weakref
 from _pickle import Pickler
 
 from .cloudpickle import (
-    islambda, _is_dynamic, GLOBAL_OPS, _BUILTIN_TYPE_CONSTRUCTORS,
-    _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL
+    islambda, _is_dynamic, extract_code_globals, GLOBAL_OPS,
+    _BUILTIN_TYPE_CONSTRUCTORS, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
+    _find_loaded_submodules, _get_cell_contents
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -58,111 +60,6 @@ def dumps(obj, protocol=None):
         return file.getvalue()
     finally:
         file.close()
-
-
-# Utility functions introspecting objects to extract useful properties about
-# them.
-def _find_loaded_submodules(globals, closure, co_names):
-    """
-    Find submodules used by a function but not listed in its globals.
-
-    In the example below:
-
-    ```
-    import xml.etree
-    import cloudpickle
-
-
-    def func():
-        x = xml.etree.ElementTree
-
-
-    if __name__ == '__main__':
-        cloudpickle.dumps(func)
-    ```
-
-    the expression xml.etree.ElementTree generates a LOAD_GLOBAL for xml, but
-    simply LOAD_ATTR for etree and ElementTree - cloudpickle cannot detect
-    such submodules by bytecode inspection. There is actually no exact way of
-    detecting them, the method below is simply "good enough". For instance:
-
-    import xml.etree
-
-    def f():
-        def g():
-            return xml.etree
-        return g
-
-    pickling f and trying to call f()() will raise a NameError
-
-    """
-
-    referenced_submodules = {}
-    top_level_dependencies = list(globals.values())
-    for cell in closure:
-        try:
-            top_level_dependencies.append(cell.cell_contents)
-        except ValueError:
-            continue
-
-    # top_level_dependencies are variables that generated a LOAD_GlOBAL or a
-    # LOAD_DEREF opcode in code.
-    for x in top_level_dependencies:
-        if (
-            isinstance(x, types.ModuleType)
-            and getattr(x, "__package__", None) is not None
-        ):
-            # check if the package has any currently loaded sub-imports
-            prefix = x.__name__ + "."
-            # A concurrent thread could mutate sys.modules,
-            # make sure we iterate over a copy to avoid exceptions
-            for name in list(sys.modules):
-                # Older versions of pytest will add a "None" module to
-                # sys.modules.
-                if name is not None and name.startswith(prefix):
-                    # check whether the function can address the sub-module
-                    tokens = set(name[len(prefix) :].split("."))
-                    if not tokens - set(co_names):
-                        # ensure unpickler executes this import
-                        referenced_submodules[name] = sys.modules[name]
-    return referenced_submodules
-
-
-_extract_code_globals_cache = (
-    weakref.WeakKeyDictionary()
-    if not hasattr(sys, "pypy_version_info")
-    else {}
-)
-
-
-def extract_code_globals(code, globals_):
-    """
-    Find all globals names read or written to by codeblock co
-    """
-    code_globals = _extract_code_globals_cache.get(code)
-    if code_globals is None:
-        code_globals = {}
-        # PyPy "builtin-code" do not have this structure
-        if hasattr(code, "co_names"):
-            # first, find, potential submodules that are hard to identify
-            instructions = dis.get_instructions(code)
-            for ins in instructions:
-                varname = ins.argval
-                if ins.opcode in GLOBAL_OPS and varname in globals_:
-                    code_globals[varname] = globals_[varname]
-
-            # Declaring a function inside another one using the "def ..."
-            # syntax generates a constant code object corresonding to the one
-            # of the nested function's As the nested function may itself need
-            # global variables, we need to introspect its code, extract its
-            # globals, (look for code object in it's co_consts attribute..) and
-            # add the result to code_globals
-            if code.co_consts:
-                for c in code.co_consts:
-                    if isinstance(c, types.CodeType):
-                        code_globals.update(extract_code_globals(c, globals_))
-
-    return code_globals
 
 
 # COLLECTION OF OBJECTS __getnewargs__-LIKE METHODS
@@ -254,12 +151,18 @@ def function_getstate(func):
         "__closure__": func.__closure__,
     }
 
-    f_globals = extract_code_globals(func.__code__, func.__globals__)
+    f_globals_ref = extract_code_globals(func.__code__)
+    f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
+                 func.__globals__}
+
+    closure_values = (
+        list(map(_get_cell_contents, func.__closure__))
+        if func.__closure__ is not None else ()
+    )
 
     # extract submodules referenced by attribute lookup (no global opcode)
     f_globals["__submodules__"] = _find_loaded_submodules(
-        f_globals, slotstate["__closure__"] or (), func.__code__.co_names
-    )
+        func.__code__, itertools.chain(f_globals.values(), closure_values))
     slotstate["__globals__"] = f_globals
 
     state = func.__dict__

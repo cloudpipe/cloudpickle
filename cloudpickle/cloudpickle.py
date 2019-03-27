@@ -681,10 +681,16 @@ class CloudPickler(Pickler):
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
-        self._save_subimports(
+        subimports = _find_loaded_submodules(
             code,
             itertools.chain(f_globals.values(), closure_values or ()),
         )
+        for s in subimports:
+            # ensure that subimport s is loaded at unpickling time
+            self.save(s)
+            # then discards the reference to it
+            self.write(pickle.POP)
+
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
@@ -746,7 +752,7 @@ class CloudPickler(Pickler):
         code = func.__code__
 
         # extract all global ref's
-        func_global_refs = self.extract_code_globals(code)
+        func_global_refs = extract_code_globals(code)
 
         # process all variables referenced by global environment
         f_globals = {}
