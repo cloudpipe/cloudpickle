@@ -646,10 +646,16 @@ class CloudPickler(Pickler):
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
-        self._save_subimports(
+        subimports = _find_loaded_submodules(
             code,
             itertools.chain(f_globals.values(), closure_values or ()),
         )
+        for s in subimports:
+            # ensure that subimport s is loaded at unpickling time
+            self.save(s)
+            # then discards the reference to it
+            self.write(pickle.POP)
+
 
         # create a skeleton function object and memoize it
         save(_make_skel_func)
@@ -681,36 +687,6 @@ class CloudPickler(Pickler):
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
-    _extract_code_globals_cache = (
-        weakref.WeakKeyDictionary()
-        if not hasattr(sys, "pypy_version_info")
-        else {})
-
-    @classmethod
-    def extract_code_globals(cls, co):
-        """
-        Find all globals names read or written to by codeblock co
-        """
-        out_names = cls._extract_code_globals_cache.get(co)
-        if out_names is None:
-            try:
-                names = co.co_names
-            except AttributeError:
-                # PyPy "builtin-code" object
-                out_names = set()
-            else:
-                out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
-
-                # see if nested function have any global refs
-                if co.co_consts:
-                    for const in co.co_consts:
-                        if type(const) is types.CodeType:
-                            out_names |= cls.extract_code_globals(const)
-
-            cls._extract_code_globals_cache[co] = out_names
-
-        return out_names
-
     def extract_func_data(self, func):
         """
         Turn the function into a tuple of data necessary to recreate it:
@@ -719,7 +695,7 @@ class CloudPickler(Pickler):
         code = func.__code__
 
         # extract all global ref's
-        func_global_refs = self.extract_code_globals(code)
+        func_global_refs = extract_code_globals(code)
 
         # process all variables referenced by global environment
         f_globals = {}
