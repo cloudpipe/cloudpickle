@@ -1077,7 +1077,9 @@ class CloudPickleTest(unittest.TestCase):
         # serializable.
         from cloudpickle import CloudPickler
         if sys.version_info[:2] >= (3, 8):
-            CloudPickler.dispatch[type(py.builtin)] = cloudpickle.module_reduce
+            from cloudpickle import cloudpickle_fast as cp_fast
+            CloudPickler.dispatch[
+                type(py.builtin)] = cp_fast._module_reduce
         else:
             CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
 

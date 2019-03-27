@@ -66,7 +66,7 @@ def dumps(obj, protocol=None):
 # -------------------------------------------------
 
 
-def function_getnewargs(func, globals_ref):
+def _function_getnewargs(func, globals_ref):
     code = func.__code__
 
     # base_globals represents the future global namespace of func at
@@ -109,31 +109,31 @@ def function_getnewargs(func, globals_ref):
 # Fortunately, many non-accessible builtin-types are mirrored in the types
 # module. For those types, we pickle the function builtin_type_reconstructor
 # instead, that contains instruction to look them up via the types module.
-def builtin_type_reconstructor(name):
+def _builtin_type_reconstructor(name):
     """Return a builtin-type using attribute lookup from the types module"""
     return getattr(types, name)
 
 
 # XXX: what does "not working as desired" means?
 # hack for __import__ not working as desired
-def module_reconstructor(name):
+def _module_reconstructor(name):
     __import__(name)
     return sys.modules[name]
 
 
-def dynamic_module_reconstructor(name, vars):
+def _dynamic_module_reconstructor(name, vars):
     mod = types.ModuleType(name)
     mod.__dict__.update(vars)
     return mod
 
 
-def file_reconstructor(retval):
+def _file_reconstructor(retval):
     return retval
 
 
 # COLLECTION OF OBJECTS STATE GETTERS
 # -----------------------------------
-def function_getstate(func):
+def _function_getstate(func):
     # - Put func's dynamic attributes (stored in func.__dict__) in state. These
     #   attributes will be restored at unpickling time using
     #   f.__dict__.update(state)
@@ -184,11 +184,11 @@ def function_getstate(func):
 # to pass even without them
 
 
-def builtin_type_reduce(obj):
-    return builtin_type_reconstructor, (_BUILTIN_TYPE_NAMES[obj],)
+def _builtin_type_reduce(obj):
+    return _builtin_type_reconstructor, (_BUILTIN_TYPE_NAMES[obj],)
 
 
-def code_reduce(obj):
+def _code_reduce(obj):
     """codeobject reducer"""
     args = (
         obj.co_argcount,
@@ -210,7 +210,7 @@ def code_reduce(obj):
     return types.CodeType, args
 
 
-def cell_reduce(obj):
+def _cell_reduce(obj):
     """Cell (containing values of a function's free variables) reducer"""
     try:
         obj.cell_contents
@@ -220,12 +220,12 @@ def cell_reduce(obj):
         return types.CellType, (obj.cell_contents,)
 
 
-def classmethod_reduce(obj):
+def _classmethod_reduce(obj):
     orig_func = obj.__func__
     return type(obj), (orig_func,)
 
 
-def file_reduce(obj):
+def _file_reduce(obj):
     """Save a file"""
     import io
 
@@ -269,51 +269,51 @@ def file_reduce(obj):
     retval.seek(curloc)
 
     retval.name = name
-    return file_reconstructor, (retval,)
+    return _file_reconstructor, (retval,)
 
 
-def mappingproxy_reduce(obj):
+def _mappingproxy_reduce(obj):
     return types.MappingProxyType, (dict(obj),)
 
 
-def memoryview_reduce(obj):
+def _memoryview_reduce(obj):
     return bytes, (obj.tobytes(),)
 
 
-def module_reduce(obj):
+def _module_reduce(obj):
     if _is_dynamic(obj):
-        return dynamic_module_reconstructor, (obj.__name__, vars(obj))
+        return _dynamic_module_reconstructor, (obj.__name__, vars(obj))
     else:
-        return module_reconstructor, (obj.__name__,)
+        return _module_reconstructor, (obj.__name__,)
 
 
-def method_reduce(obj):
+def _method_reduce(obj):
     return (types.MethodType, (obj.__func__, obj.__self__))
 
 
-def logger_reduce(obj):
+def _logger_reduce(obj):
     return logging.getLogger, (obj.name,)
 
 
-def root_logger_reduce(obj):
+def _root_logger_reduce(obj):
     return logging.getLogger, ()
 
 
-def weakset_reduce(obj):
+def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
 
-def dynamic_function_reduce(func, globals_ref):
+def _dynamic_function_reduce(func, globals_ref):
     """Reduce a function that is not pickleable via attribute loookup.
     """
     # XXX: should globals_ref be a global variable instead? The reason is
     # purely cosmetic.
-    newargs = function_getnewargs(func, globals_ref)
-    state = function_getstate(func)
-    return types.FunctionType, newargs, state, None, None, function_setstate
+    newargs = _function_getnewargs(func, globals_ref)
+    state = _function_getstate(func)
+    return types.FunctionType, newargs, state, None, None, _function_setstate
 
 
-def function_reduce(obj, globals_ref):
+def _function_reduce(obj, globals_ref):
     """Select the reducer depending on obj's dynamic nature
 
     This functions starts by replicating save_global: trying to retrieve obj
@@ -372,17 +372,17 @@ def function_reduce(obj, globals_ref):
         or getattr(obj.__code__, "co_filename", None) == "<stdin>"
         or themodule is None
     ):
-        return dynamic_function_reduce(obj, globals_ref=globals_ref)
+        return _dynamic_function_reduce(obj, globals_ref=globals_ref)
 
     # this whole code section may be cleanable: the if/else conditions + the
     # NotImplementedError look like they cover nearly all cases.
     else:
         # func is nested
         if lookedup_by_name is None or lookedup_by_name is not obj:
-            return dynamic_function_reduce(obj, globals_ref=globals_ref)
+            return _dynamic_function_reduce(obj, globals_ref=globals_ref)
 
 
-def dynamic_class_reduce(obj):
+def _dynamic_class_reduce(obj):
     """
     Save a class that can't be stored as module global.
 
@@ -439,17 +439,17 @@ def dynamic_class_reduce(obj):
         (clsdict, {}),
         None,
         None,
-        class_setstate,
+        _class_setstate,
     )
 
 
-def class_reduce(obj):
+def _class_reduce(obj):
     """Select the reducer depending on the dynamic nature of the class obj"""
     # XXX: there used to be special handling for NoneType, EllipsisType and
     # NotImplementedType. As for now this module handles only python3.8+, this
     # code has been removed.
     if obj.__module__ == "__main__":
-        return dynamic_class_reduce(obj)
+        return _dynamic_class_reduce(obj)
 
     try:
         # All classes are caught in this function: pickleable classes are
@@ -462,11 +462,11 @@ def class_reduce(obj):
         # is python 2 specific.
         if obj.__module__ == "builtins":
             if obj in _BUILTIN_TYPE_NAMES:
-                return builtin_type_reduce(obj)
+                return _builtin_type_reduce(obj)
 
         typ = type(obj)
         if typ is not obj and isinstance(obj, type):  # noqa: E721
-            return dynamic_class_reduce(obj)
+            return _dynamic_class_reduce(obj)
 
     else:
         # if pickle.dumps worked out fine, then simply fallback to the
@@ -481,7 +481,7 @@ def class_reduce(obj):
 # it has to be updated to how it was at unpickling time.
 
 
-def function_setstate(obj, state, slotstate):
+def _function_setstate(obj, state, slotstate):
     """Update the state of a dynaamic function.
 
     As __closure__ and __globals__ are readonly attributes of a function, we
@@ -510,7 +510,7 @@ def function_setstate(obj, state, slotstate):
         setattr(obj, k, v)
 
 
-def class_setstate(obj, state, slotstate):
+def _class_setstate(obj, state, slotstate):
     registry = None
     for attrname, attr in state.items():
         if attrname == "_abc_impl":
@@ -529,7 +529,7 @@ def class_setstate(obj, state, slotstate):
 # This set of functions aim at deciding whether an object can be properly
 # pickler by the c Pickler, or if it needs to be serialized using cloudpickle's
 # reducers.
-def reduce_global(pickler, obj):
+def _reduce_global(pickler, obj):
     """Custom reducing callback for functions and classes
 
     This function is the analog of a custom save_global. However, the C Pickler
@@ -552,9 +552,9 @@ def reduce_global(pickler, obj):
         is_metaclass = False
 
     if is_metaclass:
-        return class_reduce(obj)
+        return _class_reduce(obj)
     elif isinstance(obj, types.FunctionType):
-        return function_reduce(obj, pickler.globals_ref)
+        return _function_reduce(obj, pickler.globals_ref)
     else:
         # fallback to save_global
         return NotImplementedError
@@ -572,18 +572,18 @@ class CloudPickler(Pickler):
     """
 
     dispatch = {}
-    dispatch[classmethod] = classmethod_reduce
-    dispatch[io.TextIOWrapper] = file_reduce
-    dispatch[logging.Logger] = logger_reduce
-    dispatch[logging.RootLogger] = root_logger_reduce
-    dispatch[memoryview] = memoryview_reduce
-    dispatch[staticmethod] = classmethod_reduce
-    dispatch[types.CellType] = cell_reduce
-    dispatch[types.CodeType] = code_reduce
-    dispatch[types.ModuleType] = module_reduce
-    dispatch[types.MethodType] = method_reduce
-    dispatch[types.MappingProxyType] = mappingproxy_reduce
-    dispatch[weakref.WeakSet] = weakset_reduce
+    dispatch[classmethod] = _classmethod_reduce
+    dispatch[io.TextIOWrapper] = _file_reduce
+    dispatch[logging.Logger] = _logger_reduce
+    dispatch[logging.RootLogger] = _root_logger_reduce
+    dispatch[memoryview] = _memoryview_reduce
+    dispatch[staticmethod] = _classmethod_reduce
+    dispatch[types.CellType] = _cell_reduce
+    dispatch[types.CodeType] = _code_reduce
+    dispatch[types.ModuleType] = _module_reduce
+    dispatch[types.MethodType] = _method_reduce
+    dispatch[types.MappingProxyType] = _mappingproxy_reduce
+    dispatch[weakref.WeakSet] = _weakset_reduce
 
     def __init__(self, file, protocol=None):
         if protocol is None:
@@ -594,7 +594,7 @@ class CloudPickler(Pickler):
         # global namespace at unpickling time.
         self.globals_ref = {}
         self.dispatch_table = self.dispatch
-        self.global_hook = reduce_global
+        self.global_hook = _reduce_global
         self.proto = int(protocol)
 
     def dump(self, obj):
