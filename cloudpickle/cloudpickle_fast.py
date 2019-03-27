@@ -18,62 +18,12 @@ import weakref
 
 from _pickle import Pickler
 
+from .cloudpickle import (
+    islambda, _is_dynamic, GLOBAL_OPS, _BUILTIN_TYPE_CONSTRUCTORS,
+    _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL
+)
+
 load, loads = _pickle.load, _pickle.loads
-
-
-# XXX: Uncovered code in cloudpickle is currently removed, as they lack a
-# specific use case justifying their presence. Functions/Methods removed:
-# - _restore_attr
-# - _gen_ellipsis
-# - everyting after (if obj.__dict__) in save_global
-
-# cloudpickle is meant for inter process communication: we expect all
-# communicating processes to run the same Python version hence we favor
-# communication speed over compatibility:
-DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
-
-
-# relevant opcodes, used to detect global variables manipulation
-# XXX: I think STORE_GLOBAL can actually be removed.
-STORE_GLOBAL = opcode.opmap["STORE_GLOBAL"]
-DELETE_GLOBAL = opcode.opmap["DELETE_GLOBAL"]
-LOAD_GLOBAL = opcode.opmap["LOAD_GLOBAL"]
-GLOBAL_OPS = (STORE_GLOBAL, DELETE_GLOBAL, LOAD_GLOBAL)
-
-
-# map a type to its name in the types module.
-_BUILTIN_TYPE_NAMES = {}
-for k, v in types.__dict__.items():
-    if type(v) is type:
-        _BUILTIN_TYPE_NAMES[v] = k
-
-
-def _make__new__factory(type_):
-    def _factory():
-        return type_.__new__
-
-    return _factory
-
-
-# NOTE: These need to be module globals so that they're pickleable as globals.
-_get_dict_new = _make__new__factory(dict)
-_get_frozenset_new = _make__new__factory(frozenset)
-_get_list_new = _make__new__factory(list)
-_get_set_new = _make__new__factory(set)
-_get_tuple_new = _make__new__factory(tuple)
-_get_object_new = _make__new__factory(object)
-
-# Pre-defined set of builtin_function_or_method instances that can be
-# serialized.
-_BUILTIN_TYPE_CONSTRUCTORS = {
-    dict.__new__: _get_dict_new,
-    frozenset.__new__: _get_frozenset_new,
-    set.__new__: _get_set_new,
-    list.__new__: _get_list_new,
-    tuple.__new__: _get_tuple_new,
-    object.__new__: _get_object_new,
-}
-
 
 # Shorthands similar to pickle.dump/pickle.dumps
 
@@ -112,27 +62,6 @@ def dumps(obj, protocol=None):
 
 # Utility functions introspecting objects to extract useful properties about
 # them.
-
-
-def islambda(func):
-    return getattr(func, "__name__") == "<lambda>"
-
-
-def _is_dynamic(module):
-    """ Check if the module is importable by name
-
-    Notable exceptions include modules created dynamically using
-    types.ModuleType
-    """
-    # Quick check: module that have __file__ attribute are not dynamic modules.
-    if hasattr(module, "__file__"):
-        return False
-
-    # XXX: there used to be backwad compat code for python 2 here.
-    if hasattr(module, "__spec__"):
-        return module.__spec__ is None
-
-
 def _find_loaded_submodules(globals, closure, co_names):
     """
     Find submodules used by a function but not listed in its globals.
