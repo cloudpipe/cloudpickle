@@ -6,11 +6,9 @@ previous pythonic Pickler. Because this functionality is only available for
 python versions 3.8+, a lot of backward-compatibilty code is also removed.
 """
 import abc
-import dis
 import io
 import itertools
 import logging
-import opcode
 import _pickle
 import pickle
 import sys
@@ -20,9 +18,9 @@ import weakref
 from _pickle import Pickler
 
 from .cloudpickle import (
-    islambda, _is_dynamic, extract_code_globals, GLOBAL_OPS,
-    _BUILTIN_TYPE_CONSTRUCTORS, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
-    _find_loaded_submodules, _get_cell_contents
+    islambda, _is_dynamic, extract_code_globals, _BUILTIN_TYPE_CONSTRUCTORS,
+    _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL, _find_loaded_submodules,
+    _get_cell_contents
 )
 
 load, loads = _pickle.load, _pickle.loads
