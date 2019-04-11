@@ -484,13 +484,14 @@ def _class_reduce(obj):
 # it has to be updated to how it was at unpickling time.
 
 
-def _function_setstate(obj, state, slotstate):
+def _function_setstate(obj, state):
     """Update the state of a dynaamic function.
 
     As __closure__ and __globals__ are readonly attributes of a function, we
     cannot rely on the native setstate routine of pickle.load_build, that calls
     setattr on items of the slotstate. Instead, we have to modify them inplace.
     """
+    state, slotstate = state
     obj.__dict__.update(state)
 
     obj_globals = slotstate.pop("__globals__")
@@ -513,7 +514,8 @@ def _function_setstate(obj, state, slotstate):
         setattr(obj, k, v)
 
 
-def _class_setstate(obj, state, slotstate):
+def _class_setstate(obj, state):
+    state, slotstate = state
     registry = None
     for attrname, attr in state.items():
         if attrname == "_abc_impl":
