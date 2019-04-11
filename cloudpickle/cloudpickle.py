@@ -646,11 +646,11 @@ class CloudPickler(Pickler):
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
-        subimports = _find_loaded_submodules(
+        submodules = _find_loaded_submodules(
             code,
             itertools.chain(f_globals.values(), closure_values or ()),
         )
-        for s in subimports:
+        for s in submodules:
             # ensure that subimport s is loaded at unpickling time
             self.save(s)
             # then discards the reference to it
