@@ -18,7 +18,7 @@ import weakref
 from _pickle import Pickler
 
 from .cloudpickle import (
-    islambda, _is_dynamic, extract_code_globals, _BUILTIN_TYPE_CONSTRUCTORS,
+    islambda, _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_CONSTRUCTORS,
     _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL, _find_loaded_submodules,
     _get_cell_contents
 )
@@ -154,7 +154,7 @@ def _function_getstate(func):
         "__closure__": func.__closure__,
     }
 
-    f_globals_ref = extract_code_globals(func.__code__)
+    f_globals_ref = _extract_code_globals(func.__code__)
     f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
                  func.__globals__}
 

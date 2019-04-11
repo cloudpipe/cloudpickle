@@ -752,7 +752,7 @@ class CloudPickler(Pickler):
         code = func.__code__
 
         # extract all global ref's
-        func_global_refs = extract_code_globals(code)
+        func_global_refs = _extract_code_globals(code)
 
         # process all variables referenced by global environment
         f_globals = {}
