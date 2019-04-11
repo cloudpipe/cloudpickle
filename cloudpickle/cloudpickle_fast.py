@@ -51,14 +51,10 @@ def dumps(obj, protocol=None):
     Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
     compatibility with older versions of Python.
     """
-    file = io.BytesIO()
-    try:
+    with io.BytesIO() as file:
         cp = CloudPickler(file, protocol=protocol)
         cp.dump(obj)
         return file.getvalue()
-    finally:
-        file.close()
-
 
 # COLLECTION OF OBJECTS __getnewargs__-LIKE METHODS
 # -------------------------------------------------
