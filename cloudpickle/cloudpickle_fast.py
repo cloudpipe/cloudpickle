@@ -553,14 +553,14 @@ def _reduce_global(pickler, obj):
 
 
 class CloudPickler(Pickler):
-    """Fast C Pickler extension with additional reducing routines
+    """Fast C Pickler extension with additional reducing routines.
 
-       Cloudpickler's extensions exist into into:
+    Cloudpickler's extensions exist into into:
 
-       * it's dispatch_table containing reducers that are called only if ALL
-         built-in saving functions were previously discarded.
-       * a special callback, invoked before standard function/class
-         builtin-saving method (save_global), to serialize dynamic functions
+    * it's dispatch_table containing reducers that are called only if ALL
+      built-in saving functions were previously discarded.
+    * a special callback, invoked before standard function/class
+      builtin-saving method (save_global), to serialize dynamic functions
     """
 
     dispatch = {}
