@@ -529,11 +529,6 @@ def _class_setstate(obj, state):
     return obj
 
 
-# Arbitration between builtin-save method and user-defined callbacks
-# ------------------------------------------------------------------
-# This set of functions aim at deciding whether an object can be properly
-# pickler by the c Pickler, or if it needs to be serialized using cloudpickle's
-# reducers.
 def _reduce_global(pickler, obj):
     """Custom reducing callback for functions and classes
 
@@ -542,13 +537,6 @@ def _reduce_global(pickler, obj):
     we return a reduce value the the Pickler will internally serialize via
     save_reduce.
     """
-    # Classes deriving from custom, dynamic metaclasses won't get caught inside
-    # the hook_dispatch dict. In the legacy cloudpickle, this was not really a
-    # problem because not being present in the dispatch table meant falling
-    # back to save_global, which was already overriden by cloudpickle. Using
-    # the c pickler, save_global cannot be overriden, so we have manually check
-    # is obj's comes from a custom metaclass, and in this case, direct the
-    # object to save_global.
     t = type(obj)
 
     try:
