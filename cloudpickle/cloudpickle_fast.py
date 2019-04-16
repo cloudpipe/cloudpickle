@@ -548,7 +548,7 @@ def _reduce_global(pickler, obj):
     elif isinstance(obj, types.FunctionType):
         return _function_reduce(obj, pickler.globals_ref)
     else:
-        # fallback to save_global
+        # fallback to save_global, including the pickler's distpatch_table
         return NotImplementedError
 
 
@@ -586,6 +586,18 @@ class CloudPickler(Pickler):
         # global namespace at unpickling time.
         self.globals_ref = {}
         self.dispatch_table = self.dispatch
+
+        # Pickling functions and classes cannot be customized using the
+        # dispatch_table: indeed, pickling an object using the dispatch_table
+        # works by invoking a reducer specific to the object's type. When the
+        # object is a class, its type is often ``type``, except when the class
+        # is an instance of another metaclass. In this cased, the metaclass
+        # will likely not be known in advance, and thus cannot be special-cased
+        # using an entry in the dispatch_table.
+
+        # The pickler's global_hook, among other things, allows us to register
+        # a reducer that will be called for any class, independently of its
+        # type.
         self.global_hook = _reduce_global
         self.proto = int(protocol)
 
