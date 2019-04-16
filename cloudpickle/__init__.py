@@ -1,9 +1,10 @@
 from __future__ import absolute_import
 
 import sys
+import pickle
 
 
-if sys.version_info[:2] >= (3, 8):
+if hasattr(pickle.Pickler, 'global_hook'):
     from cloudpickle.cloudpickle_fast import *
 else:
     from cloudpickle.cloudpickle import *
