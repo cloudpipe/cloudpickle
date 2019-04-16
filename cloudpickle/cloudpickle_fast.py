@@ -538,13 +538,12 @@ def _reduce_global(pickler, obj):
     save_reduce.
     """
     t = type(obj)
-
     try:
-        is_metaclass = issubclass(t, type)
+        is_anyclass = issubclass(t, type)
     except TypeError:  # t is not a class (old Boost; see SF #502085)
-        is_metaclass = False
+        is_anyclass = False
 
-    if is_metaclass:
+    if is_anyclass:
         return _class_reduce(obj)
     elif isinstance(obj, types.FunctionType):
         return _function_reduce(obj, pickler.globals_ref)
