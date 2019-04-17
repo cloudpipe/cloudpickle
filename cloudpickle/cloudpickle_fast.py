@@ -309,8 +309,6 @@ def _weakset_reduce(obj):
 def _dynamic_function_reduce(func, globals_ref):
     """Reduce a function that is not pickleable via attribute loookup.
     """
-    # XXX: should globals_ref be a global variable instead? The reason is
-    # purely cosmetic.
     newargs = _function_getnewargs(func, globals_ref)
     state = _function_getstate(func)
     return types.FunctionType, newargs, state, None, None, _function_setstate
@@ -394,18 +392,10 @@ def _dynamic_class_reduce(obj):
     from global modules.
     """
     # XXX: This code is nearly untouch with regards to the legacy cloudpickle.
-    # It is pretty and hard to understand. Maybe refactor it by dumping
-    # potential python2 specific code and making a trading off optimizations in
-    # favor of readbility.
+    # It is pretty and hard to understand.
     clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
     clsdict.pop("__weakref__", None)
 
-    # XXX: I am trying to add the abc-registered subclasses into the class
-    # reconstructor, because using save_reduce semantics prevents us to perform
-    # any other operation than state updating after obj is created.
-
-    # I may encounter reference cycles, although there seems to be checks
-    # preventing this to happen.
     if "_abc_impl" in clsdict:
         (registry, _, _, _) = abc._get_dump(obj)
         clsdict["_abc_impl"] = [
@@ -461,8 +451,6 @@ def _class_reduce(obj):
         # obj is either a non-pickleable builtin or dynamic.
         pickle.dumps(obj)
     except Exception:
-        # XXX: previously, we also looked for the __builtin__ module, but this
-        # is python 2 specific.
         if obj.__module__ == "builtins":
             if obj in _BUILTIN_TYPE_NAMES:
                 return _builtin_type_reduce(obj)
@@ -537,6 +525,8 @@ def _reduce_global(pickler, obj):
     we return a reduce value the the Pickler will internally serialize via
     save_reduce.
     """
+    # XXX: This functions needs the current active pickler to pass its
+    # globals_ref to _function_reduce
     t = type(obj)
     try:
         is_anyclass = issubclass(t, type)
