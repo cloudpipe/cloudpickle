@@ -641,13 +641,33 @@ class CloudPickleTest(unittest.TestCase):
         res = pickle_depickle(type(NotImplemented), protocol=self.protocol)
         self.assertEqual(type(NotImplemented), res)
 
-    def test_builtin_function_without_module(self):
-        on = object.__new__
-        on_depickled = pickle_depickle(on, protocol=self.protocol)
-        self.assertEqual(type(on_depickled(object)), type(object()))
+    @pytest.mark.skipif(
+        sys.version_info[0] >= 3,
+        reason="builtin_function_or_method are special-cased only in python2")
+    def test_builtin_function(self):
+        # builtin function from the __builtin__ module
+        assert pickle_depickle(zip, protocol=self.protocol) is zip
 
+        from sys import getcheckinterval
+        # builtin function from a "regular" module
+        assert pickle_depickle(
+            getcheckinterval, protocol=self.protocol) is getcheckinterval
+
+    @pytest.mark.skipif(
+        sys.version_info[0] >= 3,
+        reason="builtin_function_or_method are special-cased only in python2")
+    def test_builtin_method(self):
+        # pickle_depickle some builtin methods of the __builtin__ module
+        for t in list, tuple, set, frozenset, dict, object:
+            cloned = pickle_depickle(t.__new__, protocol=self.protocol)
+            self.assertTrue(cloned is t.__new__)
+
+        # pickle_depickle a method of a "regular" module
         fi = itertools.chain.from_iterable
         fi_depickled = pickle_depickle(fi, protocol=self.protocol)
+
+        # fi is fi_depickled will return false, but so does
+        # itertools.chain.from_iterable is itertools.chain.from_iterable
         self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
     @pytest.mark.skipif(tornado is None,
@@ -963,14 +983,6 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_MyTuple is MyTuple
         assert isinstance(depickled_t2, MyTuple)
         assert depickled_t2 == t2
-
-    def test_builtin_type__new__(self):
-        # Functions occasionally take the __new__ of these types as default
-        # parameters for factories.  For example, on Python 3.3,
-        # `tuple.__new__` is a default value for some methods of namedtuple.
-        for t in list, tuple, set, frozenset, dict, object:
-            cloned = pickle_depickle(t.__new__, protocol=self.protocol)
-            self.assertTrue(cloned is t.__new__)
 
     def test_interactively_defined_function(self):
         # Check that callables defined in the __main__ module of a Python
