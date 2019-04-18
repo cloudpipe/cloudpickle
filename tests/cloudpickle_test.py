@@ -641,10 +641,10 @@ class CloudPickleTest(unittest.TestCase):
         res = pickle_depickle(type(NotImplemented), protocol=self.protocol)
         self.assertEqual(type(NotImplemented), res)
 
-    @pytest.mark.skipif(
-        sys.version_info[0] >= 3,
-        reason="builtin_function_or_method are special-cased only in python2")
     def test_builtin_function(self):
+        # Note that builtin_function_or_method are special-cased by cloudpickle
+        # only in python2.
+
         # builtin function from the __builtin__ module
         assert pickle_depickle(zip, protocol=self.protocol) is zip
 
@@ -653,10 +653,10 @@ class CloudPickleTest(unittest.TestCase):
         assert pickle_depickle(
             getcheckinterval, protocol=self.protocol) is getcheckinterval
 
-    @pytest.mark.skipif(
-        sys.version_info[0] >= 3,
-        reason="builtin_function_or_method are special-cased only in python2")
     def test_builtin_method(self):
+        # Note that builtin_function_or_method are special-cased by cloudpickle
+        # only in python2.
+
         # pickle_depickle some builtin methods of the __builtin__ module
         for t in list, tuple, set, frozenset, dict, object:
             cloned = pickle_depickle(t.__new__, protocol=self.protocol)
@@ -666,8 +666,10 @@ class CloudPickleTest(unittest.TestCase):
         fi = itertools.chain.from_iterable
         fi_depickled = pickle_depickle(fi, protocol=self.protocol)
 
-        # fi is fi_depickled will return false, but so does
-        # itertools.chain.from_iterable is itertools.chain.from_iterable
+        # `fi is fi_depickled` would return False, but so will
+        # `itertools.chain.from_iterable is itertools.chain.from_iterable`.
+        # Instead of testing physical equality, check that `fi_depickled`
+        # behaves as expected.
         self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
     @pytest.mark.skipif(tornado is None,

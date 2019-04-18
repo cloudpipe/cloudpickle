@@ -747,7 +747,7 @@ class CloudPickler(Pickler):
                 return Pickler.save_global(self, obj)
 
             # obj is a method, such as dict.__new__ (from the builtin
-            # module) or itertools.chain.from_iterable (ffrom
+            # module) or itertools.chain.from_iterable (from
             # the itertools module).
             rv = (getattr, (obj.__self__, obj.__name__))
             return self.save_reduce(obj=obj, *rv)
