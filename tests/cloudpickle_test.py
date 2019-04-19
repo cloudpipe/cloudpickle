@@ -659,8 +659,8 @@ class CloudPickleTest(unittest.TestCase):
 
         # pickle_depickle some builtin methods of the __builtin__ module
         for t in list, tuple, set, frozenset, dict, object:
-            cloned = pickle_depickle(t.__new__, protocol=self.protocol)
-            self.assertTrue(cloned is t.__new__)
+            cloned_new = pickle_depickle(t.__new__, protocol=self.protocol)
+            assert isinstance(cloned_new(t), t)
 
         # pickle_depickle a method of a "regular" module
         fi = itertools.chain.from_iterable
