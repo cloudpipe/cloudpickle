@@ -4,7 +4,7 @@ import sys
 import pickle
 
 
-if hasattr(pickle.Pickler, 'global_hook'):
+if hasattr(pickle.Pickler, 'reducer_override'):
     from cloudpickle.cloudpickle_fast import *
 else:
     from cloudpickle.cloudpickle import *

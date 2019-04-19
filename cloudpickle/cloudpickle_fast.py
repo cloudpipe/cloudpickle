@@ -359,7 +359,7 @@ def _function_reduce(obj, globals_ref):
     if lookedup_by_name is obj:  # in this case, module is None
         # if obj exists in a filesytem-backed module, let the builtin pickle
         # saving routines save obj
-        return NotImplementedError
+        return NotImplemented
 
     # XXX: the special handling of builtin_function_or_method is removed as
     # currently this hook is not called for such instances, as opposed to
@@ -376,7 +376,7 @@ def _function_reduce(obj, globals_ref):
         return _dynamic_function_reduce(obj, globals_ref=globals_ref)
 
     # this whole code section may be cleanable: the if/else conditions + the
-    # NotImplementedError look like they cover nearly all cases.
+    # NotImplemented look like they cover nearly all cases.
     else:
         # func is nested
         if lookedup_by_name is None or lookedup_by_name is not obj:
@@ -463,7 +463,7 @@ def _class_reduce(obj):
         # if pickle.dumps worked out fine, then simply fallback to the
         # traditional pickle by attribute # implemented in the builtin
         # `Pickler.save_global`.
-        return NotImplementedError
+        return NotImplemented
 
 
 # COLLECTIONS OF OBJECTS STATE SETTERS
@@ -539,7 +539,7 @@ def _reduce_global(pickler, obj):
         return _function_reduce(obj, pickler.globals_ref)
     else:
         # fallback to save_global, including the pickler's distpatch_table
-        return NotImplementedError
+        return NotImplemented
 
 
 class CloudPickler(Pickler):
@@ -585,10 +585,10 @@ class CloudPickler(Pickler):
         # will likely not be known in advance, and thus cannot be special-cased
         # using an entry in the dispatch_table.
 
-        # The pickler's global_hook, among other things, allows us to register
-        # a reducer that will be called for any class, independently of its
-        # type.
-        self.global_hook = _reduce_global
+        # The pickler's reducer_override, among other things, allows us to
+        # register a reducer that will be called for any class, independently
+        # of its type.
+        self.reducer_override = _reduce_global
         self.proto = int(protocol)
 
     def dump(self, obj):
