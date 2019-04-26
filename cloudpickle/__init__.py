@@ -4,7 +4,7 @@ import sys
 import pickle
 
 
-if hasattr(pickle.Pickler, 'reducer_override'):
+if sys.version_info[:2] >= (3, 8):
     from cloudpickle.cloudpickle_fast import *
 else:
     from cloudpickle.cloudpickle import *

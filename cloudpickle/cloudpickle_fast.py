@@ -517,31 +517,6 @@ def _class_setstate(obj, state):
     return obj
 
 
-def _reduce_global(pickler, obj):
-    """Custom reducing callback for functions and classes
-
-    This function is the analog of a custom save_global. However, the C Pickler
-    API does not expose low-level instructions such as save or write. Instead,
-    we return a reduce value the the Pickler will internally serialize via
-    save_reduce.
-    """
-    # XXX: This functions needs the current active pickler to pass its
-    # globals_ref to _function_reduce
-    t = type(obj)
-    try:
-        is_anyclass = issubclass(t, type)
-    except TypeError:  # t is not a class (old Boost; see SF #502085)
-        is_anyclass = False
-
-    if is_anyclass:
-        return _class_reduce(obj)
-    elif isinstance(obj, types.FunctionType):
-        return _function_reduce(obj, pickler.globals_ref)
-    else:
-        # fallback to save_global, including the pickler's distpatch_table
-        return NotImplemented
-
-
 class CloudPickler(Pickler):
     """Fast C Pickler extension with additional reducing routines.
 
@@ -588,8 +563,29 @@ class CloudPickler(Pickler):
         # The pickler's reducer_override, among other things, allows us to
         # register a reducer that will be called for any class, independently
         # of its type.
-        self.reducer_override = _reduce_global
         self.proto = int(protocol)
+
+    def reducer_override(self, obj):
+        """Custom reducing callback for functions and classes
+
+        This function is the analog of a custom save_global. However, the C
+        Pickler API does not expose low-level instructions such as save or
+        write. Instead, we return a reduce value the the Pickler will
+        internally serialize via save_reduce.
+        """
+        t = type(obj)
+        try:
+            is_anyclass = issubclass(t, type)
+        except TypeError:  # t is not a class (old Boost; see SF #502085)
+            is_anyclass = False
+
+        if is_anyclass:
+            return _class_reduce(obj)
+        elif isinstance(obj, types.FunctionType):
+            return _function_reduce(obj, self.globals_ref)
+        else:
+            # fallback to save_global, including the pickler's distpatch_table
+            return NotImplemented
 
     def dump(self, obj):
         try:
