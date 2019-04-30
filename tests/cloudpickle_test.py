@@ -653,6 +653,9 @@ class CloudPickleTest(unittest.TestCase):
         assert pickle_depickle(
             getcheckinterval, protocol=self.protocol) is getcheckinterval
 
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
+                        sys.version_info[:2] == (3, 5),
+                        reason="bug of pypy3.5 in builtin constructors")
     def test_builtin_method(self):
         # Note that builtin_function_or_method are special-cased by cloudpickle
         # only in python2.
