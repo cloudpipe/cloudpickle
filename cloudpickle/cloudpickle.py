@@ -591,6 +591,8 @@ class CloudPickler(Pickler):
             state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
+        if hasattr(func, '__kwdefaults__'):
+            state['kwdefaults'] = func.__kwdefaults__
         save(state)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
@@ -1075,6 +1077,8 @@ def _fill_function(*args):
         func.__module__ = state['module']
     if 'qualname' in state:
         func.__qualname__ = state['qualname']
+    if 'kwdefaults' in state:
+        func.__kwdefaults__ = state['kwdefaults']
 
     cells = func.__closure__
     if cells is not None:

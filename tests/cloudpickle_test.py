@@ -1392,6 +1392,28 @@ class CloudPickleTest(unittest.TestCase):
             cloned_func = pickle_depickle(func, protocol=self.protocol)
             assert cloned_func() == "hello from a {}!".format(source)
 
+    @pytest.mark.skipif(sys.version_info[0] < 3,
+                        reason="keyword only arguments were introduced in "
+                               "python 3")
+    def test_interactively_defined_func_with_keyword_only_argument(self):
+        # fixes https://github.com/cloudpipe/cloudpickle/issues/263
+        # The source code of this test is bundled in a string and is ran from
+        # the __main__ module of a subprocess in order to avoid a SyntaxError
+        # in python2 when pytest imports this file, as the keyword-only syntax
+        # is python3-only.
+        code = """
+        from cloudpickle import loads, dumps
+
+        def f(a, *, b=1):
+            return a + b
+
+        depickled_f = loads(dumps(f, protocol={protocol}))
+
+        for func in (f, depickled_f):
+            assert func(2) == 3
+            assert func.__kwdefaults__ == {{'b': 1}}
+        """.format(protocol=self.protocol)
+        assert_run_python_script(textwrap.dedent(code))
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
