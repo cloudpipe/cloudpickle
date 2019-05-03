@@ -16,6 +16,7 @@ matrix:
       python: 3.7
     - os: linux
       python: 3.6
+      env: CLOUDPICKLE_DEFAULT_PROTOCOL=3
     - os: linux
       python: 3.5
     - os: linux

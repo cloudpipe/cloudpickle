@@ -50,6 +50,7 @@ import itertools
 import logging
 import opcode
 import operator
+import os
 import pickle
 import struct
 import sys
@@ -60,7 +61,7 @@ import weakref
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
-DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
+DEFAULT_PROTOCOL = int(os.environ.get("CLOUDPICKLE_DEFAULT_PROTOCOL", pickle.HIGHEST_PROTOCOL))
 
 
 if sys.version_info[0] < 3:  # pragma: no branch
