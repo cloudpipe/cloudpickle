@@ -733,49 +733,43 @@ class CloudPickler(Pickler):
         return (code, f_globals, defaults, closure, dct, base_globals)
 
     if not PY3:  # pragma: no branch
-        # In python 3, builtin_function_or_method objects have a __reduce__
-        # method, which make them correctly serializable by the standard pickle
+        # Python3 comes with native reducers that allow builtin functions and
+        # methods pickling as module/class attributes.  The following method
+        # extends this for python2.
+        # Plase note that currently, neither pickle nor cloudpickle support
+        # dynamically created builtin functions/method pickling.
+        def save_builtin_function_or_method(self, obj):
+            is_bound = getattr(obj, '__self__', None) is not None
+            if is_bound:
+                # obj is a bound builtin method.
+                rv = (getattr, (obj.__self__, obj.__name__))
+                return self.save_reduce(obj=obj, *rv)
 
-        def save_builtin_function(self, obj):
-            # builtin functions are actually pickled correctly by the standard
-            # pickle. In python2, only methods are not pickleable.
+            is_unbound = hasattr(obj, '__objclass__')
+            if is_unbound:
+                # obj is a unbound builtin method (accessed from its class)
+                rv = (getattr, (obj.__objclass__, obj.__name__))
+                return self.save_reduce(obj=obj, *rv)
 
-            is_function = getattr(obj, '__self__', None) is None
-            if is_function:
-                # obj is a function, such as zip (from the __builtin__ module),
-                # or sys.getcheckinterval (from the sys module)
-                return Pickler.save_global(self, obj)
+            # Otherwise, obj is not a method, but a function. Fallback to
+            # default pickling by attribute.
+            return Pickler.save_global(self, obj)
 
-            # obj is a method, such as dict.__new__ (from the builtin
-            # module) or itertools.chain.from_iterable (from
-            # the itertools module).
-            rv = (getattr, (obj.__self__, obj.__name__))
-            return self.save_reduce(obj=obj, *rv)
+        dispatch[types.BuiltinFunctionType] = save_builtin_function_or_method
 
-        dispatch[types.BuiltinFunctionType] = save_builtin_function
-
-        def save_classmethod_descriptor(self, obj):
-            return self.save_reduce(getattr, (obj.__objclass__, obj.__name__))
+        # A comprehensive summary of the various kinds of builtin methods can
+        # be found in PEP 579: https://www.python.org/dev/peps/pep-0579/
         classmethod_descriptor_type = type(float.__dict__['fromhex'])
-        dispatch[classmethod_descriptor_type] = save_classmethod_descriptor
-
-        def save_wrapper_descriptor(self, obj):
-            return self.save_reduce(getattr, (obj.__objclass__, obj.__name__))
         wrapper_descriptor_type = type(float.__repr__)
-        dispatch[wrapper_descriptor_type] = save_wrapper_descriptor
-
-        def save_method_wrapper(self, obj):
-            return self.save_reduce(getattr, (obj.__self__, obj.__name__))
         method_wrapper_type = type(1.5.__repr__)
-        dispatch[method_wrapper_type] = save_method_wrapper
+
+        dispatch[classmethod_descriptor_type] = save_builtin_function_or_method
+        dispatch[wrapper_descriptor_type] = save_builtin_function_or_method
+        dispatch[method_wrapper_type] = save_builtin_function_or_method
 
     if sys.version_info[:2] < (3, 4):
         method_descriptor = type(str.upper)
-
-        def save_method_descriptor(self, obj):
-            self.save_reduce(
-                getattr, (obj.__objclass__, obj.__name__), obj=obj)
-        dispatch[method_descriptor] = save_method_descriptor
+        dispatch[method_descriptor] = save_builtin_function_or_method
 
     def save_global(self, obj, name=None, pack=struct.pack):
         """
