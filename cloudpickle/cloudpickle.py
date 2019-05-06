@@ -754,6 +754,14 @@ class CloudPickler(Pickler):
 
         dispatch[types.BuiltinFunctionType] = save_builtin_function
 
+    if sys.version_info[:2] < (3, 4):
+        method_descriptor = type(str.upper)
+
+        def save_method_descriptor(self, obj):
+            self.save_reduce(
+                getattr, (obj.__objclass__, obj.__name__), obj=obj)
+        dispatch[method_descriptor] = save_method_descriptor
+
     def save_global(self, obj, name=None, pack=struct.pack):
         """
         Save a "global".
@@ -1277,18 +1285,3 @@ def _is_dynamic(module):
         except ImportError:
             return True
         return False
-
-
-""" Use copy_reg to extend global pickle definitions """
-
-if sys.version_info < (3, 4):  # pragma: no branch
-    method_descriptor = type(str.upper)
-
-    def _reduce_method_descriptor(obj):
-        return (getattr, (obj.__objclass__, obj.__name__))
-
-    try:
-        import copy_reg as copyreg
-    except ImportError:
-        import copyreg
-    copyreg.pickle(method_descriptor, _reduce_method_descriptor)
