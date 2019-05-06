@@ -1,4 +1,4 @@
-0.9.0
+1.0.0
 =====
 
 - Track the provenance of dynamic classes and enums so as to preseve the
