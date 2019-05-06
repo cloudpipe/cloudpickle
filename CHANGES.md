@@ -1,4 +1,4 @@
-0.9.0
+1.0.0
 =====
 
 - Fix a bug making functions with keyword-only arguments forget the default
