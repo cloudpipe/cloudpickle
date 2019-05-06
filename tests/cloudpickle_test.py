@@ -722,11 +722,10 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_bound_meth(target) == bound_clsmethod(target)
         assert depickled_unbound_meth(target) == unbound_clsmethod(target)
 
-        # builtin classmethod_descriptor objects are not callable, neither do
-        # they have an accessible __func__ object. Moreover, roundtripping them
-        # results in a builtin_function_or_method (python upstream issue).
-        # XXX: shall we test anything in this case?
-        assert depickled_clsdict_meth == unbound_clsmethod
+        # Roundtripping a classmethod_descriptor results in a
+        # builtin_function_or_method (python upstream issue).
+        assert depickled_clsdict_meth(target) == clsdict_clsmethod(float,
+                                                                   target)
 
     def test_builtin_slotmethod(self):
         obj = 1.5  # float object
