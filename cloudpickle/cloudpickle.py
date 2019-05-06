@@ -788,18 +788,16 @@ class CloudPickler(Pickler):
     dispatch[type] = save_global
     dispatch[types.ClassType] = save_global
 
-    def save_instancemethod(self, obj):
-        # Memoization rarely is ever useful due to python bounding
-        if obj.__self__ is None:
-            self.save_reduce(getattr, (obj.im_class, obj.__name__))
-        else:
-            if PY3:  # pragma: no branch
-                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
+    if not PY3:
+        def save_instancemethod(self, obj):
+            # Memoization rarely is ever useful due to python bounding
+            if obj.__self__ is None:
+                self.save_reduce(getattr, (obj.im_class, obj.__name__))
             else:
-                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
+                self.save_reduce(getattr, (obj.__self__, obj.__name__),
                                  obj=obj)
 
-    dispatch[types.MethodType] = save_instancemethod
+        dispatch[types.MethodType] = save_instancemethod
 
     def save_inst(self, obj):
         """Inner logic to save instance. Based off pickle.save_inst"""
