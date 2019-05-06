@@ -6,6 +6,10 @@
   original class defintions.
   ([issue #246](https://github.com/cloudpipe/cloudpickle/pull/246))
 
+- Fix a bug making functions with keyword-only arguments forget the default
+  values of these arguments after being pickled.
+  ([issue #264](https://github.com/cloudpipe/cloudpickle/pull/264))
+
 0.8.1
 =====
 
