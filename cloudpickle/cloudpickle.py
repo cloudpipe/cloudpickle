@@ -754,6 +754,21 @@ class CloudPickler(Pickler):
 
         dispatch[types.BuiltinFunctionType] = save_builtin_function
 
+        def save_classmethod_descriptor(self, obj):
+            return self.save_reduce(getattr, (obj.__objclass__, obj.__name__))
+        classmethod_descriptor_type = type(float.__dict__['fromhex'])
+        dispatch[classmethod_descriptor_type] = save_classmethod_descriptor
+
+        def save_wrapper_descriptor(self, obj):
+            return self.save_reduce(getattr, (obj.__objclass__, obj.__name__))
+        wrapper_descriptor_type = type(float.__repr__)
+        dispatch[wrapper_descriptor_type] = save_wrapper_descriptor
+
+        def save_method_wrapper(self, obj):
+            return self.save_reduce(getattr, (obj.__self__, obj.__name__))
+        method_wrapper_type = type(1.5.__repr__)
+        dispatch[method_wrapper_type] = save_method_wrapper
+
     if sys.version_info[:2] < (3, 4):
         method_descriptor = type(str.upper)
 
