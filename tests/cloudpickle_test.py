@@ -675,6 +675,105 @@ class CloudPickleTest(unittest.TestCase):
         # behaves as expected.
         self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
+    # The next 4 tests pickle-depickle all forms into which builtin python
+    # methods can appear.
+    # There are 4 kinds of method: 'classic' methods, classmethods,
+    # staticmethods and slotmethods. They will appear under different types
+    # depending on whether they are called from the __dict__ of their
+    # class, their class itself, or an instance of their class. This makes
+    # 12 total combinations.
+
+    def test_builtin_classicmethod(self):
+        obj = 1.5  # float object
+
+        bound_classicmethod = obj.hex  # builtin_function_or_method
+        unbound_classicmethod = type(obj).hex  # method_descriptor
+        clsdict_classicmethod = type(obj).__dict__['hex']  # method_descriptor
+
+        depickled_bound_meth = pickle_depickle(
+            bound_classicmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_classicmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_classicmethod, protocol=self.protocol)
+
+        assert depickled_bound_meth() == bound_classicmethod()
+        assert depickled_unbound_meth(obj) == unbound_classicmethod(obj)
+        assert depickled_clsdict_meth(obj) == clsdict_classicmethod(obj)
+
+    def test_builtin_classmethod(self):
+        obj = 1.5  # float object
+
+        bound_clsmethod = obj.fromhex  # builtin_function_or_method
+        unbound_clsmethod = type(obj).fromhex  # builtin_function_or_method
+        clsdict_clsmethod = type(
+            obj).__dict__['fromhex']  # classmethod_descriptor
+
+        depickled_bound_meth = pickle_depickle(
+            bound_clsmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_clsmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_clsmethod, protocol=self.protocol)
+
+        # classmethods may require objects of another type than the one they
+        # are bound to.
+        target = "0x1"
+        assert depickled_bound_meth(target) == bound_clsmethod(target)
+        assert depickled_unbound_meth(target) == unbound_clsmethod(target)
+
+        # builtin classmethod_descriptor objects are not callable, neither do
+        # they have an accessible __func__ object. Moreover, roundtripping them
+        # results in a builtin_function_or_method (python upstream issue).
+        # XXX: shall we test anything in this case?
+        assert depickled_clsdict_meth == unbound_clsmethod
+
+    def test_builtin_slotmethod(self):
+        obj = 1.5  # float object
+
+        bound_slotmethod = obj.__repr__  # method-wrapper
+        unbound_slotmethod = type(obj).__repr__  # wrapper_descriptor
+        clsdict_slotmethod = type(obj).__dict__['__repr__']  # ditto
+
+        depickled_bound_meth = pickle_depickle(
+            bound_slotmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_slotmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_slotmethod, protocol=self.protocol)
+
+        assert depickled_bound_meth() == bound_slotmethod()
+        assert depickled_unbound_meth(obj) == unbound_slotmethod(obj)
+        assert depickled_clsdict_meth(obj) == clsdict_slotmethod(obj)
+
+    @pytest.mark.skipif(
+        sys.version_info[:1] < (3,),
+        reason="No staticmethod example in the python 2 stdlib")
+    def test_builtin_staticmethod(self):
+        obj = "foo"  # str object
+
+        bound_staticmethod = obj.maketrans  # builtin_function_or_method
+        unbound_staticmethod = type(obj).maketrans  # ditto
+        clsdict_staticmethod = type(obj).__dict__['maketrans']  # staticmethod
+
+        depickled_bound_meth = pickle_depickle(
+            bound_staticmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_staticmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_staticmethod, protocol=self.protocol)
+
+        # staticmethod may require objects of another type than the one they
+        # are bound to.
+        target = {"a": "b"}
+        assert depickled_bound_meth(target) == bound_staticmethod(target)
+        assert depickled_unbound_meth(target) == unbound_staticmethod(target)
+
+        # staticmethod objects are not callable. Instead, we test for the
+        # depickled's object class, and wrapped object attribute.
+        assert type(depickled_clsdict_meth) is type(clsdict_staticmethod)
+        assert depickled_clsdict_meth.__func__ is clsdict_staticmethod.__func__
+
     @pytest.mark.skipif(tornado is None,
                         reason="test needs Tornado installed")
     def test_tornado_coroutine(self):
