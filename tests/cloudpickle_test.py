@@ -694,12 +694,20 @@ class CloudPickleTest(unittest.TestCase):
         unbound_classicmethod = type(obj).hex  # method_descriptor
         clsdict_classicmethod = type(obj).__dict__['hex']  # method_descriptor
 
+        assert unbound_classicmethod is clsdict_classicmethod
+
         depickled_bound_meth = pickle_depickle(
             bound_classicmethod, protocol=self.protocol)
         depickled_unbound_meth = pickle_depickle(
             unbound_classicmethod, protocol=self.protocol)
         depickled_clsdict_meth = pickle_depickle(
             clsdict_classicmethod, protocol=self.protocol)
+
+        # No identity on the bound methods they are bound to different float
+        # instances
+        # assert depickled_bound_meth is bound_classicmethod
+        assert depickled_unbound_meth is unbound_classicmethod
+        assert depickled_clsdict_meth is clsdict_classicmethod
 
         assert depickled_bound_meth() == bound_classicmethod()
         assert depickled_unbound_meth(obj) == unbound_classicmethod(obj)
@@ -719,6 +727,10 @@ class CloudPickleTest(unittest.TestCase):
             unbound_clsmethod, protocol=self.protocol)
         depickled_clsdict_meth = pickle_depickle(
             clsdict_clsmethod, protocol=self.protocol)
+
+        # Identity on both the bound and the unbound methods cannot be
+        # tested: the bound methods are bound to different objects, and the
+        # unbound methods are actually recreated at each call.
 
         # classmethods may require objects of another type than the one they
         # are bound to.
@@ -755,6 +767,11 @@ class CloudPickleTest(unittest.TestCase):
         depickled_clsdict_meth = pickle_depickle(
             clsdict_slotmethod, protocol=self.protocol)
 
+        # No identity tests on the bound slotmethod are they are bound to
+        # different float instances
+        assert depickled_unbound_meth is unbound_slotmethod
+        assert depickled_clsdict_meth is clsdict_slotmethod
+
         assert depickled_bound_meth() == bound_slotmethod()
         assert depickled_unbound_meth(obj) == unbound_slotmethod(obj)
         assert depickled_clsdict_meth(obj) == clsdict_slotmethod(obj)
@@ -770,6 +787,8 @@ class CloudPickleTest(unittest.TestCase):
         unbound_staticmethod = type(obj).maketrans  # ditto
         clsdict_staticmethod = type(obj).__dict__['maketrans']  # staticmethod
 
+        assert bound_staticmethod is unbound_staticmethod
+
         depickled_bound_meth = pickle_depickle(
             bound_staticmethod, protocol=self.protocol)
         depickled_unbound_meth = pickle_depickle(
@@ -780,6 +799,9 @@ class CloudPickleTest(unittest.TestCase):
         # staticmethod may require objects of another type than the one they
         # are bound to.
         target = {"a": "b"}
+        assert depickled_bound_meth is bound_staticmethod
+        assert depickled_unbound_meth is unbound_staticmethod
+
         assert depickled_bound_meth(target) == bound_staticmethod(target)
         assert depickled_unbound_meth(target) == unbound_staticmethod(target)
 
