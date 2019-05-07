@@ -682,6 +682,10 @@ class CloudPickleTest(unittest.TestCase):
     # depending on whether they are called from the __dict__ of their
     # class, their class itself, or an instance of their class. This makes
     # 12 total combinations.
+    # This discussion and the following tests are relevant for the CPython
+    # implementation only. In PyPy, there is no builtin method or builtin
+    # function types/flavours. The only way into which a builtin method can be
+    # identified is with it's builtin-code __code__ attribute.
 
     def test_builtin_classicmethod(self):
         obj = 1.5  # float object
@@ -722,10 +726,20 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_bound_meth(target) == bound_clsmethod(target)
         assert depickled_unbound_meth(target) == unbound_clsmethod(target)
 
-        # Roundtripping a classmethod_descriptor results in a
-        # builtin_function_or_method (python upstream issue).
-        assert depickled_clsdict_meth(target) == clsdict_clsmethod(float,
-                                                                   target)
+        if platform.python_implementation() == 'CPython':
+            # Roundtripping a classmethod_descriptor results in a
+            # builtin_function_or_method (CPython upstream issue).
+            assert depickled_clsdict_meth(target) == clsdict_clsmethod(float,
+                                                                       target)
+        if platform.python_implementation() == 'PyPy':
+            # builtin-classmethods are simple classmethod in PyPy (not
+            # callable). We test equality of types and the functionality of the
+            # __func__ attribute instead. We do not test the the identity of
+            # the functions as __func__ attributes of classmethods are not
+            # pickleable and must be reconstructed at depickling time.
+            assert type(depickled_clsdict_meth) == type(clsdict_clsmethod)
+            assert depickled_clsdict_meth.__func__(
+                float, target) == clsdict_clsmethod.__func__(float, target)
 
     def test_builtin_slotmethod(self):
         obj = 1.5  # float object
@@ -746,8 +760,9 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_clsdict_meth(obj) == clsdict_slotmethod(obj)
 
     @pytest.mark.skipif(
+        platform.python_implementation() == "PyPy" or
         sys.version_info[:1] < (3,),
-        reason="No staticmethod example in the python 2 stdlib")
+        reason="No known staticmethod example in the python 2 / pypy stdlib")
     def test_builtin_staticmethod(self):
         obj = "foo"  # str object
 
