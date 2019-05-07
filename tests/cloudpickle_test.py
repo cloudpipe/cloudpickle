@@ -732,8 +732,7 @@ class CloudPickleTest(unittest.TestCase):
         # tested: the bound methods are bound to different objects, and the
         # unbound methods are actually recreated at each call.
 
-        # classmethods may require objects of another type than the one they
-        # are bound to.
+        # float.fromhex takes a string as input.
         target = "0x1"
         assert depickled_bound_meth(target) == bound_clsmethod(target)
         assert depickled_unbound_meth(target) == unbound_clsmethod(target)
@@ -796,8 +795,7 @@ class CloudPickleTest(unittest.TestCase):
         depickled_clsdict_meth = pickle_depickle(
             clsdict_staticmethod, protocol=self.protocol)
 
-        # staticmethod may require objects of another type than the one they
-        # are bound to.
+        # str.maketrans takes a dict as input.
         target = {"a": "b"}
         assert depickled_bound_meth is bound_staticmethod
         assert depickled_unbound_meth is unbound_staticmethod
