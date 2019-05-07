@@ -705,13 +705,10 @@ class CloudPickleTest(unittest.TestCase):
 
         # No identity on the bound methods they are bound to different float
         # instances
-        # assert depickled_bound_meth is bound_classicmethod
+        assert depickled_bound_meth() == bound_classicmethod()
         assert depickled_unbound_meth is unbound_classicmethod
         assert depickled_clsdict_meth is clsdict_classicmethod
 
-        assert depickled_bound_meth() == bound_classicmethod()
-        assert depickled_unbound_meth(obj) == unbound_classicmethod(obj)
-        assert depickled_clsdict_meth(obj) == clsdict_classicmethod(obj)
 
     def test_builtin_classmethod(self):
         obj = 1.5  # float object
@@ -728,12 +725,12 @@ class CloudPickleTest(unittest.TestCase):
         depickled_clsdict_meth = pickle_depickle(
             clsdict_clsmethod, protocol=self.protocol)
 
+        # float.fromhex takes a string as input.
+        target = "0x1"
+
         # Identity on both the bound and the unbound methods cannot be
         # tested: the bound methods are bound to different objects, and the
         # unbound methods are actually recreated at each call.
-
-        # float.fromhex takes a string as input.
-        target = "0x1"
         assert depickled_bound_meth(target) == bound_clsmethod(target)
         assert depickled_unbound_meth(target) == unbound_clsmethod(target)
 
@@ -768,12 +765,9 @@ class CloudPickleTest(unittest.TestCase):
 
         # No identity tests on the bound slotmethod are they are bound to
         # different float instances
+        assert depickled_bound_meth() == bound_slotmethod()
         assert depickled_unbound_meth is unbound_slotmethod
         assert depickled_clsdict_meth is clsdict_slotmethod
-
-        assert depickled_bound_meth() == bound_slotmethod()
-        assert depickled_unbound_meth(obj) == unbound_slotmethod(obj)
-        assert depickled_clsdict_meth(obj) == clsdict_slotmethod(obj)
 
     @pytest.mark.skipif(
         platform.python_implementation() == "PyPy" or
@@ -797,16 +791,14 @@ class CloudPickleTest(unittest.TestCase):
 
         # str.maketrans takes a dict as input.
         target = {"a": "b"}
+
         assert depickled_bound_meth is bound_staticmethod
         assert depickled_unbound_meth is unbound_staticmethod
 
-        assert depickled_bound_meth(target) == bound_staticmethod(target)
-        assert depickled_unbound_meth(target) == unbound_staticmethod(target)
-
-        # staticmethod objects are not callable. Instead, we test for the
-        # depickled's object class, and wrapped object attribute.
-        assert type(depickled_clsdict_meth) is type(clsdict_staticmethod)
+        # staticmethod objects are recreated at depickling time, but the
+        # underlying __func__ object is pickled by attribute.
         assert depickled_clsdict_meth.__func__ is clsdict_staticmethod.__func__
+        type(depickled_clsdict_meth) is type(clsdict_staticmethod)
 
     @pytest.mark.skipif(tornado is None,
                         reason="test needs Tornado installed")
