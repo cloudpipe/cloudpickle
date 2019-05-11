@@ -130,24 +130,43 @@ def _make_cell_set_template_code():
             (),
         )
     else:
-        return types.CodeType(
-            co.co_argcount,
-            co.co_kwonlyargcount,
-            co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags,
-            co.co_code,
-            co.co_consts,
-            co.co_names,
-            co.co_varnames,
-            co.co_filename,
-            co.co_name,
-            co.co_firstlineno,
-            co.co_lnotab,
-            co.co_cellvars,  # this is the trickery
-            (),
-        )
-
+        try:
+            return types.CodeType(
+                co.co_argcount,
+                co.co_kwonlyargcount,
+                co.co_nlocals,
+                co.co_stacksize,
+                co.co_flags,
+                co.co_code,
+                co.co_consts,
+                co.co_names,
+                co.co_varnames,
+                co.co_filename,
+                co.co_name,
+                co.co_firstlineno,
+                co.co_lnotab,
+                co.co_cellvars,  # this is the trickery
+                (),
+            )
+   except:
+            return types.CodeType(
+                co.co_argcount,
+                co.co_posonlyargcount,  # Python3.8 with PEP570
+                co.co_kwonlyargcount,
+                co.co_nlocals,
+                co.co_stacksize,
+                co.co_flags,
+                co.co_code,
+                co.co_consts,
+                co.co_names,
+                co.co_varnames,
+                co.co_filename,
+                co.co_name,
+                co.co_firstlineno,
+                co.co_lnotab,
+                co.co_cellvars,  # this is the trickery
+                (),
+            )
 
 _cell_set_template_code = _make_cell_set_template_code()
 
