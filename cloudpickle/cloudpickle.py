@@ -148,7 +148,7 @@ def _make_cell_set_template_code():
                 co.co_cellvars,  # this is the trickery
                 (),
             )
-   except:
+        except:
             return types.CodeType(
                 co.co_argcount,
                 co.co_posonlyargcount,  # Python3.8 with PEP570
