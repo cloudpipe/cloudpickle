@@ -168,9 +168,10 @@ def _make_cell_set_template_code():
             (),
         )
     else:
-        try:
+        if sys.version_info > (3, 8, 0, 'alpha', 3):
             return types.CodeType(
                 co.co_argcount,
+                co.co_posonlyargcount,  # Python3.8 with PEP570
                 co.co_kwonlyargcount,
                 co.co_nlocals,
                 co.co_stacksize,
@@ -186,10 +187,9 @@ def _make_cell_set_template_code():
                 co.co_cellvars,  # this is the trickery
                 (),
             )
-        except:
+        else:
             return types.CodeType(
                 co.co_argcount,
-                co.co_posonlyargcount,  # Python3.8 with PEP570
                 co.co_kwonlyargcount,
                 co.co_nlocals,
                 co.co_stacksize,
