@@ -42,6 +42,7 @@ except ImportError:
 import cloudpickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
+from cloudpickle.cloudpickle import _extract_class_dict
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -69,6 +70,32 @@ def pickle_depickle(obj, protocol=cloudpickle.DEFAULT_PROTOCOL):
 def _escape(raw_filepath):
     # Ugly hack to embed filepaths in code templates for windows
     return raw_filepath.replace("\\", r"\\\\")
+
+
+def test_extract_class_dict():
+    class A(int):
+        """A docstring"""
+        def method(self):
+            return "a"
+
+    class B:
+        """B docstring"""
+        B_CONSTANT = 42
+
+        def method(self):
+            return "b"
+
+    class C(A, B):
+        C_CONSTANT = 43
+
+        def method_c(self):
+            return "c"
+
+    clsdict = _extract_class_dict(C)
+    assert sorted(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
+    assert clsdict["C_CONSTANT"] == 43
+    assert clsdict["__doc__"] is None
+    assert clsdict["method_c"](C()) == C().method_c()
 
 
 class CloudPickleTest(unittest.TestCase):
@@ -924,21 +951,18 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
     def test_namedtuple(self):
-
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
-        t = MyTuple(1, 2, 3)
+        t1 = MyTuple(1, 2, 3)
+        t2 = MyTuple(3, 2, 1)
 
-        depickled_t, depickled_MyTuple = pickle_depickle(
-            [t, MyTuple], protocol=self.protocol)
-        self.assertTrue(isinstance(depickled_t, depickled_MyTuple))
+        depickled_t1, depickled_MyTuple, depickled_t2 = pickle_depickle(
+            [t1, MyTuple, t2], protocol=self.protocol)
 
-        self.assertEqual((depickled_t.a, depickled_t.b, depickled_t.c),
-                         (1, 2, 3))
-        self.assertEqual((depickled_t[0], depickled_t[1], depickled_t[2]),
-                         (1, 2, 3))
-
-        self.assertEqual(depickled_MyTuple.__name__, 'MyTuple')
-        self.assertTrue(issubclass(depickled_MyTuple, tuple))
+        assert isinstance(depickled_t1, MyTuple)
+        assert depickled_t1 == t1
+        assert depickled_MyTuple is MyTuple
+        assert isinstance(depickled_t2, MyTuple)
+        assert depickled_t2 == t2
 
     def test_builtin_type__new__(self):
         # Functions occasionally take the __new__ of these types as default
@@ -1197,6 +1221,123 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
+    def test_interactive_dynamic_type_and_remote_instances(self):
+        code = """if __name__ == "__main__":
+        from testutils import subprocess_worker
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            class CustomCounter:
+                def __init__(self):
+                    self.count = 0
+                def increment(self):
+                    self.count += 1
+                    return self
+
+            counter = CustomCounter().increment()
+            assert counter.count == 1
+
+            returned_counter = w.run(counter.increment)
+            assert returned_counter.count == 2, returned_counter.count
+
+            # Check that the class definition of the returned instance was
+            # matched back to the original class definition living in __main__.
+
+            assert isinstance(returned_counter, CustomCounter)
+
+            # Check that memoization does not break provenance tracking:
+
+            def echo(*args):
+                return args
+
+            C1, C2, c1, c2 = w.run(echo, CustomCounter, CustomCounter,
+                                   CustomCounter(), returned_counter)
+            assert C1 is CustomCounter
+            assert C2 is CustomCounter
+            assert isinstance(c1, CustomCounter)
+            assert isinstance(c2, CustomCounter)
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
+    def test_interactive_dynamic_type_and_stored_remote_instances(self):
+        """Simulate objects stored on workers to check isinstance semantics
+
+        Such instances stored in the memory of running worker processes are
+        similar to dask-distributed futures for instance.
+        """
+        code = """if __name__ == "__main__":
+        import cloudpickle, uuid
+        from testutils import subprocess_worker
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            class A:
+                '''Original class definition'''
+                pass
+
+            def store(x):
+                storage = getattr(cloudpickle, "_test_storage", None)
+                if storage is None:
+                    storage = cloudpickle._test_storage = dict()
+                obj_id = uuid.uuid4().hex
+                storage[obj_id] = x
+                return obj_id
+
+            def lookup(obj_id):
+                return cloudpickle._test_storage[obj_id]
+
+            id1 = w.run(store, A())
+
+            # The stored object on the worker is matched to a singleton class
+            # definition thanks to provenance tracking:
+            assert w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
+
+            # Retrieving the object from the worker yields a local copy that
+            # is matched back the local class definition this instance
+            # originally stems from.
+            assert isinstance(w.run(lookup, id1), A)
+
+            # Changing the local class definition should be taken into account
+            # in all subsequent calls. In particular the old instances on the
+            # worker do not map back to the new class definition, neither on
+            # the worker itself, nor locally on the main program when the old
+            # instance is retrieved:
+
+            class A:
+                '''Updated class definition'''
+                pass
+
+            assert not w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
+            retrieved1 = w.run(lookup, id1)
+            assert not isinstance(retrieved1, A)
+            assert retrieved1.__class__ is not A
+            assert retrieved1.__class__.__doc__ == "Original class definition"
+
+            # New instances on the other hand are proper instances of the new
+            # class definition everywhere:
+
+            a = A()
+            id2 = w.run(store, a)
+            assert w.run(lambda obj_id: isinstance(lookup(obj_id), A), id2)
+            assert isinstance(w.run(lookup, id2), A)
+
+            # Monkeypatch the class defintion in the main process to a new
+            # class method:
+            A.echo = lambda cls, x: x
+
+            # Calling this method on an instance will automatically update
+            # the remote class definition on the worker to propagate the monkey
+            # patch dynamically.
+            assert w.run(a.echo, 42) == 42
+
+            # The stored instance can therefore also access the new class
+            # method:
+            assert w.run(lambda obj_id: lookup(obj_id).echo(43), id2) == 43
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
+
     @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
                         reason="Skip PyPy because memory grows too much")
     def test_interactive_remote_function_calls_no_memory_leak(self):
@@ -1226,9 +1367,10 @@ class CloudPickleTest(unittest.TestCase):
             import gc
             w.run(gc.collect)
 
-            # By this time the worker process has processed worth of 100MB of
-            # data passed in the closures its memory size should now have
-            # grown by more than a few MB.
+            # By this time the worker process has processed 100MB worth of data
+            # passed in the closures. The worker memory size should not have
+            # grown by more than a few MB as closures are garbage collected at
+            # the end of each remote function call.
             growth = w.memsize() - reference_size
             assert growth < 1e7, growth
 
@@ -1367,6 +1509,88 @@ class CloudPickleTest(unittest.TestCase):
 
         pickle_depickle(DataClass, protocol=self.protocol)
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
+
+    def test_locally_defined_enum(self):
+        enum = pytest.importorskip("enum")
+
+        class StringEnum(str, enum.Enum):
+            """Enum when all members are also (and must be) strings"""
+
+        class Color(StringEnum):
+            """3-element color space"""
+            RED = "1"
+            GREEN = "2"
+            BLUE = "3"
+
+            def is_green(self):
+                return self is Color.GREEN
+
+        green1, green2, ClonedColor = pickle_depickle(
+            [Color.GREEN, Color.GREEN, Color], protocol=self.protocol)
+        assert green1 is green2
+        assert green1 is ClonedColor.GREEN
+        assert green1 is not ClonedColor.BLUE
+        assert isinstance(green1, str)
+        assert green1.is_green()
+
+        # cloudpickle systematically tracks provenance of class definitions
+        # and ensure reconciliation in case of round trips:
+        assert green1 is Color.GREEN
+        assert ClonedColor is Color
+
+        green3 = pickle_depickle(Color.GREEN, protocol=self.protocol)
+        assert green3 is Color.GREEN
+
+    def test_locally_defined_intenum(self):
+        enum = pytest.importorskip("enum")
+        # Try again with a IntEnum defined with the functional API
+        DynamicColor = enum.IntEnum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
+
+        green1, green2, ClonedDynamicColor = pickle_depickle(
+            [DynamicColor.GREEN, DynamicColor.GREEN, DynamicColor],
+            protocol=self.protocol)
+
+        assert green1 is green2
+        assert green1 is ClonedDynamicColor.GREEN
+        assert green1 is not ClonedDynamicColor.BLUE
+        assert ClonedDynamicColor is DynamicColor
+
+    def test_interactively_defined_enum(self):
+        pytest.importorskip("enum")
+        code = """if __name__ == "__main__":
+        from enum import Enum
+        from testutils import subprocess_worker
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
+
+            def check_positive(x):
+                return Color.GREEN if x >= 0 else Color.RED
+
+            result = w.run(check_positive, 1)
+
+            # Check that the returned enum instance is reconciled with the
+            # locally defined Color enum type definition:
+
+            assert result is Color.GREEN
+
+            # Check that changing the definition of the Enum class is taken
+            # into account on the worker for subsequent calls:
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+
+            def check_positive(x):
+                return Color.BLUE if x >= 0 else Color.RED
+
+            result = w.run(check_positive, 1)
+            assert result is Color.BLUE
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
 
     def test_relative_import_inside_function(self):
         # Make sure relative imports inside round-tripped functions is not

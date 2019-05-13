@@ -1,3 +1,11 @@
+1.1.0
+=====
+
+- Track the provenance of dynamic classes and enums so as to preseve the
+  usual `isinstance` relationship between pickled objects and their
+  original class defintions.
+  ([issue #246](https://github.com/cloudpipe/cloudpickle/pull/246))
+
 1.0.0
 =====
 
