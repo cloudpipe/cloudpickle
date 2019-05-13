@@ -390,12 +390,23 @@ class CloudPickler(Pickler):
         Save a code object
         """
         if PY3:  # pragma: no branch
-            args = (
-                obj.co_argcount, obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
-                obj.co_flags, obj.co_code, obj.co_consts, obj.co_names, obj.co_varnames,
-                obj.co_filename, obj.co_name, obj.co_firstlineno, obj.co_lnotab, obj.co_freevars,
-                obj.co_cellvars
-            )
+            if hasattr(obj, "co_posonlyargcount"):
+                args = (
+                    obj.co_argcount, obj.co_posonlyargcount,
+                    obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
+                    obj.co_flags, obj.co_code, obj.co_consts, obj.co_names,
+                    obj.co_varnames, obj.co_filename, obj.co_name,
+                    obj.co_firstlineno, obj.co_lnotab, obj.co_freevars,
+                    obj.co_cellvars
+                )
+            else:
+                args = (
+                    obj.co_argcount, obj.co_kwonlyargcount, obj.co_nlocals,
+                    obj.co_stacksize, obj.co_flags, obj.co_code, obj.co_consts,
+                    obj.co_names, obj.co_varnames, obj.co_filename,
+                    obj.co_name, obj.co_firstlineno, obj.co_lnotab,
+                    obj.co_freevars, obj.co_cellvars
+                )
         else:
             args = (
                 obj.co_argcount, obj.co_nlocals, obj.co_stacksize, obj.co_flags, obj.co_code,
