@@ -168,7 +168,7 @@ def _make_cell_set_template_code():
             (),
         )
     else:
-        if sys.version_info > (3, 8, 0, 'alpha', 3):
+        if hasattr(types.CodeType, "co_posonlyargcount"):
             return types.CodeType(
                 co.co_argcount,
                 co.co_posonlyargcount,  # Python3.8 with PEP570
