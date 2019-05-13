@@ -1639,6 +1639,31 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
+    @pytest.mark.skipif(hasattr(types.CodeType, "co_posonlyargcount"),
+                        reason="Not all python version support this syntax")
+    def test_interactively_defined_func_with_positional_only_argument(self):
+        # Fixes https://github.com/cloudpipe/cloudpickle/issues/266
+        # The source code of this test is bundled in a string and is ran from
+        # the __main__ module of a subprocess in order to avoid a SyntaxError
+        # in versions of python that do not support positional-only argument
+        # syntax.
+        code = """
+        from cloudpickle import loads, dumps
+
+        def f(a, /, b=1):
+            return a + b
+
+        depickled_f = loads(dumps(f, protocol={protocol}))
+
+        for func in (f, depickled_f):
+            assert func(2) == 3
+            assert func.__code__.co_posonlyargcount == 1
+            with pytest.raises(TypeError):
+                func(a=2)
+
+        """.format(protocol=self.protocol)
+        assert_run_python_script(textwrap.dedent(code))
+
 class Protocol2CloudPickleTest(CloudPickleTest):
 
     protocol = 2
