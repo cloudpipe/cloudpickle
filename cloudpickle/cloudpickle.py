@@ -390,7 +390,7 @@ class CloudPickler(Pickler):
         Save a code object
         """
         if PY3:  # pragma: no branch
-            if hasattr(obj, "co_posonlyargcount"):
+            if hasattr(obj, "co_posonlyargcount"):  # pragma: no branch
                 args = (
                     obj.co_argcount, obj.co_posonlyargcount,
                     obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
