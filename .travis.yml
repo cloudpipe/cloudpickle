@@ -72,7 +72,7 @@ before_install:
         export PATH="$PYTHON_ROOT:$PYTHON_ROOT/Scripts:$PATH";
         python -m pip install --upgrade pip;
     fi
-  - if [[ "$BUILD_PY_FROM_SOURCE" == 1 ]]; then
+  - if [[ "$PYTHON_NIGHTLY" == 1 ]]; then
         export VENV_DIR="$HOME/python38";
         pushd ..;
         git clone https://github.com/python/cpython.git;
