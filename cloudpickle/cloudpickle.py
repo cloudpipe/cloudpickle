@@ -168,7 +168,7 @@ def _make_cell_set_template_code():
             (),
         )
     else:
-        if hasattr(types.CodeType, "co_posonlyargcount"):
+        if hasattr(types.CodeType, "co_posonlyargcount"):  # pragma: no branch
             return types.CodeType(
                 co.co_argcount,
                 co.co_posonlyargcount,  # Python3.8 with PEP570
