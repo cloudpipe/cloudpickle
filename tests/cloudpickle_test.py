@@ -1640,7 +1640,7 @@ class CloudPickleTest(unittest.TestCase):
         assert_run_python_script(textwrap.dedent(code))
 
     @pytest.mark.skipif(not hasattr(types.CodeType, "co_posonlyargcount"),
-                        reason="Not all python versions support this syntax")
+                        reason="Requires positional-only argument syntax")
     def test_interactively_defined_func_with_positional_only_argument(self):
         # Fixes https://github.com/cloudpipe/cloudpickle/issues/266
         # The source code of this test is bundled in a string and is ran from
