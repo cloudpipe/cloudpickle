@@ -31,6 +31,7 @@ dist = setup(
     license='BSD 3-Clause License',
     packages=['cloudpickle'],
     long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
