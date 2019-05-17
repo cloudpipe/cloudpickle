@@ -726,19 +726,18 @@ class CloudPickleTest(unittest.TestCase):
             clsdict_clsmethod, protocol=self.protocol)
 
         # float.fromhex takes a string as input.
-        target = "0x1"
+        arg = "0x1"
 
         # Identity on both the bound and the unbound methods cannot be
         # tested: the bound methods are bound to different objects, and the
         # unbound methods are actually recreated at each call.
-        assert depickled_bound_meth(target) == bound_clsmethod(target)
-        assert depickled_unbound_meth(target) == unbound_clsmethod(target)
+        assert depickled_bound_meth(arg) == bound_clsmethod(arg)
+        assert depickled_unbound_meth(arg) == unbound_clsmethod(arg)
 
         if platform.python_implementation() == 'CPython':
             # Roundtripping a classmethod_descriptor results in a
             # builtin_function_or_method (CPython upstream issue).
-            assert depickled_clsdict_meth(target) == clsdict_clsmethod(float,
-                                                                       target)
+            assert depickled_clsdict_meth(arg) == clsdict_clsmethod(float, arg)
         if platform.python_implementation() == 'PyPy':
             # builtin-classmethods are simple classmethod in PyPy (not
             # callable). We test equality of types and the functionality of the
@@ -747,7 +746,7 @@ class CloudPickleTest(unittest.TestCase):
             # pickleable and must be reconstructed at depickling time.
             assert type(depickled_clsdict_meth) == type(clsdict_clsmethod)
             assert depickled_clsdict_meth.__func__(
-                float, target) == clsdict_clsmethod.__func__(float, target)
+                float, arg) == clsdict_clsmethod.__func__(float, arg)
 
     def test_builtin_slotmethod(self):
         obj = 1.5  # float object
@@ -788,9 +787,6 @@ class CloudPickleTest(unittest.TestCase):
             unbound_staticmethod, protocol=self.protocol)
         depickled_clsdict_meth = pickle_depickle(
             clsdict_staticmethod, protocol=self.protocol)
-
-        # str.maketrans takes a dict as input.
-        target = {"a": "b"}
 
         assert depickled_bound_meth is bound_staticmethod
         assert depickled_unbound_meth is unbound_staticmethod
