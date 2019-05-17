@@ -119,8 +119,10 @@ def _lookup_class_or_track(class_tracker_id, class_def):
 if PY3:
     from pickle import _getattribute
 else:
-    # compatibility function for python2 with the same signature as
-    # _getattribute
+    # pickle._getattribute is a python3 addition and enchancement of getattr,
+    # that can handle dotted attribute names. In cloudpickle for python2,
+    # handling dotted names is not needed, so we simply define _getattribute as
+    # a wrapper around getattr.
     def _getattribute(obj, name):
         return getattr(obj, name, None), None
 
