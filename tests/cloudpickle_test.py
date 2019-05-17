@@ -655,25 +655,16 @@ class CloudPickleTest(unittest.TestCase):
 
     @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
                         sys.version_info[:2] == (3, 5),
-                        reason="bug of pypy3.5 in builtin constructors")
-    def test_builtin_method(self):
-        # Note that builtin_function_or_method are special-cased by cloudpickle
-        # only in python2.
+                        reason="bug of pypy3.5 in builtin-type constructors")
+    def test_builtin_type_constructor(self):
+        # Due to a bug in pypy3.5, cloudpickling builtin-type constructors
+        # fails. This test makes sure that cloudpickling builtin-type
+        # constructors works for all other python versions/implementation.
 
         # pickle_depickle some builtin methods of the __builtin__ module
         for t in list, tuple, set, frozenset, dict, object:
             cloned_new = pickle_depickle(t.__new__, protocol=self.protocol)
             assert isinstance(cloned_new(t), t)
-
-        # pickle_depickle a method of a "regular" module
-        fi = itertools.chain.from_iterable
-        fi_depickled = pickle_depickle(fi, protocol=self.protocol)
-
-        # `fi is fi_depickled` would return False, but so will
-        # `itertools.chain.from_iterable is itertools.chain.from_iterable`.
-        # Instead of testing physical equality, check that `fi_depickled`
-        # behaves as expected.
-        self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
     # The next 4 tests cover all cases into which builtin python methods can
     # appear.
