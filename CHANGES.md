@@ -1,6 +1,9 @@
 1.1.0
 =====
 
+- Support the pickling of interactively-defined functions with positional-only
+  arguments. ([issue #266](https://github.com/cloudpipe/cloudpickle/pull/266))
+
 - Track the provenance of dynamic classes and enums so as to preseve the
   usual `isinstance` relationship between pickled objects and their
   original class defintions.

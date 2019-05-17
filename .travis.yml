@@ -13,6 +13,9 @@ matrix:
       dist: trusty
       python: "pypy3"
     - os: linux
+      if: commit_message =~ /(\[ci python-nightly\])/
+      env: PYTHON_NIGHTLY=1
+    - os: linux
       python: 3.7
     - os: linux
       python: 3.6
@@ -69,15 +72,30 @@ before_install:
         export PATH="$PYTHON_ROOT:$PYTHON_ROOT/Scripts:$PATH";
         python -m pip install --upgrade pip;
     fi
+  - if [[ "$PYTHON_NIGHTLY" == 1 ]]; then
+        export VENV_DIR="$HOME/python38";
+        pushd ..;
+        git clone https://github.com/python/cpython.git;
+        pushd cpython;
+        ./configure;
+        make;
+        ./python -m venv "$VENV_DIR";
+        popd;
+        popd;
+        export PYTHON_EXE="$VENV_DIR/bin/python";
+    else
+        export PYTHON_EXE="python";
+    fi
+
 install:
-  - pip install .
-  - pip install --upgrade -r dev-requirements.txt
-  - pip install tornado
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
-        pip install numpy scipy;
+  - $PYTHON_EXE -m pip install .
+  - $PYTHON_EXE -m pip install --upgrade -r dev-requirements.txt
+  - $PYTHON_EXE -m pip install tornado
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* && "$PYTHON_NIGHTLY" != 1 ]]; then
+        $PYTHON_EXE -m pip install numpy scipy;
     fi
   - if [[ $PROJECT != "" ]]; then
-        pip install $TEST_REQUIREMENTS;
+        $PYTHON_EXE -m pip install $TEST_REQUIREMENTS;
         pushd ..;
         git clone $PROJECT_URL;
         if [[ $PROJECT == "joblib" ]]; then
@@ -85,22 +103,22 @@ install:
             source vendor_cloudpickle.sh ../../../cloudpickle;
             popd;
         fi;
-        pip install ./$PROJECT;
+        $PYTHON_EXE -m pip install ./$PROJECT;
         popd;
     fi
-  - pip list
+  - $PYTHON_EXE -m pip list
 before_script:
   # stop the build if there are Python syntax errors or undefined names
-  - flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
+  - $PYTHON_EXE -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 --show-source --statistics
   # exit-zero treats all errors as warnings.  The GitHub editor is 127 chars wide
-  - flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-  - python ci/install_coverage_subprocess_pth.py
+  - $PYTHON_EXE -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+  - $PYTHON_EXE ci/install_coverage_subprocess_pth.py
 script:
-  - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+  - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' $PYTHON_EXE -m pytest -r s
   - |
     if [[ $PROJECT != "" ]]; then
       pushd ../$PROJECT
-      pytest -vl
+      $PYTHON_EXE -m pytest -vl
       TEST_RETURN_CODE=$?
       popd
       if [[ "$TEST_RETURN_CODE" != "0" ]]; then
