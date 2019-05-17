@@ -1,3 +1,9 @@
+1.2.0
+=====
+
+- Support pickling of classmethod and staticmethod objects in python2.
+  arguments. ([issue #262](https://github.com/cloudpipe/cloudpickle/pull/262))
+
 1.1.0
 =====
 
