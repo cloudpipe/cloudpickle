@@ -675,8 +675,8 @@ class CloudPickleTest(unittest.TestCase):
         # behaves as expected.
         self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
 
-    # The next 4 tests pickle-depickle all forms into which builtin python
-    # methods can appear.
+    # The next 4 tests cover all cases into which builtin python methods can
+    # appear.
     # There are 4 kinds of method: 'classic' methods, classmethods,
     # staticmethods and slotmethods. They will appear under different types
     # depending on whether they are called from the __dict__ of their

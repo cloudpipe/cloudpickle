@@ -738,7 +738,7 @@ class CloudPickler(Pickler):
         # Python3 comes with native reducers that allow builtin functions and
         # methods pickling as module/class attributes.  The following method
         # extends this for python2.
-        # Plase note that currently, neither pickle nor cloudpickle support
+        # Please note that currently, neither pickle nor cloudpickle support
         # dynamically created builtin functions/method pickling.
         def save_builtin_function_or_method(self, obj):
             is_bound = getattr(obj, '__self__', None) is not None
@@ -749,7 +749,7 @@ class CloudPickler(Pickler):
 
             is_unbound = hasattr(obj, '__objclass__')
             if is_unbound:
-                # obj is a unbound builtin method (accessed from its class)
+                # obj is an unbound builtin method (accessed from its class)
                 rv = (getattr, (obj.__objclass__, obj.__name__))
                 return self.save_reduce(obj=obj, *rv)
 
