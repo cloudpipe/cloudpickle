@@ -116,6 +116,16 @@ def _lookup_class_or_track(class_tracker_id, class_def):
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
     return class_def
 
+if PY3:
+    from pickle import _getattribute
+else:
+    # pickle._getattribute is a python3 addition and enchancement of getattr,
+    # that can handle dotted attribute names. In cloudpickle for python2,
+    # handling dotted names is not needed, so we simply define _getattribute as
+    # a wrapper around getattr.
+    def _getattribute(obj, name):
+        return getattr(obj, name, None), None
+
 
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
@@ -242,32 +252,6 @@ for k, v in types.__dict__.items():
 
 def _builtin_type(name):
     return getattr(types, name)
-
-
-def _make__new__factory(type_):
-    def _factory():
-        return type_.__new__
-    return _factory
-
-
-# NOTE: These need to be module globals so that they're pickleable as globals.
-_get_dict_new = _make__new__factory(dict)
-_get_frozenset_new = _make__new__factory(frozenset)
-_get_list_new = _make__new__factory(list)
-_get_set_new = _make__new__factory(set)
-_get_tuple_new = _make__new__factory(tuple)
-_get_object_new = _make__new__factory(object)
-
-# Pre-defined set of builtin_function_or_method instances that can be
-# serialized.
-_BUILTIN_TYPE_CONSTRUCTORS = {
-    dict.__new__: _get_dict_new,
-    frozenset.__new__: _get_frozenset_new,
-    set.__new__: _get_set_new,
-    list.__new__: _get_list_new,
-    tuple.__new__: _get_tuple_new,
-    object.__new__: _get_object_new,
-}
 
 
 if sys.version_info < (3, 4):  # pragma: no branch
@@ -423,28 +407,12 @@ class CloudPickler(Pickler):
         Determines what kind of function obj is (e.g. lambda, defined at
         interactive prompt, etc) and handles the pickling appropriately.
         """
-        try:
-            should_special_case = obj in _BUILTIN_TYPE_CONSTRUCTORS
-        except TypeError:
-            # Methods of builtin types aren't hashable in python 2.
-            should_special_case = False
-
-        if should_special_case:
-            # We keep a special-cased cache of built-in type constructors at
-            # global scope, because these functions are structured very
-            # differently in different python versions and implementations (for
-            # example, they're instances of types.BuiltinFunctionType in
-            # CPython, but they're ordinary types.FunctionType instances in
-            # PyPy).
-            #
-            # If the function we've received is in that cache, we just
-            # serialize it as a lookup into the cache.
-            return self.save_reduce(_BUILTIN_TYPE_CONSTRUCTORS[obj], (), obj=obj)
-
         write = self.write
 
         if name is None:
-            name = obj.__name__
+            name = getattr(obj, '__qualname__', None)
+        if name is None:
+            name = getattr(obj, '__name__', None)
         try:
             # whichmodule() could fail, see
             # https://bitbucket.org/gutworth/six/issues/63/importing-six-breaks-pickling
@@ -462,30 +430,13 @@ class CloudPickler(Pickler):
             themodule = None
 
         try:
-            lookedup_by_name = getattr(themodule, name, None)
+            lookedup_by_name, _ = _getattribute(themodule, name)
         except Exception:
             lookedup_by_name = None
 
         if themodule:
             if lookedup_by_name is obj:
                 return self.save_global(obj, name)
-
-        # a builtin_function_or_method which comes in as an attribute of some
-        # object (e.g., itertools.chain.from_iterable) will end
-        # up with modname "__main__" and so end up here. But these functions
-        # have no __code__ attribute in CPython, so the handling for
-        # user-defined functions below will fail.
-        # So we pickle them here using save_reduce; have to do it differently
-        # for different python versions.
-        if not hasattr(obj, '__code__'):
-            if PY3:  # pragma: no branch
-                rv = obj.__reduce_ex__(self.proto)
-            else:
-                if hasattr(obj, '__self__'):
-                    rv = (getattr, (obj.__self__, name))
-                else:
-                    raise pickle.PicklingError("Can't pickle %r" % obj)
-            return self.save_reduce(obj=obj, *rv)
 
         # if func is lambda, def'ed at prompt, is in main, or is nested, then
         # we'll pickle the actual function object rather than simply saving a
@@ -813,12 +764,44 @@ class CloudPickler(Pickler):
 
         return (code, f_globals, defaults, closure, dct, base_globals)
 
-    def save_builtin_function(self, obj):
-        if obj.__module__ == "__builtin__":
-            return self.save_global(obj)
-        return self.save_function(obj)
+    if not PY3:  # pragma: no branch
+        # Python3 comes with native reducers that allow builtin functions and
+        # methods pickling as module/class attributes.  The following method
+        # extends this for python2.
+        # Please note that currently, neither pickle nor cloudpickle support
+        # dynamically created builtin functions/method pickling.
+        def save_builtin_function_or_method(self, obj):
+            is_bound = getattr(obj, '__self__', None) is not None
+            if is_bound:
+                # obj is a bound builtin method.
+                rv = (getattr, (obj.__self__, obj.__name__))
+                return self.save_reduce(obj=obj, *rv)
 
-    dispatch[types.BuiltinFunctionType] = save_builtin_function
+            is_unbound = hasattr(obj, '__objclass__')
+            if is_unbound:
+                # obj is an unbound builtin method (accessed from its class)
+                rv = (getattr, (obj.__objclass__, obj.__name__))
+                return self.save_reduce(obj=obj, *rv)
+
+            # Otherwise, obj is not a method, but a function. Fallback to
+            # default pickling by attribute.
+            return Pickler.save_global(self, obj)
+
+        dispatch[types.BuiltinFunctionType] = save_builtin_function_or_method
+
+        # A comprehensive summary of the various kinds of builtin methods can
+        # be found in PEP 579: https://www.python.org/dev/peps/pep-0579/
+        classmethod_descriptor_type = type(float.__dict__['fromhex'])
+        wrapper_descriptor_type = type(float.__repr__)
+        method_wrapper_type = type(1.5.__repr__)
+
+        dispatch[classmethod_descriptor_type] = save_builtin_function_or_method
+        dispatch[wrapper_descriptor_type] = save_builtin_function_or_method
+        dispatch[method_wrapper_type] = save_builtin_function_or_method
+
+    if sys.version_info[:2] < (3, 4):
+        method_descriptor = type(str.upper)
+        dispatch[method_descriptor] = save_builtin_function_or_method
 
     def save_global(self, obj, name=None, pack=struct.pack):
         """
@@ -1345,18 +1328,3 @@ def _is_dynamic(module):
         except ImportError:
             return True
         return False
-
-
-""" Use copy_reg to extend global pickle definitions """
-
-if sys.version_info < (3, 4):  # pragma: no branch
-    method_descriptor = type(str.upper)
-
-    def _reduce_method_descriptor(obj):
-        return (getattr, (obj.__objclass__, obj.__name__))
-
-    try:
-        import copy_reg as copyreg
-    except ImportError:
-        import copyreg
-    copyreg.pickle(method_descriptor, _reduce_method_descriptor)

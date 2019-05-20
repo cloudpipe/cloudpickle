@@ -641,14 +641,151 @@ class CloudPickleTest(unittest.TestCase):
         res = pickle_depickle(type(NotImplemented), protocol=self.protocol)
         self.assertEqual(type(NotImplemented), res)
 
-    def test_builtin_function_without_module(self):
-        on = object.__new__
-        on_depickled = pickle_depickle(on, protocol=self.protocol)
-        self.assertEqual(type(on_depickled(object)), type(object()))
+    def test_builtin_function(self):
+        # Note that builtin_function_or_method are special-cased by cloudpickle
+        # only in python2.
 
-        fi = itertools.chain.from_iterable
-        fi_depickled = pickle_depickle(fi, protocol=self.protocol)
-        self.assertEqual(list(fi_depickled([[1, 2], [3, 4]])), [1, 2, 3, 4])
+        # builtin function from the __builtin__ module
+        assert pickle_depickle(zip, protocol=self.protocol) is zip
+
+        from sys import getcheckinterval
+        # builtin function from a "regular" module
+        assert pickle_depickle(
+            getcheckinterval, protocol=self.protocol) is getcheckinterval
+
+    @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
+                        sys.version_info[:2] == (3, 5),
+                        reason="bug of pypy3.5 in builtin-type constructors")
+    def test_builtin_type_constructor(self):
+        # Due to a bug in pypy3.5, cloudpickling builtin-type constructors
+        # fails. This test makes sure that cloudpickling builtin-type
+        # constructors works for all other python versions/implementation.
+
+        # pickle_depickle some builtin methods of the __builtin__ module
+        for t in list, tuple, set, frozenset, dict, object:
+            cloned_new = pickle_depickle(t.__new__, protocol=self.protocol)
+            assert isinstance(cloned_new(t), t)
+
+    # The next 4 tests cover all cases into which builtin python methods can
+    # appear.
+    # There are 4 kinds of method: 'classic' methods, classmethods,
+    # staticmethods and slotmethods. They will appear under different types
+    # depending on whether they are called from the __dict__ of their
+    # class, their class itself, or an instance of their class. This makes
+    # 12 total combinations.
+    # This discussion and the following tests are relevant for the CPython
+    # implementation only. In PyPy, there is no builtin method or builtin
+    # function types/flavours. The only way into which a builtin method can be
+    # identified is with it's builtin-code __code__ attribute.
+
+    def test_builtin_classicmethod(self):
+        obj = 1.5  # float object
+
+        bound_classicmethod = obj.hex  # builtin_function_or_method
+        unbound_classicmethod = type(obj).hex  # method_descriptor
+        clsdict_classicmethod = type(obj).__dict__['hex']  # method_descriptor
+
+        assert unbound_classicmethod is clsdict_classicmethod
+
+        depickled_bound_meth = pickle_depickle(
+            bound_classicmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_classicmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_classicmethod, protocol=self.protocol)
+
+        # No identity on the bound methods they are bound to different float
+        # instances
+        assert depickled_bound_meth() == bound_classicmethod()
+        assert depickled_unbound_meth is unbound_classicmethod
+        assert depickled_clsdict_meth is clsdict_classicmethod
+
+
+    def test_builtin_classmethod(self):
+        obj = 1.5  # float object
+
+        bound_clsmethod = obj.fromhex  # builtin_function_or_method
+        unbound_clsmethod = type(obj).fromhex  # builtin_function_or_method
+        clsdict_clsmethod = type(
+            obj).__dict__['fromhex']  # classmethod_descriptor
+
+        depickled_bound_meth = pickle_depickle(
+            bound_clsmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_clsmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_clsmethod, protocol=self.protocol)
+
+        # float.fromhex takes a string as input.
+        arg = "0x1"
+
+        # Identity on both the bound and the unbound methods cannot be
+        # tested: the bound methods are bound to different objects, and the
+        # unbound methods are actually recreated at each call.
+        assert depickled_bound_meth(arg) == bound_clsmethod(arg)
+        assert depickled_unbound_meth(arg) == unbound_clsmethod(arg)
+
+        if platform.python_implementation() == 'CPython':
+            # Roundtripping a classmethod_descriptor results in a
+            # builtin_function_or_method (CPython upstream issue).
+            assert depickled_clsdict_meth(arg) == clsdict_clsmethod(float, arg)
+        if platform.python_implementation() == 'PyPy':
+            # builtin-classmethods are simple classmethod in PyPy (not
+            # callable). We test equality of types and the functionality of the
+            # __func__ attribute instead. We do not test the the identity of
+            # the functions as __func__ attributes of classmethods are not
+            # pickleable and must be reconstructed at depickling time.
+            assert type(depickled_clsdict_meth) == type(clsdict_clsmethod)
+            assert depickled_clsdict_meth.__func__(
+                float, arg) == clsdict_clsmethod.__func__(float, arg)
+
+    def test_builtin_slotmethod(self):
+        obj = 1.5  # float object
+
+        bound_slotmethod = obj.__repr__  # method-wrapper
+        unbound_slotmethod = type(obj).__repr__  # wrapper_descriptor
+        clsdict_slotmethod = type(obj).__dict__['__repr__']  # ditto
+
+        depickled_bound_meth = pickle_depickle(
+            bound_slotmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_slotmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_slotmethod, protocol=self.protocol)
+
+        # No identity tests on the bound slotmethod are they are bound to
+        # different float instances
+        assert depickled_bound_meth() == bound_slotmethod()
+        assert depickled_unbound_meth is unbound_slotmethod
+        assert depickled_clsdict_meth is clsdict_slotmethod
+
+    @pytest.mark.skipif(
+        platform.python_implementation() == "PyPy" or
+        sys.version_info[:1] < (3,),
+        reason="No known staticmethod example in the python 2 / pypy stdlib")
+    def test_builtin_staticmethod(self):
+        obj = "foo"  # str object
+
+        bound_staticmethod = obj.maketrans  # builtin_function_or_method
+        unbound_staticmethod = type(obj).maketrans  # ditto
+        clsdict_staticmethod = type(obj).__dict__['maketrans']  # staticmethod
+
+        assert bound_staticmethod is unbound_staticmethod
+
+        depickled_bound_meth = pickle_depickle(
+            bound_staticmethod, protocol=self.protocol)
+        depickled_unbound_meth = pickle_depickle(
+            unbound_staticmethod, protocol=self.protocol)
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_staticmethod, protocol=self.protocol)
+
+        assert depickled_bound_meth is bound_staticmethod
+        assert depickled_unbound_meth is unbound_staticmethod
+
+        # staticmethod objects are recreated at depickling time, but the
+        # underlying __func__ object is pickled by attribute.
+        assert depickled_clsdict_meth.__func__ is clsdict_staticmethod.__func__
+        type(depickled_clsdict_meth) is type(clsdict_staticmethod)
 
     @pytest.mark.skipif(tornado is None,
                         reason="test needs Tornado installed")
@@ -963,14 +1100,6 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_MyTuple is MyTuple
         assert isinstance(depickled_t2, MyTuple)
         assert depickled_t2 == t2
-
-    def test_builtin_type__new__(self):
-        # Functions occasionally take the __new__ of these types as default
-        # parameters for factories.  For example, on Python 3.3,
-        # `tuple.__new__` is a default value for some methods of namedtuple.
-        for t in list, tuple, set, frozenset, dict, object:
-            cloned = pickle_depickle(t.__new__, protocol=self.protocol)
-            self.assertTrue(cloned is t.__new__)
 
     def test_interactively_defined_function(self):
         # Check that callables defined in the __main__ module of a Python
