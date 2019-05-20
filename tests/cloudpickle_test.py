@@ -1023,7 +1023,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(set(weakset), {depickled1, depickled2})
 
     def test_faulty_module(self):
-        for module_name in ['_faulty_module', '_missing_module', None]:
+        for module_name in ['_missing_module', None]:
             class FaultyModule(object):
                 def __getattr__(self, name):
                     # This throws an exception while looking up within

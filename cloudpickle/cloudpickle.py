@@ -123,6 +123,71 @@ else:
         return getattr(obj, name, None), None
 
 
+def whichmodule(obj, name):
+    """Find the module an object belongs to.
+
+    This function differs from ``pickle.whichmodule`` in two ways:
+    - it does not mangle the cases where obj's module is __main__ and obj was
+      not found in any module.
+    - Errors arising during module introspection are ignored, as those errors
+      are considered unwanted side effects.
+    """
+    module_name = getattr(obj, '__module__', None)
+    if module_name is not None:
+        return module_name
+    # Protect the iteration by using a list copy of sys.modules against dynamic
+    # modules that trigger imports of other modules upon calls to getattr.
+    for module_name, module in list(sys.modules.items()):
+        if module_name == '__main__' or module is None:
+            continue
+        try:
+            if _getattribute(module, name)[0] is obj:
+                return module_name
+        except Exception:
+            pass
+    return None
+
+
+def _is_global(obj, name=None):
+    """Determine if obj can be pickled as attribute of a file-backed module"""
+    if name is None:
+        name = getattr(obj, '__qualname__', None)
+    if name is None:
+        name = getattr(obj, '__name__', None)
+
+    module_name = whichmodule(obj, name)
+
+    if module_name is None:
+        # In this case, obj.__module__ is None AND obj was not found in any
+        # imported module. obj is thus treated as dynamic.
+        return False
+
+    if module_name == "__main__":
+        return False
+
+    module = sys.modules.get(module_name, None)
+    if module is None:
+        # The main reason why obj's module would not be imported is that this
+        # module has been dynamically created, using for example
+        # types.ModuleType. The other possibility is that module was removed
+        # from sys.modules after obj was created/imported. But this case is not
+        # supported, as the standard pickle does not support it either.
+        return False
+
+    if _is_dynamic(module):
+        # module has been added to sys.modules, but it can still be dynamic.
+        return False
+
+    try:
+        obj2, parent = _getattribute(module, name)
+    except AttributeError:
+        # obj was not found inside the module it points to
+        return False
+    if obj2 is not obj:
+        return False
+    return True
+
+
 def _make_cell_set_template_code():
     """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
 
@@ -392,61 +457,9 @@ class CloudPickler(Pickler):
         Determines what kind of function obj is (e.g. lambda, defined at
         interactive prompt, etc) and handles the pickling appropriately.
         """
-        write = self.write
-
-        if name is None:
-            name = getattr(obj, '__qualname__', None)
-        if name is None:
-            name = getattr(obj, '__name__', None)
-        try:
-            # whichmodule() could fail, see
-            # https://bitbucket.org/gutworth/six/issues/63/importing-six-breaks-pickling
-            modname = pickle.whichmodule(obj, name)
-        except Exception:
-            modname = None
-        # print('which gives %s %s %s' % (modname, obj, name))
-        try:
-            themodule = sys.modules[modname]
-        except KeyError:
-            # eval'd items such as namedtuple give invalid items for their function __module__
-            modname = '__main__'
-
-        if modname == '__main__':
-            themodule = None
-
-        try:
-            lookedup_by_name, _ = _getattribute(themodule, name)
-        except Exception:
-            lookedup_by_name = None
-
-        if themodule:
-            if lookedup_by_name is obj:
-                return self.save_global(obj, name)
-
-        # if func is lambda, def'ed at prompt, is in main, or is nested, then
-        # we'll pickle the actual function object rather than simply saving a
-        # reference (as is done in default pickler), via save_function_tuple.
-        if (islambda(obj)
-                or getattr(obj.__code__, 'co_filename', None) == '<stdin>'
-                or themodule is None):
-            self.save_function_tuple(obj)
-            return
-        else:
-            # func is nested
-            if lookedup_by_name is None or lookedup_by_name is not obj:
-                self.save_function_tuple(obj)
-                return
-
-        if obj.__dict__:
-            # essentially save_reduce, but workaround needed to avoid recursion
-            self.save(_restore_attr)
-            write(pickle.MARK + pickle.GLOBAL + modname + '\n' + name + '\n')
-            self.memoize(obj)
-            self.save(obj.__dict__)
-            write(pickle.TUPLE + pickle.REDUCE)
-        else:
-            write(pickle.GLOBAL + modname + '\n' + name + '\n')
-            self.memoize(obj)
+        if not _is_global(obj, name=name):
+            return self.save_function_tuple(obj)
+        return Pickler.save_global(self, obj, name=name)
 
     dispatch[types.FunctionType] = save_function
 
@@ -801,23 +814,13 @@ class CloudPickler(Pickler):
             return self.save_reduce(type, (Ellipsis,), obj=obj)
         elif obj is type(NotImplemented):
             return self.save_reduce(type, (NotImplemented,), obj=obj)
-
-        if obj.__module__ == "__main__":
-            return self.save_dynamic_class(obj)
-
-        try:
-            return Pickler.save_global(self, obj, name=name)
-        except Exception:
-            if obj.__module__ == "__builtin__" or obj.__module__ == "builtins":
-                if obj in _BUILTIN_TYPE_NAMES:
-                    return self.save_reduce(
-                        _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
-
-            typ = type(obj)
-            if typ is not obj and isinstance(obj, (type, types.ClassType)):
-                return self.save_dynamic_class(obj)
-
-            raise
+        elif obj in _BUILTIN_TYPE_NAMES:
+            return self.save_reduce(
+                _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
+        elif not _is_global(obj, name=name):
+            self.save_dynamic_class(obj)
+        else:
+            Pickler.save_global(self, obj, name=name)
 
     dispatch[type] = save_global
     dispatch[types.ClassType] = save_global
