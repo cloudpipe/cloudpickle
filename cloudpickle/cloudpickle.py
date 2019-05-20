@@ -176,8 +176,8 @@ def _is_global(obj, name=None):
         # supported, as the standard pickle does not support it either.
         return False
 
-    # module has been added to sys.modules, but it can still be dynamic.
     if _is_dynamic(module):
+        # module has been added to sys.modules, but it can still be dynamic.
         return False
 
     try:
