@@ -95,7 +95,7 @@ else:
     PY2 = False
     from importlib._bootstrap import _find_spec
 
-    if sys.implementation.name == 'pypy':
+    if platform.python_implementation() == 'PyPy':
         from importlib._bootstrap import _find_spec
     else:
         from _frozen_importlib import _find_spec
