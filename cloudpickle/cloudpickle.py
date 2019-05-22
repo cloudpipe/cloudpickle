@@ -95,6 +95,11 @@ else:
     PY2 = False
     from importlib._bootstrap import _find_spec
 
+    if sys.implementation.name == 'pypy':
+        from importlib._bootstrap import _find_spec
+    else:
+        from _frozen_importlib import _find_spec
+
 
 def _ensure_tracking(class_def):
     with _DYNAMIC_CLASS_TRACKER_LOCK:
