@@ -621,7 +621,7 @@ class CloudPickleTest(unittest.TestCase):
         dynamic_module = types.ModuleType('dynamic_module')
         assert _is_dynamic(dynamic_module)
 
-        if sys.implementation.name == 'pypy':
+        if platform.python_implementation() == 'PyPy':
             import _codecs
             assert not _is_dynamic(_codecs)
 

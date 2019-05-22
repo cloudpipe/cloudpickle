@@ -50,6 +50,7 @@ import logging
 import opcode
 import operator
 import pickle
+import platform
 import struct
 import sys
 import traceback
@@ -93,7 +94,7 @@ else:
     PY3 = True
     PY2 = False
 
-    if sys.implementation.name == 'pypy':
+    if platform.python_implementation() == 'PyPy':
         from importlib._bootstrap import _find_spec
     else:
         from _frozen_importlib import _find_spec
