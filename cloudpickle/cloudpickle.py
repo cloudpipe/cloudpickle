@@ -307,10 +307,6 @@ HAVE_ARGUMENT = dis.HAVE_ARGUMENT
 EXTENDED_ARG = dis.EXTENDED_ARG
 
 
-def islambda(func):
-    return getattr(func, '__name__') == '<lambda>'
-
-
 _BUILTIN_TYPE_NAMES = {}
 for k, v in types.__dict__.items():
     if type(v) is type:
@@ -1092,13 +1088,6 @@ def dynamic_subimport(name, vars):
     mod = types.ModuleType(name)
     mod.__dict__.update(vars)
     return mod
-
-
-# restores function attributes
-def _restore_attr(obj, attr):
-    for key, val in attr.items():
-        setattr(obj, key, val)
-    return obj
 
 
 def _gen_ellipsis():
