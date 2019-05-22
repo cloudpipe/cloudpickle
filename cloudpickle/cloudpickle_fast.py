@@ -27,8 +27,6 @@ from .cloudpickle import (
 load, loads = _pickle.load, _pickle.loads
 
 # Shorthands similar to pickle.dump/pickle.dumps
-
-
 def dump(obj, file, protocol=None):
     """Serialize obj as bytes streamed into file
 
@@ -57,9 +55,9 @@ def dumps(obj, protocol=None):
         cp.dump(obj)
         return file.getvalue()
 
+
 # COLLECTION OF OBJECTS __getnewargs__-LIKE METHODS
 # -------------------------------------------------
-
 
 def _function_getnewargs(func, globals_ref):
     code = func.__code__
