@@ -93,6 +93,11 @@ else:
     PY3 = True
     PY2 = False
 
+    if sys.implementation.name == 'pypy':
+        from importlib._bootstrap import _find_spec
+    else:
+        from _frozen_importlib import _find_spec
+
 
 def _ensure_tracking(class_def):
     with _DYNAMIC_CLASS_TRACKER_LOCK:
@@ -1301,7 +1306,25 @@ def _is_dynamic(module):
         return False
 
     if hasattr(module, '__spec__'):
-        return module.__spec__ is None
+        if module.__spec__ is not None:
+            return False
+
+        # In PyPy, Some built-in modules such as _codecs can have their
+        # __spec__ attribute set to None despite being imported.  For such
+        # modules, the ``_find_spec`` utility of the standard library is used.
+        parent_name = module.__name__.rpartition('.')[0]
+        if parent_name:
+            try:
+                parent = sys.modules[parent_name]
+            except KeyError:
+                msg = "parent {!r} not in sys.modules"
+                raise ImportError(msg.format(parent_name))
+            else:
+                pkgpath = parent.__path__
+        else:
+            pkgpath = None
+        return _find_spec(module.__name__, pkgpath, module) is None
+
     else:
         # Backward compat for Python 2
         import imp
