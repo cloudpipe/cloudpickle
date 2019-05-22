@@ -18,9 +18,10 @@ import weakref
 from _pickle import Pickler
 
 from .cloudpickle import (
-    islambda, _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_CONSTRUCTORS,
-    _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL, _find_loaded_submodules,
-    _get_cell_contents
+    _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
+    _find_loaded_submodules, _get_cell_contents, _is_global, _builtin_type,
+    Enum, _ensure_tracking, _lookup_class_or_track, _make_skeleton_class,
+    _make_skeleton_enum, _extract_class_dict, string_types
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -93,6 +94,29 @@ def _function_getnewargs(func, globals_ref):
         closure = tuple(types.CellType() for _ in range(len(code.co_freevars)))
 
     return code, base_globals, None, None, closure
+
+
+def _class_getnewargs(obj):
+    # On PyPy, __doc__ is a readonly attribute, so we need to include it in
+    # the initial skeleton class.  This is safe because we know that the
+    # doc can't participate in a cycle with the original class.
+    type_kwargs = {'__doc__': obj.__dict__.get('__doc__', None)}
+
+    if hasattr(obj, "__slots__"):
+        type_kwargs["__slots__"] = obj.__slots__
+
+    __dict__ = obj.__dict__.get('__dict__', None)
+    if isinstance(__dict__, property):
+        type_kwargs['__dict__'] = __dict__
+
+    return (type(obj), obj.__name__, obj.__bases__, type_kwargs,
+            _ensure_tracking(obj), None)
+
+
+def _enum_getnewargs(obj):
+    members = dict((e.name, e.value) for e in obj)
+    return (obj.__bases__, obj.__name__, obj.__qualname__, members,
+            obj.__module__, _ensure_tracking(obj), None)
 
 
 # COLLECTION OF OBJECTS RECONSTRUCTORS
@@ -172,6 +196,49 @@ def _function_getstate(func):
     return state, slotstate
 
 
+def _class_getstate(obj):
+    clsdict = _extract_class_dict(obj)
+    clsdict.pop('__weakref__', None)
+    clsdict.pop('__doc__', None)  # present in the reconstructor args
+
+    # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
+    # This is a fix which breaks the cache but this only makes the first
+    # calls to issubclass slower.
+    if "_abc_impl" in clsdict:
+        (registry, _, _, _) = abc._get_dump(obj)
+        clsdict["_abc_impl"] = [subclass_weakref()
+                                for subclass_weakref in registry]
+    if hasattr(obj, "__slots__"):
+        # pickle string length optimization: member descriptors of obj are
+        # created automatically from obj's __slots__ attribute, no need to
+        # save them in obj's state
+        if isinstance(obj.__slots__, string_types):
+            clsdict.pop(obj.__slots__)
+        else:
+            for k in obj.__slots__:
+                clsdict.pop(k, None)
+
+    clsdict.pop('__dict__', None)  # unpickleable property object
+
+    return (clsdict, {})
+
+
+def _enum_getstate(obj):
+    clsdict, slotstate = _class_getstate(obj)
+
+    members = dict((e.name, e.value) for e in obj)
+    # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
+    # Those attributes are already handled by the metaclass.
+    for attrname in ["_generate_next_value_", "_member_names_",
+                     "_member_map_", "_member_type_",
+                     "_value2member_map_"]:
+        clsdict.pop(attrname, None)
+    for member in members:
+        clsdict.pop(member)
+        # Special handling of Enum subclasses
+    return clsdict, slotstate
+
+
 # COLLECTIONS OF OBJECTS REDUCERS
 # -------------------------------
 # A reducer is a function taking a single argument (obj), and that returns a
@@ -193,23 +260,23 @@ def _builtin_type_reduce(obj):
 
 def _code_reduce(obj):
     """codeobject reducer"""
-    args = (
-        obj.co_argcount,
-        obj.co_kwonlyargcount,
-        obj.co_nlocals,
-        obj.co_stacksize,
-        obj.co_flags,
-        obj.co_code,
-        obj.co_consts,
-        obj.co_names,
-        obj.co_varnames,
-        obj.co_filename,
-        obj.co_name,
-        obj.co_firstlineno,
-        obj.co_lnotab,
-        obj.co_freevars,
-        obj.co_cellvars,
-    )
+    if hasattr(obj, "co_posonlyargcount"):  # pragma: no branch
+        args = (
+            obj.co_argcount, obj.co_posonlyargcount,
+            obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
+            obj.co_flags, obj.co_code, obj.co_consts, obj.co_names,
+            obj.co_varnames, obj.co_filename, obj.co_name,
+            obj.co_firstlineno, obj.co_lnotab, obj.co_freevars,
+            obj.co_cellvars
+        )
+    else:
+        args = (
+            obj.co_argcount, obj.co_kwonlyargcount, obj.co_nlocals,
+            obj.co_stacksize, obj.co_flags, obj.co_code, obj.co_consts,
+            obj.co_names, obj.co_varnames, obj.co_filename,
+            obj.co_name, obj.co_firstlineno, obj.co_lnotab,
+            obj.co_freevars, obj.co_cellvars
+        )
     return types.CodeType, args
 
 
@@ -321,66 +388,9 @@ def _function_reduce(obj, globals_ref):
     from an attribute lookup of a file-backed module. If this check fails, then
     a custom reducer is called.
     """
-    if obj in _BUILTIN_TYPE_CONSTRUCTORS:
-        # We keep a special-cased cache of built-in type constructors at
-        # global scope, because these functions are structured very
-        # differently in different python versions and implementations (for
-        # example, they're instances of types.BuiltinFunctionType in
-        # CPython, but they're ordinary types.FunctionType instances in
-        # PyPy).
-        #
-        # If the function we've received is in that cache, we just
-        # serialize it as a lookup into the cache.
-        return _BUILTIN_TYPE_CONSTRUCTORS[obj], ()
-
-    name = obj.__name__
-    try:
-        modname = pickle.whichmodule(obj, name)
-    except Exception:
-        modname = None
-
-    try:
-        themodule = sys.modules[modname]
-    except KeyError:
-        # eval'd items such as namedtuple give invalid items for their function
-        # __module__
-        modname = "__main__"
-
-    if modname == "__main__":
-        # we do not want the incoming module attribute lookup to succeed for
-        # the __main__ module.
-        themodule = None
-
-    try:
-        lookedup_by_name = getattr(themodule, name, None)
-    except Exception:
-        lookedup_by_name = None
-
-    if lookedup_by_name is obj:  # in this case, module is None
-        # if obj exists in a filesytem-backed module, let the builtin pickle
-        # saving routines save obj
-        return NotImplemented
-
-    # XXX: the special handling of builtin_function_or_method is removed as
-    # currently this hook is not called for such instances, as opposed to
-    # cloudpickle.
-
-    # if func is lambda, def'ed at prompt, is in main, or is nested, then
-    # we'll pickle the actual function object rather than simply saving a
-    # reference (as is done in default pickler), via save_function_tuple.
-    if (
-        islambda(obj)
-        or getattr(obj.__code__, "co_filename", None) == "<stdin>"
-        or themodule is None
-    ):
-        return _dynamic_function_reduce(obj, globals_ref=globals_ref)
-
-    # this whole code section may be cleanable: the if/else conditions + the
-    # NotImplemented look like they cover nearly all cases.
-    else:
-        # func is nested
-        if lookedup_by_name is None or lookedup_by_name is not obj:
-            return _dynamic_function_reduce(obj, globals_ref=globals_ref)
+    if not _is_global(obj):
+        return _dynamic_function_reduce(obj, globals_ref)
+    return NotImplemented
 
 
 def _dynamic_class_reduce(obj):
@@ -391,49 +401,16 @@ def _dynamic_class_reduce(obj):
     functions, or that otherwise can't be serialized as attribute lookups
     from global modules.
     """
-    # XXX: This code is nearly untouch with regards to the legacy cloudpickle.
-    # It is pretty and hard to understand.
-    clsdict = dict(obj.__dict__)  # copy dict proxy to a dict
-    clsdict.pop("__weakref__", None)
-
-    if "_abc_impl" in clsdict:
-        (registry, _, _, _) = abc._get_dump(obj)
-        clsdict["_abc_impl"] = [
-            subclass_weakref() for subclass_weakref in registry
-        ]
-
-    # On PyPy, __doc__ is a readonly attribute, so we need to include it in
-    # the initial skeleton class.  This is safe because we know that the
-    # doc can't participate in a cycle with the original class.
-    type_kwargs = {"__doc__": clsdict.pop("__doc__", None)}
-
-    if hasattr(obj, "__slots__"):
-        type_kwargs["__slots__"] = obj.__slots__
-        # Pickle string length optimization: member descriptors of obj are
-        # created automatically from obj's __slots__ attribute, no need to
-        # save them in obj's state
-        if isinstance(obj.__slots__, str):
-            clsdict.pop(obj.__slots__)
-        else:
-            for k in obj.__slots__:
-                clsdict.pop(k, None)
-
-    # If type overrides __dict__ as a property, include it in the type kwargs.
-    # In Python 2, we can't set this attribute after construction.
-    # XXX: removed special handling of __dict__ for python2
-    __dict__ = clsdict.pop("__dict__", None)
-    if isinstance(__dict__, property):
-        type_kwargs["__dict__"] = __dict__
-        __dict__ = None
-
-    return (
-        type(obj),
-        (obj.__name__, obj.__bases__, type_kwargs),
-        (clsdict, {}),
-        None,
-        None,
-        _class_setstate,
-    )
+    if Enum is not None and issubclass(obj, Enum):
+        return (
+            _make_skeleton_enum, _enum_getnewargs(obj), _enum_getstate(obj),
+            None, None, _class_setstate
+        )
+    else:
+        return (
+            _make_skeleton_class, _class_getnewargs(obj), _class_getstate(obj),
+            None, None, _class_setstate
+        )
 
 
 def _class_reduce(obj):
@@ -441,29 +418,17 @@ def _class_reduce(obj):
     # XXX: there used to be special handling for NoneType, EllipsisType and
     # NotImplementedType. As for now this module handles only python3.8+, this
     # code has been removed.
-    if obj.__module__ == "__main__":
+    if obj is type(None):  # noqa
+        return type, (None,)
+    elif obj is type(Ellipsis):
+        return type, (Ellipsis,)
+    elif obj is type(NotImplemented):
+        return type, (NotImplemented,)
+    elif obj in _BUILTIN_TYPE_NAMES:
+        return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
+    elif not _is_global(obj):
         return _dynamic_class_reduce(obj)
-
-    try:
-        # All classes are caught in this function: pickleable classes are
-        # filtered out by creating a Pickler with no custom class reducer
-        # (thus, falling back to save_global). If it fails to save obj, then
-        # obj is either a non-pickleable builtin or dynamic.
-        pickle.dumps(obj)
-    except Exception:
-        if obj.__module__ == "builtins":
-            if obj in _BUILTIN_TYPE_NAMES:
-                return _builtin_type_reduce(obj)
-
-        typ = type(obj)
-        if typ is not obj and isinstance(obj, type):  # noqa: E721
-            return _dynamic_class_reduce(obj)
-
-    else:
-        # if pickle.dumps worked out fine, then simply fallback to the
-        # traditional pickle by attribute # implemented in the builtin
-        # `Pickler.save_global`.
-        return NotImplemented
+    return NotImplemented
 
 
 # COLLECTIONS OF OBJECTS STATE SETTERS

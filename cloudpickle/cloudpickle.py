@@ -107,6 +107,12 @@ else:
     else:
         from _frozen_importlib import _find_spec
 
+_extract_code_globals_cache = (
+    weakref.WeakKeyDictionary()
+    if not hasattr(sys, "pypy_version_info")
+    else {})
+
+
 
 def _ensure_tracking(class_def):
     with _DYNAMIC_CLASS_TRACKER_LOCK:
@@ -198,6 +204,77 @@ def _is_global(obj, name=None):
         # obj was not found inside the module it points to
         return False
     return obj2 is obj
+
+
+def _extract_code_globals(co):
+    """
+    Find all globals names read or written to by codeblock co
+    """
+    out_names = _extract_code_globals_cache.get(co)
+    if out_names is None:
+        try:
+            names = co.co_names
+        except AttributeError:
+            # PyPy "builtin-code" object
+            out_names = set()
+        else:
+            out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
+
+            # Declaring a function inside another one using the "def ..."
+            # syntax generates a constant code object corresonding to the one
+            # of the nested function's As the nested function may itself need
+            # global variables, we need to introspect its code, extract its
+            # globals, (look for code object in it's co_consts attribute..) and
+            # add the result to code_globals
+            if co.co_consts:
+                for const in co.co_consts:
+                    if isinstance(const, types.CodeType):
+                        out_names |= _extract_code_globals(const)
+
+        _extract_code_globals_cache[co] = out_names
+
+    return out_names
+
+
+def _find_loaded_submodules(code, top_level_dependencies):
+    """
+    Save submodules used by a function but not listed in its globals.
+    In the example below:
+    ```
+    import concurrent.futures
+    import cloudpickle
+    def func():
+        x = concurrent.futures.ThreadPoolExecutor
+    if __name__ == '__main__':
+        cloudpickle.dumps(func)
+    ```
+    the globals extracted by cloudpickle in the function's state include
+    the concurrent package, but not its submodule (here,
+    concurrent.futures), which is the module used by func.
+    To ensure that calling the depickled function does not raise an
+    AttributeError, this function looks for any currently loaded submodule
+    that the function uses and whose parent is present in the function
+    globals, and saves it before saving the function.
+    """
+
+    subimports = []
+    # check if any known dependency is an imported package
+    for x in top_level_dependencies:
+        if (isinstance(x, types.ModuleType) and
+                hasattr(x, '__package__') and x.__package__):
+            # check if the package has any currently loaded sub-imports
+            prefix = x.__name__ + '.'
+            # A concurrent thread could mutate sys.modules,
+            # make sure we iterate over a copy to avoid exceptions
+            for name in list(sys.modules):
+                # Older versions of pytest will add a "None" module to
+                # sys.modules.
+                if name is not None and name.startswith(prefix):
+                    # check whether the function can address the sub-module
+                    tokens = set(name[len(prefix):].split('.'))
+                    if not tokens - set(code.co_names):
+                        subimports.append(sys.modules[name])
+    return subimports
 
 
 def _make_cell_set_template_code():
