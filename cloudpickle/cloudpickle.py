@@ -93,11 +93,7 @@ else:
     string_types = (str,)
     PY3 = True
     PY2 = False
-
-    if platform.python_implementation() == 'PyPy':
-        from importlib._bootstrap import _find_spec
-    else:
-        from _frozen_importlib import _find_spec
+    from importlib._bootstrap import _find_spec
 
 
 def _ensure_tracking(class_def):
@@ -180,8 +176,8 @@ def _is_global(obj, name=None):
         # supported, as the standard pickle does not support it either.
         return False
 
+    # module has been added to sys.modules, but it can still be dynamic.
     if _is_dynamic(module):
-        # module has been added to sys.modules, but it can still be dynamic.
         return False
 
     try:
@@ -189,9 +185,7 @@ def _is_global(obj, name=None):
     except AttributeError:
         # obj was not found inside the module it points to
         return False
-    if obj2 is not obj:
-        return False
-    return True
+    return obj2 is obj
 
 
 def _make_cell_set_template_code():
