@@ -137,5 +137,5 @@ script:
       fi
     fi
 after_success:
-  - coverage combine --append
-  - codecov
+  - $PYTHON_EXE -m coverage combine --append
+  - $PYTHON_EXE -m codecov
