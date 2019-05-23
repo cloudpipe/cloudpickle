@@ -21,7 +21,8 @@ from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_loaded_submodules, _get_cell_contents, _is_global, _builtin_type,
     Enum, _ensure_tracking, _lookup_class_or_track, _make_skeleton_class,
-    _make_skeleton_enum, _extract_class_dict, string_types
+    _make_skeleton_enum, _extract_class_dict, string_types, dynamic_subimport,
+    subimport
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -119,39 +120,6 @@ def _enum_getnewargs(obj):
 
 # COLLECTION OF OBJECTS RECONSTRUCTORS
 # ------------------------------------
-
-# Builtin types are types defined in the python language source code, that are
-# not defined in an importable python module (Lib/* for pure python module,
-# Modules/* for C-implemented modules). The most wildely used ones (such as
-# tuple, dict, list) are made accessible in any interpreter session by exposing
-# them in the builtin namespace at startup time.
-
-# By construction, builtin types do not have a module. Trying to access their
-# __module__ attribute will default to 'builtins', that only contains builtin
-# types accessible at interpreter startup. Therefore, trying to pickle the
-# other ones using classic module attribute lookup instructions will fail.
-
-# Fortunately, many non-accessible builtin-types are mirrored in the types
-# module. For those types, we pickle the function builtin_type_reconstructor
-# instead, that contains instruction to look them up via the types module.
-def _builtin_type_reconstructor(name):
-    """Return a builtin-type using attribute lookup from the types module"""
-    return getattr(types, name)
-
-
-# XXX: what does "not working as desired" means?
-# hack for __import__ not working as desired
-def _module_reconstructor(name):
-    __import__(name)
-    return sys.modules[name]
-
-
-def _dynamic_module_reconstructor(name, vars):
-    mod = types.ModuleType(name)
-    mod.__dict__.update(vars)
-    return mod
-
-
 def _file_reconstructor(retval):
     return retval
 
@@ -251,11 +219,6 @@ def _enum_getstate(obj):
 # XXX: no itemgetter/attrgetter reducer support implemented as the tests seem
 # to pass even without them
 
-
-def _builtin_type_reduce(obj):
-    return _builtin_type_reconstructor, (_BUILTIN_TYPE_NAMES[obj],)
-
-
 def _code_reduce(obj):
     """codeobject reducer"""
     if hasattr(obj, "co_posonlyargcount"):  # pragma: no branch
@@ -350,9 +313,9 @@ def _memoryview_reduce(obj):
 
 def _module_reduce(obj):
     if _is_dynamic(obj):
-        return _dynamic_module_reconstructor, (obj.__name__, vars(obj))
+        return dynamic_subimport, (obj.__name__, vars(obj))
     else:
-        return _module_reconstructor, (obj.__name__,)
+        return subimport, (obj.__name__,)
 
 
 def _method_reduce(obj):
