@@ -138,5 +138,6 @@ script:
       fi
     fi
 after_success:
+  - pip install coverage codecov
   - coverage combine --append
   - codecov
