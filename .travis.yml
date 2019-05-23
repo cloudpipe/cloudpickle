@@ -26,6 +26,7 @@ matrix:
     - os: linux
       if: commit_message =~ /(\[ci python-nightly\])/
       env: PYTHON_NIGHTLY=1
+      python: 3.7
     - os: linux
       python: 3.7
     - os: linux
@@ -137,5 +138,5 @@ script:
       fi
     fi
 after_success:
-  - $PYTHON_EXE -m coverage combine --append
-  - $PYTHON_EXE -m codecov
+  - coverage combine --append
+  - codecov
