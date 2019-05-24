@@ -813,6 +813,8 @@ class CloudPickler(Pickler):
         elif obj in _BUILTIN_TYPE_NAMES:
             return self.save_reduce(
                 _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
+        elif name is not None:
+            Pickler.save_global(self, obj, name=name)
         elif not _is_global(obj, name=name):
             self.save_dynamic_class(obj)
         else:
