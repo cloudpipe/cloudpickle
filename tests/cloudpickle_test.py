@@ -1798,6 +1798,15 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
+    def test___reduce___returns_string(self):
+        # Non regression test for objects with a __reduce__ method returning a
+        # string, meaning "save by attribute using save_global"
+        from .mypkg import some_singleton
+        assert some_singleton.__reduce__() == "some_singleton"
+        depickled_singleton = pickle_depickle(
+            some_singleton, protocol=self.protocol)
+        assert depickled_singleton is some_singleton
+
 class Protocol2CloudPickleTest(CloudPickleTest):
 
     protocol = 2
