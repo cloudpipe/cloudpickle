@@ -1299,7 +1299,7 @@ def _is_dynamic(module):
         # __spec__ attribute set to None despite being imported.  For such
         # modules, the ``_find_spec`` utility of the standard library is used.
         parent_name = module.__name__.rpartition('.')[0]
-        if parent_name:  # pragma: no branch
+        if parent_name:  # pragma: no cover
             # This code handles the case where an imported package (and not
             # module) remains with __spec__ set to None. It is however untested
             # as no package in the PyPy stdlib has __spec__ set to None after
