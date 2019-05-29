@@ -478,6 +478,10 @@ class CloudPickleTest(unittest.TestCase):
         mod1, mod2 = pickle_depickle([mod, mod])
         self.assertEqual(id(mod1), id(mod2))
 
+        # Test pickling a function of mod
+        depickled_f = pickle_depickle(mod.f, protocol=self.protocol)
+        self.assertEqual(mod.f(5), depickled_f(5))
+
     def test_module_locals_behavior(self):
         # Makes sure that a local function defined in another module is
         # correctly serialized. This notably checks that the globals are
