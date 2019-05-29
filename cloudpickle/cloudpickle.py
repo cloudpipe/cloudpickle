@@ -125,10 +125,10 @@ else:
         return getattr(obj, name, None), None
 
 
-def whichmodule(obj, name):
+def _whichmodule(obj, name):
     """Find the module an object belongs to.
 
-    This function differs from ``pickle.whichmodule`` in two ways:
+    This function differs from ``pickle._whichmodule`` in two ways:
     - it does not mangle the cases where obj's module is __main__ and obj was
       not found in any module.
     - Errors arising during module introspection are ignored, as those errors
@@ -157,7 +157,7 @@ def _is_global(obj, name=None):
     if name is None:
         name = getattr(obj, '__name__', None)
 
-    module_name = whichmodule(obj, name)
+    module_name = _whichmodule(obj, name)
 
     if module_name is None:
         # In this case, obj.__module__ is None AND obj was not found in any
