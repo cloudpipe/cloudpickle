@@ -4,6 +4,8 @@
 - Support pickling of classmethod and staticmethod objects in python2.
   arguments. ([issue #262](https://github.com/cloudpipe/cloudpickle/pull/262))
 
+- Fix for CloudPickle Dropping Type Hints ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
+
 1.1.1
 =====
 
@@ -77,7 +79,7 @@
 - Stop using the deprecated `imp` module under Python 3.
   ([issue #207](https://github.com/cloudpipe/cloudpickle/issues/207))
 
-- Fixed pickling issue with singleton types `NoneType`, `type(...)` and 
+- Fixed pickling issue with singleton types `NoneType`, `type(...)` and
   `type(NotImplemented)` ([issue #209](https://github.com/cloudpipe/cloudpickle/issues/209))
 
 
