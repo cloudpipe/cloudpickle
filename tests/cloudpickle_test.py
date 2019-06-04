@@ -1601,9 +1601,9 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__doc__, f.__doc__)
 
-    @unittest.skipIf(sys.version_info < (3, 7),
+    @unittest.skipIf(sys.version_info < (3, 4),
                      """This syntax won't work on py2 and pickling annotations
-                     isn't supported for py36 and below.""")
+                     isn't supported for py34 and below.""")
     def test_wraps_preserves_function_annotations(self):
         from functools import wraps
 

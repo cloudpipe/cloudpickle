@@ -666,7 +666,7 @@ class CloudPickler(Pickler):
             'name': func.__name__,
             'doc': func.__doc__,
         }
-        if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
+        if hasattr(func, '__annotations__') and sys.version_info >= (3, 4):
             state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
