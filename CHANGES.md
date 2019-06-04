@@ -4,7 +4,10 @@
 - Support pickling of classmethod and staticmethod objects in python2.
   arguments. ([issue #262](https://github.com/cloudpipe/cloudpickle/pull/262))
 
-- Fix for CloudPickle Dropping Type Hints ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
+- Add support to pickle type annotations for Python 3.5 and 3.6 (pickling type
+  annotations was already supported for Python 3.7, Python 3.4 might also work
+  but is no longer officially supported by cloudpickle)
+  ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
 
 1.1.1
 =====
