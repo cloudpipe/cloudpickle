@@ -128,7 +128,7 @@ else:
 def _whichmodule(obj, name):
     """Find the module an object belongs to.
 
-    This function differs from ``pickle._whichmodule`` in two ways:
+    This function differs from ``pickle.whichmodule`` in two ways:
     - it does not mangle the cases where obj's module is __main__ and obj was
       not found in any module.
     - Errors arising during module introspection are ignored, as those errors
