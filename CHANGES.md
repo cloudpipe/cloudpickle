@@ -9,6 +9,10 @@
   but is no longer officially supported by cloudpickle)
   ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
 
+- Internal refactoring of the pickling logic to make the code more predictable.
+  This refactoring also yielded small performance improvements (~10%)
+  ([issue #273](https://github.com/cloudpipe/cloudpickle/pull/273))
+
 1.1.1
 =====
 
