@@ -9,8 +9,9 @@
   but is no longer officially supported by cloudpickle)
   ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
 
-- Internal refactoring of the pickling logic to make the code more predictable.
-  This refactoring also yielded small performance improvements (~10%)
+- Internal refactoring to proactively detect dynamic functions and classes when
+  pickling them.  This refactoring also yields small performance improvements
+  when pickling dynamic classes (~10%)
   ([issue #273](https://github.com/cloudpipe/cloudpickle/pull/273))
 
 1.1.1
