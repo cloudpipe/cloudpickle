@@ -478,6 +478,15 @@ class CloudPickleTest(unittest.TestCase):
         mod1, mod2 = pickle_depickle([mod, mod])
         self.assertEqual(id(mod1), id(mod2))
 
+        # Ensure proper pickling of mod's functions when module "looks" like a
+        # file-backed module even though it is not:
+        try:
+            sys.modules['mod'] = mod
+            depickled_f = pickle_depickle(mod.f, protocol=self.protocol)
+            self.assertEqual(mod.f(5), depickled_f(5))
+        finally:
+            sys.modules.pop('mod', None)
+
     def test_module_locals_behavior(self):
         # Makes sure that a local function defined in another module is
         # correctly serialized. This notably checks that the globals are
@@ -620,6 +629,10 @@ class CloudPickleTest(unittest.TestCase):
         # dynamic
         dynamic_module = types.ModuleType('dynamic_module')
         assert _is_dynamic(dynamic_module)
+
+        if platform.python_implementation() == 'PyPy':
+            import _codecs
+            assert not _is_dynamic(_codecs)
 
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
@@ -1023,7 +1036,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(set(weakset), {depickled1, depickled2})
 
     def test_faulty_module(self):
-        for module_name in ['_faulty_module', '_missing_module', None]:
+        for module_name in ['_missing_module', None]:
             class FaultyModule(object):
                 def __getattr__(self, name):
                     # This throws an exception while looking up within
@@ -1793,6 +1806,15 @@ class CloudPickleTest(unittest.TestCase):
 
         """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
+
+    def test___reduce___returns_string(self):
+        # Non regression test for objects with a __reduce__ method returning a
+        # string, meaning "save by attribute using save_global"
+        from .mypkg import some_singleton
+        assert some_singleton.__reduce__() == "some_singleton"
+        depickled_singleton = pickle_depickle(
+            some_singleton, protocol=self.protocol)
+        assert depickled_singleton is some_singleton
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
