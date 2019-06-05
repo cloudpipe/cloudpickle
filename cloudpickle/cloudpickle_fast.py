@@ -1,9 +1,10 @@
 """
-New, fast version of the Cloudpickler.
+New, fast version of the CloudPickler.
 
-This new Cloudpickler class can now extend the fast C Pickler instead of the
-previous pythonic Pickler. Because this functionality is only available for
-python versions 3.8+, a lot of backward-compatibilty code is also removed.
+This new CloudPickler class can now extend the fast C Pickler instead of the
+previous python implementation of the Pickler class. Because this functionality
+is only available for python versions 3.8+, a lot of backward-compatibility
+code is also removed.
 """
 import abc
 import io
@@ -59,41 +60,6 @@ def dumps(obj, protocol=None):
 
 # COLLECTION OF OBJECTS __getnewargs__-LIKE METHODS
 # -------------------------------------------------
-
-def _function_getnewargs(func, globals_ref):
-    code = func.__code__
-
-    # base_globals represents the future global namespace of func at
-    # unpickling time. Looking it up and storing it in globals_ref allow
-    # functions sharing the same globals at pickling time to also
-    # share them once unpickled, at one condition: since globals_ref is
-    # an attribute of a Cloudpickler instance, and that a new CloudPickler is
-    # created each time pickle.dump or pickle.dumps is called, functions
-    # also need to be saved within the same invokation of
-    # cloudpickle.dump/cloudpickle.dumps
-    # (for example: cloudpickle.dumps([f1, f2])). There
-    # is no such limitation when using Cloudpickler.dump, as long as the
-    # multiple invokations are bound to the same Cloudpickler.
-    base_globals = globals_ref.setdefault(id(func.__globals__), {})
-
-    if base_globals == {}:
-        # Add module attributes used to resolve relative imports
-        # instructions inside func.
-        for k in ["__package__", "__name__", "__path__", "__file__"]:
-            # Some built-in functions/methods such as object.__new__  have
-            # their __globals__ set to None in PyPy
-            if func.__globals__ is not None and k in func.__globals__:
-                base_globals[k] = func.__globals__[k]
-
-    # Do not bind the free variables before the function is created to avoid
-    # infinite recursion.
-    if func.__closure__ is None:
-        closure = None
-    else:
-        closure = tuple(types.CellType() for _ in range(len(code.co_freevars)))
-
-    return code, base_globals, None, None, closure
-
 
 def _class_getnewargs(obj):
     # On PyPy, __doc__ is a readonly attribute, so we need to include it in
@@ -153,7 +119,10 @@ def _function_getstate(func):
         if func.__closure__ is not None else ()
     )
 
-    # extract submodules referenced by attribute lookup (no global opcode)
+    # Extract submodules referenced by attribute lookup (no global opcode).
+    # Storing the loaded submodules in a smoke __submodule__ attribute of
+    # func.__globals__ allow these modules to be saved at pickling time, and
+    # thus imported when the function is unpickled.
     f_globals["__submodules__"] = _find_loaded_submodules(
         func.__code__, itertools.chain(f_globals.values(), closure_values))
     slotstate["__globals__"] = f_globals
@@ -184,7 +153,7 @@ def _class_getstate(obj):
             for k in obj.__slots__:
                 clsdict.pop(k, None)
 
-    clsdict.pop('__dict__', None)  # unpickleable property object
+    clsdict.pop('__dict__', None)  # unpicklable property object
 
     return (clsdict, {})
 
@@ -209,15 +178,12 @@ def _enum_getstate(obj):
 # -------------------------------
 # A reducer is a function taking a single argument (obj), and that returns a
 # tuple with all the necessary data to re-construct obj. Apart from a few
-# exceptions (list, dicts, bytes, ints, etc.), a reducer is necessary to
-# correclty pickle an object.
+# exceptions (list, dict, bytes, int, etc.), a reducer is necessary to
+# correctly pickle an object.
 # While many built-in objects (Exceptions objects, instances of the "object"
 # class, etc), are shipped with their own built-in reducer (invoked using
 # obj.__reduce__), some do not. The following methods were created to "fill
 # these holes".
-
-# XXX: no itemgetter/attrgetter reducer support implemented as the tests seem
-# to pass even without them
 
 def _code_reduce(obj):
     """codeobject reducer"""
@@ -334,26 +300,6 @@ def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
 
-def _dynamic_function_reduce(func, globals_ref):
-    """Reduce a function that is not pickleable via attribute loookup.
-    """
-    newargs = _function_getnewargs(func, globals_ref)
-    state = _function_getstate(func)
-    return types.FunctionType, newargs, state, None, None, _function_setstate
-
-
-def _function_reduce(obj, globals_ref):
-    """Select the reducer depending on obj's dynamic nature
-
-    This functions starts by replicating save_global: trying to retrieve obj
-    from an attribute lookup of a file-backed module. If this check fails, then
-    a custom reducer is called.
-    """
-    if not _is_global(obj):
-        return _dynamic_function_reduce(obj, globals_ref)
-    return NotImplemented
-
-
 def _dynamic_class_reduce(obj):
     """
     Save a class that can't be stored as module global.
@@ -411,7 +357,7 @@ def _function_setstate(obj, state):
     obj_globals = slotstate.pop("__globals__")
     obj_closure = slotstate.pop("__closure__")
 
-    # remove uncessary  references to submodules
+    # remove unnecessary references to submodules
     obj_globals.pop("__submodules__")
     obj.__globals__.update(obj_globals)
     obj.__globals__["__builtins__"] = __builtins__
@@ -446,9 +392,9 @@ def _class_setstate(obj, state):
 class CloudPickler(Pickler):
     """Fast C Pickler extension with additional reducing routines.
 
-    Cloudpickler's extensions exist into into:
+    CloudPickler's extensions exist into into:
 
-    * it's dispatch_table containing reducers that are called only if ALL
+    * its dispatch_table containing reducers that are called only if ALL
       built-in saving functions were previously discarded.
     * a special callback, invoked before standard function/class
       builtin-saving method (save_global), to serialize dynamic functions
@@ -486,7 +432,7 @@ class CloudPickler(Pickler):
         # will likely not be known in advance, and thus cannot be special-cased
         # using an entry in the dispatch_table.
 
-        # The pickler's reducer_override, among other things, allows us to
+        # The Pickler's reducer_override, among other things, allows us to
         # register a reducer that will be called for any class, independently
         # of its type.
         self.proto = int(protocol)
@@ -496,7 +442,7 @@ class CloudPickler(Pickler):
 
         This function is the analog of a custom save_global. However, the C
         Pickler API does not expose low-level instructions such as save or
-        write. Instead, we return a reduce value the the Pickler will
+        write. Instead, we return a reduce value the Pickler will
         internally serialize via save_reduce.
         """
         t = type(obj)
@@ -508,10 +454,66 @@ class CloudPickler(Pickler):
         if is_anyclass:
             return _class_reduce(obj)
         elif isinstance(obj, types.FunctionType):
-            return _function_reduce(obj, self.globals_ref)
+            return self._function_reduce(obj)
         else:
-            # fallback to save_global, including the pickler's distpatch_table
+            # fallback to save_global, including the Pickler's distpatch_table
             return NotImplemented
+
+    # function reducers are defined as instance methods of CloudPickler
+    # objects, as they rely on a CloudPickler attribute (globals_ref)
+    def _dynamic_function_reduce(self, func):
+        """Reduce a function that is not pickleable via attribute lookup.
+        """
+        newargs = self._function_getnewargs(func)
+        state = _function_getstate(func)
+        return (types.FunctionType, newargs, state, None, None,
+                _function_setstate)
+
+    def _function_reduce(self, obj):
+        """Select the reducer depending on obj's dynamic nature
+
+        This functions starts by replicating save_global: trying to retrieve
+        obj from an attribute lookup of a file-backed module. If this check
+        fails, then a custom reducer is called.
+        """
+        if not _is_global(obj):
+            return self._dynamic_function_reduce(obj)
+        return NotImplemented
+
+    def _function_getnewargs(self, func):
+        code = func.__code__
+
+        # base_globals represents the future global namespace of func at
+        # unpickling time. Looking it up and storing it in
+        # CloudpiPickler.globals_ref allow functions sharing the same globals
+        # at pickling time to also share them once unpickled, at one condition:
+        # since globals_ref is an attribute of a CloudPickler instance, and
+        # that a new CloudPickler is created each time pickle.dump or
+        # pickle.dumps is called, functions also need to be saved within the
+        # same invocation of cloudpickle.dump/cloudpickle.dumps (for example:
+        # cloudpickle.dumps([f1, f2])). There is no such limitation when using
+        # CloudPickler.dump, as long as the multiple invocations are bound to
+        # the same CloudPickler.
+        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
+
+        if base_globals == {}:
+            # Add module attributes used to resolve relative imports
+            # instructions inside func.
+            for k in ["__package__", "__name__", "__path__", "__file__"]:
+                # Some built-in functions/methods such as object.__new__  have
+                # their __globals__ set to None in PyPy
+                if func.__globals__ is not None and k in func.__globals__:
+                    base_globals[k] = func.__globals__[k]
+
+        # Do not bind the free variables before the function is created to
+        # avoid infinite recursion.
+        if func.__closure__ is None:
+            closure = None
+        else:
+            closure = tuple(
+                types.CellType() for _ in range(len(code.co_freevars)))
+
+        return code, base_globals, None, None, closure
 
     def dump(self, obj):
         try:
