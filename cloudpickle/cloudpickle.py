@@ -95,11 +95,6 @@ else:
     PY2 = False
     from importlib._bootstrap import _find_spec
 
-    if platform.python_implementation() == 'PyPy':
-        from importlib._bootstrap import _find_spec
-    else:
-        from _frozen_importlib import _find_spec
-
 _extract_code_globals_cache = (
     weakref.WeakKeyDictionary()
     if not hasattr(sys, "pypy_version_info")
@@ -187,8 +182,8 @@ def _is_global(obj, name=None):
         # supported, as the standard pickle does not support it either.
         return False
 
+    # module has been added to sys.modules, but it can still be dynamic.
     if _is_dynamic(module):
-        # module has been added to sys.modules, but it can still be dynamic.
         return False
 
     try:
