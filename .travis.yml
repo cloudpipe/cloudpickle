@@ -92,7 +92,7 @@ install:
   - $PYTHON_EXE -m pip install --upgrade -r dev-requirements.txt
   - $PYTHON_EXE -m pip install tornado
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
-      if [[ "$PYTHON_NIGHTLY" == 1 ]]; then
+      if [[ "$PYTHON_NIGHTLY" == "1" ]]; then
         # Install the master version of numpy (with the master branch of cython)
         $PYTHON_EXE -m pip install git+https://github.com/cython/cython git+https://github.com/numpy/numpy;
       else
