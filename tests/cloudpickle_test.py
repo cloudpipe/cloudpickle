@@ -1816,6 +1816,23 @@ class CloudPickleTest(unittest.TestCase):
             some_singleton, protocol=self.protocol)
         assert depickled_singleton is some_singleton
 
+    def test_cloudpickle_extract_nested_globals(self):
+        def function_factory():
+            def inner_function():
+                global _TEST_GLOBAL_VARIABLE
+                return _TEST_GLOBAL_VARIABLE
+            return inner_function
+
+        globals_ = cloudpickle.CloudPickler.extract_code_globals(
+            function_factory.__code__)
+        assert globals_ == {'_TEST_GLOBAL_VARIABLE'}
+
+        depickled_factory = pickle_depickle(function_factory,
+                                            protocol=self.protocol)
+        inner_func = depickled_factory()
+        assert inner_func() == _TEST_GLOBAL_VARIABLE
+
+
 class Protocol2CloudPickleTest(CloudPickleTest):
 
     protocol = 2
