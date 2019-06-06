@@ -483,6 +483,10 @@ class CloudPickler(Pickler):
         (compared the one already implemented in pickle) to protect ourselves
         from reference cycles. A simple (reconstructor, newargs, obj.__dict__)
         tuple is save_reduced.
+
+        Note also that PyPy improved their support for __qualname__ in v3.6, so
+        this routing should be removed when cloudpickle supports only PyPy 3.6
+        and later.
         """
         rv = (types.FunctionType, (obj.__code__, {}, obj.__name__,
                                    obj.__defaults__, obj.__closure__),
