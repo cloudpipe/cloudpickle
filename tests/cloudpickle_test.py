@@ -1829,7 +1829,7 @@ class CloudPickleTest(unittest.TestCase):
                 return _TEST_GLOBAL_VARIABLE
             return inner_function
 
-        globals_ = cloudpickle.CloudPickler.extract_code_globals(
+        globals_ = cloudpickle.cloudpickle._extract_code_globals(
             function_factory.__code__)
         assert globals_ == {'_TEST_GLOBAL_VARIABLE'}
 

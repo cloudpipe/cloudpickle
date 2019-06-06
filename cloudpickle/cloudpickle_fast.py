@@ -485,9 +485,12 @@ class CloudPickler(Pickler):
         obj from an attribute lookup of a file-backed module. If this check
         fails, then a custom reducer is called.
         """
-        if not _is_global(obj):
+        # There no special handling for builtin pypy functions like in
+        # cloudpickle.py because cloudpickle_fast is CPython-specific.
+        if _is_global(obj):
+            return NotImplemented
+        else:
             return self._dynamic_function_reduce(obj)
-        return NotImplemented
 
     def _function_getnewargs(self, func):
         code = func.__code__

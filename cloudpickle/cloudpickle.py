@@ -102,20 +102,7 @@ else:
     PY2 = False
     from importlib._bootstrap import _find_spec
 
-# XXX: This cache cannot be a WeakKeyDictionary, because sometimes, cloudpickle
-# misclassifies a builtin pypy function as dynamic, and thus tries to extract
-# the globals of its underlying builtin-code. However, builtin-code objects
-# cannot be weak-referenced (hence the if-else clause below).
-# Note that the root cause of cloudpickle misclassification of builtin
-# functions is PyPy flaky support of __qualname__ attributes in v3.5. This
-# guard can be removed by either spotting more proactively builtin pypy
-# functions before trying to save them as dynamic, or simply after support for
-# pypy3.5 is dropped.
-_extract_code_globals_cache = (
-    weakref.WeakKeyDictionary()
-    if not hasattr(sys, "pypy_version_info")
-    else {})
-
+_extract_code_globals_cache = weakref.WeakKeyDictionary()
 
 
 def _ensure_tracking(class_def):
@@ -216,24 +203,19 @@ def _extract_code_globals(co):
     """
     out_names = _extract_code_globals_cache.get(co)
     if out_names is None:
-        try:
-            names = co.co_names
-        except AttributeError:
-            # PyPy "builtin-code" object
-            out_names = set()
-        else:
-            out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
+        names = co.co_names
+        out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
 
-            # Declaring a function inside another one using the "def ..."
-            # syntax generates a constant code object corresonding to the one
-            # of the nested function's As the nested function may itself need
-            # global variables, we need to introspect its code, extract its
-            # globals, (look for code object in it's co_consts attribute..) and
-            # add the result to code_globals
-            if co.co_consts:
-                for const in co.co_consts:
-                    if isinstance(const, types.CodeType):
-                        out_names |= _extract_code_globals(const)
+        # Declaring a function inside another one using the "def ..."
+        # syntax generates a constant code object corresonding to the one
+        # of the nested function's As the nested function may itself need
+        # global variables, we need to introspect its code, extract its
+        # globals, (look for code object in it's co_consts attribute..) and
+        # add the result to code_globals
+        if co.co_consts:
+            for const in co.co_consts:
+                if isinstance(const, types.CodeType):
+                    out_names |= _extract_code_globals(const)
 
         _extract_code_globals_cache[co] = out_names
 
@@ -802,28 +784,6 @@ class CloudPickler(Pickler):
         save(state)
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
-
-    _extract_code_globals_cache = weakref.WeakKeyDictionary()
-
-    @classmethod
-    def extract_code_globals(cls, co):
-        """
-        Find all globals names read or written to by codeblock co
-        """
-        out_names = cls._extract_code_globals_cache.get(co)
-        if out_names is None:
-            names = co.co_names
-            out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
-
-            # see if nested function have any global refs
-            if co.co_consts:
-                for const in co.co_consts:
-                    if isinstance(const, types.CodeType):
-                        out_names |= cls.extract_code_globals(const)
-
-            cls._extract_code_globals_cache[co] = out_names
-
-        return out_names
 
     def extract_func_data(self, func):
         """
