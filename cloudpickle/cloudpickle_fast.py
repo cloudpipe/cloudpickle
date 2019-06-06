@@ -401,7 +401,10 @@ class CloudPickler(Pickler):
       builtin-saving method (save_global), to serialize dynamic functions
     """
 
-    dispatch = copyreg.dispatch_table.copy()
+    # cloudpickle's own dispatch_table, containing the additional set of
+    # objects (compared to the standard library pickle) that cloupickle can
+    # serialize.
+    dispatch = {}
     dispatch[classmethod] = _classmethod_reduce
     dispatch[io.TextIOWrapper] = _file_reduce
     dispatch[logging.Logger] = _logger_reduce
@@ -423,7 +426,12 @@ class CloudPickler(Pickler):
         # sharing the same global namespace at pickling time also share their
         # global namespace at unpickling time.
         self.globals_ref = {}
-        self.dispatch_table = self.dispatch
+
+        # Take into account potential custom reducers registered by external
+        # modules
+        self.dispatch_table = copyreg.dispatch_table.copy()
+
+        self.dispatch_table.update(self.dispatch)
 
         # Pickling functions and classes cannot be customized using the
         # dispatch_table: indeed, pickling an object using the dispatch_table
