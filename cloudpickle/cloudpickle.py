@@ -676,10 +676,7 @@ class CloudPickler(Pickler):
         write(pickle.TUPLE)
         write(pickle.REDUCE)  # applies _fill_function on the tuple
 
-    _extract_code_globals_cache = (
-        weakref.WeakKeyDictionary()
-        if not hasattr(sys, "pypy_version_info")
-        else {})
+    _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
     @classmethod
     def extract_code_globals(cls, co):
@@ -688,19 +685,14 @@ class CloudPickler(Pickler):
         """
         out_names = cls._extract_code_globals_cache.get(co)
         if out_names is None:
-            try:
-                names = co.co_names
-            except AttributeError:
-                # PyPy "builtin-code" object
-                out_names = set()
-            else:
-                out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
+            names = co.co_names
+            out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
 
-                # see if nested function have any global refs
-                if co.co_consts:
-                    for const in co.co_consts:
-                        if type(const) is types.CodeType:
-                            out_names |= cls.extract_code_globals(const)
+            # see if nested function have any global refs
+            if co.co_consts:
+                for const in co.co_consts:
+                    if isinstance(const, types.CodeType):
+                        out_names |= cls.extract_code_globals(const)
 
             cls._extract_code_globals_cache[co] = out_names
 
