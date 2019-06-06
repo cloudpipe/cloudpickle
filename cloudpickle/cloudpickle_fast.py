@@ -7,6 +7,7 @@ is only available for python versions 3.8+, a lot of backward-compatibility
 code is also removed.
 """
 import abc
+import copyreg
 import io
 import itertools
 import logging
@@ -400,7 +401,7 @@ class CloudPickler(Pickler):
       builtin-saving method (save_global), to serialize dynamic functions
     """
 
-    dispatch = {}
+    dispatch = copyreg.dispatch_table.copy()
     dispatch[classmethod] = _classmethod_reduce
     dispatch[io.TextIOWrapper] = _file_reduce
     dispatch[logging.Logger] = _logger_reduce
