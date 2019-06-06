@@ -95,6 +95,15 @@ else:
     PY2 = False
     from importlib._bootstrap import _find_spec
 
+# XXX: This cache cannot be a WeakKeyDictionary, because sometimes, cloudpickle
+# misclassifies a builtin pypy function as dynamic, and thus tries to extract
+# the globals of its underlying builtin-code. However, builtin-code objects
+# cannot be weak-referenced (hence the if-else clause below).
+# Note that the root cause of cloudpickle misclassification of builtin
+# functions is PyPy flaky support of __qualname__ attributes in v3.5. This
+# guard can be removed by either spotting more proactively builtin pypy
+# functions before trying to save them as dynamic, or simply after support for
+# pypy3.5 is dropped.
 _extract_code_globals_cache = (
     weakref.WeakKeyDictionary()
     if not hasattr(sys, "pypy_version_info")
