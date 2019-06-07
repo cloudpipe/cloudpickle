@@ -313,9 +313,6 @@ def _dynamic_class_reduce(obj):
 
 def _class_reduce(obj):
     """Select the reducer depending on the dynamic nature of the class obj"""
-    # XXX: there used to be special handling for NoneType, EllipsisType and
-    # NotImplementedType. As for now this module handles only python3.8+, this
-    # code has been removed.
     if obj is type(None):  # noqa
         return type, (None,)
     elif obj is type(Ellipsis):
