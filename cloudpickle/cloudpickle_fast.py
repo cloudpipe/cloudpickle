@@ -433,26 +433,37 @@ class CloudPickler(Pickler):
 
         self.dispatch_table.update(self.dispatch)
 
-        # Pickling functions and classes cannot be customized using the
-        # dispatch_table: indeed, pickling an object using the dispatch_table
-        # works by invoking a reducer specific to the object's type. When the
-        # object is a class, its type is often ``type``, except when the class
-        # is an instance of another metaclass. In this cased, the metaclass
-        # will likely not be known in advance, and thus cannot be special-cased
-        # using an entry in the dispatch_table.
-
-        # The Pickler's reducer_override, among other things, allows us to
-        # register a reducer that will be called for any class, independently
-        # of its type.
         self.proto = int(protocol)
 
     def reducer_override(self, obj):
-        """Custom reducing callback for functions and classes
+        """Type-agnostic reducing callback for function and classes.
 
-        This function is the analog of a custom save_global. However, the C
-        Pickler API does not expose low-level instructions such as save or
-        write. Instead, we return a reduce value the Pickler will
-        internally serialize via save_reduce.
+        For performance reasons, subclasses of the C _pickle.Pickler class
+        cannot register custom reducers for functions and classes in the
+        dispatch_table. Reducer for such types must instead implemented in the
+        special reducer_override method.
+
+        Note that method will be called for any object except a few
+        builtin-types (int, lists, dicts etc.), which differs from reducers in
+        the Pickler's dispatch_table, each of them being invoked for objects of
+        a specific type only.
+
+        This property comes in handy for classes: although most classes are
+        instances of the ``type`` metaclass, some of them can be instances of
+        other custom metaclasses (such as enum.EnumMeta for example). In
+        particular, the metaclass will likely not be known in advance, and thus
+        cannot be special-cased using an entry in the dispatch_table.
+        reducer_override, among other things, allows us to register a reducer
+        that will be called for any class, independently of its type.
+
+
+        Notes:
+
+        - reducer_override has the priority over dispatch_table-registered
+          reducers.
+        - reducer_override can be use to fix other limitations of cloudpickle
+          for other types that suffered from type-specific reducers, such as
+          Exceptions. See https://github.com/cloudpipe/cloudpickle/issues/248
         """
         t = type(obj)
         try:
