@@ -483,14 +483,17 @@ class CloudPickler(Pickler):
                 _function_setstate)
 
     def _function_reduce(self, obj):
-        """Select the reducer depending on obj's dynamic nature
+        """Reducer for function objects.
 
-        This functions starts by replicating save_global: trying to retrieve
-        obj from an attribute lookup of a file-backed module. If this check
-        fails, then a custom reducer is called.
+        If obj is a top-level attribute of a file-backed module, this
+        reducer returns NotImplemented, making the CloudPickler fallback to
+        traditional _pickle.Pickler routines to save obj. Otherwise, it reduces
+        obj using a custom cloudpickle reducer designed specifically to handle
+        dynamic functions.
+
+        As opposed to cloudpickle.py, There no special handling for builtin
+        pypy functions because cloudpickle_fast is CPython-specific.
         """
-        # There no special handling for builtin pypy functions like in
-        # cloudpickle.py because cloudpickle_fast is CPython-specific.
         if _is_global(obj):
             return NotImplemented
         else:
