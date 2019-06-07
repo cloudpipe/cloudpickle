@@ -2,8 +2,8 @@
 New, fast version of the CloudPickler.
 
 This new CloudPickler class can now extend the fast C Pickler instead of the
-previous python implementation of the Pickler class. Because this functionality
-is only available for python versions 3.8+, a lot of backward-compatibility
+previous Python implementation of the Pickler class. Because this functionality
+is only available for Python versions 3.8+, a lot of backward-compatibility
 code is also removed.
 
 Note that the C Pickler sublassing API is CPython-specific. Therefore, some
@@ -26,12 +26,12 @@ from _pickle import Pickler
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _is_global, _builtin_type,
-    Enum, _ensure_tracking, _lookup_class_or_track, _make_skeleton_class,
-    _make_skeleton_enum, _extract_class_dict, string_types, dynamic_subimport,
-    subimport
+    Enum, _ensure_tracking,  _make_skeleton_class, _make_skeleton_enum,
+    _extract_class_dict, string_types, dynamic_subimport, subimport
 )
 
 load, loads = _pickle.load, _pickle.loads
+
 
 # Shorthands similar to pickle.dump/pickle.dumps
 def dump(obj, file, protocol=None):
@@ -391,8 +391,9 @@ class CloudPickler(Pickler):
 
     * its dispatch_table containing reducers that are called only if ALL
       built-in saving functions were previously discarded.
-    * a special callback named "reducer_override", invoked before standard function/class
-      builtin-saving method (save_global), to serialize dynamic functions
+    * a special callback named "reducer_override", invoked before standard
+      function/class builtin-saving method (save_global), to serialize dynamic
+      functions
     """
 
     # cloudpickle's own dispatch_table, containing the additional set of
