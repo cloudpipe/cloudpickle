@@ -397,7 +397,7 @@ class CloudPickler(Pickler):
 
     * its dispatch_table containing reducers that are called only if ALL
       built-in saving functions were previously discarded.
-    * a special callback, invoked before standard function/class
+    * a special callback named "reducer_override", invoked before standard function/class
       builtin-saving method (save_global), to serialize dynamic functions
     """
 
