@@ -4,9 +4,8 @@ import sys
 import pickle
 
 
+from cloudpickle.cloudpickle import *
 if sys.version_info[:2] >= (3, 8):
-    from cloudpickle.cloudpickle_fast import *
-else:
-    from cloudpickle.cloudpickle import *
+    from cloudpickle.cloudpickle_fast import CloudPickler, dumps, dump
 
 __version__ = '1.2.0.dev0'
