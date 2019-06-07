@@ -72,7 +72,11 @@ def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
 
     """
     # run then pickle_echo(protocol=protocol) in __main__:
-    cmd = [sys.executable, __file__, "--protocol", str(protocol)]
+
+    # Protect stderr from any warning, as we will assume an error will happen
+    # if it is not empty. A concrete example is pytest using the imp module,
+    # which is deprecated in python 3.8
+    cmd = [sys.executable, '-W ignore', __file__, "--protocol", str(protocol)]
     cwd, env = _make_cwd_env()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
                  bufsize=4096)
@@ -186,7 +190,7 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
     try:
         with open(source_file, 'wb') as f:
             f.write(source_code.encode('utf-8'))
-        cmd = [sys.executable, source_file]
+        cmd = [sys.executable, '-W ignore', source_file]
         cwd, env = _make_cwd_env()
         kwargs = {
             'cwd': cwd,

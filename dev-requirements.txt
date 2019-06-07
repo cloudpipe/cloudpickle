@@ -6,3 +6,4 @@ psutil
 futures; python_version < '3.4'
 # Code coverage uploader for Travis:
 codecov
+coverage

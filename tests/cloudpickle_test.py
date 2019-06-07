@@ -961,7 +961,7 @@ class CloudPickleTest(unittest.TestCase):
             logger = cloudpickle.loads(base64.b32decode(b'{}'))
             logger.info('hello')
             """.format(base64.b32encode(dumped).decode('ascii'))
-        proc = subprocess.Popen([sys.executable, "-c", code],
+        proc = subprocess.Popen([sys.executable, "-W ignore", "-c", code],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
         out, _ = proc.communicate()
@@ -1076,7 +1076,13 @@ class CloudPickleTest(unittest.TestCase):
         # some setup is required to allow pytest apimodules to be correctly
         # serializable.
         from cloudpickle import CloudPickler
-        CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
+        if sys.version_info[:2] >= (3, 8):
+            from cloudpickle import cloudpickle_fast as cp_fast
+            CloudPickler.dispatch[
+                type(py.builtin)] = cp_fast._module_reduce
+        else:
+            CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
+
         g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
 
         result = g()
@@ -1823,7 +1829,7 @@ class CloudPickleTest(unittest.TestCase):
                 return _TEST_GLOBAL_VARIABLE
             return inner_function
 
-        globals_ = cloudpickle.CloudPickler.extract_code_globals(
+        globals_ = cloudpickle.cloudpickle._extract_code_globals(
             function_factory.__code__)
         assert globals_ == {'_TEST_GLOBAL_VARIABLE'}
 
@@ -1831,6 +1837,15 @@ class CloudPickleTest(unittest.TestCase):
                                             protocol=self.protocol)
         inner_func = depickled_factory()
         assert inner_func() == _TEST_GLOBAL_VARIABLE
+
+    def test_recursion_during_pickling(self):
+        class A:
+            def __getattr__(self, name):
+                return getattr(self, name)
+
+        a = A()
+        with pytest.raises(pickle.PicklingError, match='recursion'):
+            cloudpickle.dumps(a)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
