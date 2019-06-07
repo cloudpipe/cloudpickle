@@ -222,7 +222,7 @@ def _extract_code_globals(co):
     return out_names
 
 
-def _find_loaded_submodules(code, top_level_dependencies):
+def _find_imported_submodules(code, top_level_dependencies):
     """
     Save submodules used by a function but not listed in its globals.
     In the example below:
@@ -744,7 +744,7 @@ class CloudPickler(Pickler):
         save(_fill_function)  # skeleton function updater
         write(pickle.MARK)    # beginning of tuple that _fill_function expects
 
-        submodules = _find_loaded_submodules(
+        submodules = _find_imported_submodules(
             code,
             itertools.chain(f_globals.values(), closure_values or ()),
         )

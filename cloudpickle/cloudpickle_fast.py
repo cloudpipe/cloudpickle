@@ -21,7 +21,7 @@ from _pickle import Pickler
 
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
-    _find_loaded_submodules, _get_cell_contents, _is_global, _builtin_type,
+    _find_imported_submodules, _get_cell_contents, _is_global, _builtin_type,
     Enum, _ensure_tracking, _lookup_class_or_track, _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, string_types, dynamic_subimport,
     subimport
@@ -120,11 +120,11 @@ def _function_getstate(func):
         if func.__closure__ is not None else ()
     )
 
-    # Extract submodules referenced by attribute lookup (no global opcode).
-    # Storing the loaded submodules in a smoke __submodule__ attribute of
-    # func.__globals__ allow these modules to be saved at pickling time, and
-    # thus imported when the function is unpickled.
-    f_globals["__submodules__"] = _find_loaded_submodules(
+    # Extract currently-imported submodules used by func. Storing these modules
+    # in a smoke _cloudpickle_subimports attribute of the object's state will
+    # trigger the side effect of importing these modules at unpickling time
+    # (which is necessary for func to work correctly once depickled)
+    slotstate["_cloudpickle_submodules"] = _find_imported_submodules(
         func.__code__, itertools.chain(f_globals.values(), closure_values))
     slotstate["__globals__"] = f_globals
 
@@ -357,9 +357,13 @@ def _function_setstate(obj, state):
 
     obj_globals = slotstate.pop("__globals__")
     obj_closure = slotstate.pop("__closure__")
+    # _cloudpickle_subimports is a set of submodules that must be loaded for
+    # the pickled function to work correctly at unpickling time. Now that these
+    # submodules are depickled (hence imported), they can be removed from the
+    # object's state (the object state only served as a reference holder to
+    # these submodules)
+    slotstate.pop("_cloudpickle_submodules")
 
-    # remove unnecessary references to submodules
-    obj_globals.pop("__submodules__")
     obj.__globals__.update(obj_globals)
     obj.__globals__["__builtins__"] = __builtins__
 
@@ -430,9 +434,7 @@ class CloudPickler(Pickler):
         # Take into account potential custom reducers registered by external
         # modules
         self.dispatch_table = copyreg.dispatch_table.copy()
-
         self.dispatch_table.update(self.dispatch)
-
         self.proto = int(protocol)
 
     def reducer_override(self, obj):
