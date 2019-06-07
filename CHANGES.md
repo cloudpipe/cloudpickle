@@ -1,6 +1,11 @@
 1.2.0
 =====
 
+- Leverage the C-accelerated Pickler new subclassing API (available in Python
+  3.8) in cloudpickle. This allows cloudpickle to pickle Python objects up to
+  30 times faster.
+  ([issue #253](https://github.com/cloudpipe/cloudpickle/pull/253))
+
 - Support pickling of classmethod and staticmethod objects in python2.
   arguments. ([issue #262](https://github.com/cloudpipe/cloudpickle/pull/262))
 
