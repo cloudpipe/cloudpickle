@@ -475,8 +475,7 @@ class CloudPickler(Pickler):
     # function reducers are defined as instance methods of CloudPickler
     # objects, as they rely on a CloudPickler attribute (globals_ref)
     def _dynamic_function_reduce(self, func):
-        """Reduce a function that is not pickleable via attribute lookup.
-        """
+        """Reduce a function that is not pickleable via attribute lookup."""
         newargs = self._function_getnewargs(func)
         state = _function_getstate(func)
         return (types.FunctionType, newargs, state, None, None,
