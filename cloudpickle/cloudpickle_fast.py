@@ -451,7 +451,7 @@ class CloudPickler(Pickler):
 
         * reducer_override has the priority over dispatch_table-registered
           reducers.
-        * reducer_override can be use to fix other limitations of cloudpickle
+        * reducer_override can be used to fix other limitations of cloudpickle
           for other types that suffered from type-specific reducers, such as
           Exceptions. See https://github.com/cloudpipe/cloudpickle/issues/248
         """
