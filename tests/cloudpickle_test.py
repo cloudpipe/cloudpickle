@@ -1840,20 +1840,10 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_recursion_during_pickling(self):
         class A:
-            def __init__(self, some_attribute):
-                self.some_attribute = some_attribute
+            def __getattr__(self, name):
+                return getattr(self, name)
 
-            def __reduce__(self):
-                # Make some_attribute an initarg instead of a state item.  This
-                # makes the reducer unsafe with regards to reference cycles as
-                # cloudpickle will try to some_attribute before self is
-                # memoized.
-                return A, (self.some_attribute, ), {}
-
-        a = A(None)
-
-        # generate a reference cycle
-        a.some_attribute = a
+        a = A()
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
