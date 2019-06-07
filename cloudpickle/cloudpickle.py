@@ -679,8 +679,8 @@ class CloudPickler(Pickler):
         # If type overrides __dict__ as a property, include it in the type
         # kwargs. In Python 2, we can't set this attribute after construction.
         __dict__ = clsdict.pop('__dict__', None)
-        # if isinstance(__dict__, property):
-        #     type_kwargs['__dict__'] = __dict__
+        if isinstance(__dict__, property):
+            type_kwargs['__dict__'] = __dict__
 
         save = self.save
         write = self.write
