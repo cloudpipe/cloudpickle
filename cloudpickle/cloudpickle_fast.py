@@ -5,6 +5,10 @@ This new CloudPickler class can now extend the fast C Pickler instead of the
 previous python implementation of the Pickler class. Because this functionality
 is only available for python versions 3.8+, a lot of backward-compatibility
 code is also removed.
+
+Note that the C Pickler sublassing API is CPython-specific. Therefore, some
+guards present in cloudpickle.py that were written to handle PyPy specificities
+are not present in cloudpickle_fast.py
 """
 import abc
 import copyreg
@@ -63,11 +67,7 @@ def dumps(obj, protocol=None):
 # -------------------------------------------------
 
 def _class_getnewargs(obj):
-    # On PyPy, __doc__ is a readonly attribute, so we need to include it in
-    # the initial skeleton class.  This is safe because we know that the
-    # doc can't participate in a cycle with the original class.
-    type_kwargs = {'__doc__': obj.__dict__.get('__doc__', None)}
-
+    type_kwargs = {}
     if hasattr(obj, "__slots__"):
         type_kwargs["__slots__"] = obj.__slots__
 
@@ -135,7 +135,6 @@ def _function_getstate(func):
 def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop('__weakref__', None)
-    clsdict.pop('__doc__', None)  # present in the reconstructor args
 
     # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
     # This is a fix which breaks the cache but this only makes the first
@@ -516,9 +515,7 @@ class CloudPickler(Pickler):
             # Add module attributes used to resolve relative imports
             # instructions inside func.
             for k in ["__package__", "__name__", "__path__", "__file__"]:
-                # Some built-in functions/methods such as object.__new__  have
-                # their __globals__ set to None in PyPy
-                if func.__globals__ is not None and k in func.__globals__:
+                if k in func.__globals__:
                     base_globals[k] = func.__globals__[k]
 
         # Do not bind the free variables before the function is created to
