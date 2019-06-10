@@ -1,3 +1,11 @@
+
+1.2.1
+=====
+
+- Restore (partial) support for Python 3.4 for downstream projects that have
+  LTS versions that would benefit from cloudpickle bug fixes.
+
+
 1.2.0
 =====
 
