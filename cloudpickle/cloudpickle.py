@@ -326,7 +326,7 @@ def cell_set(cell, value):
     test and checker libraries decide to parse the whole file.
     """
 
-    if sys.version_info[:2] >= (3, 7):
+    if sys.version_info[:2] >= (3, 7):  # pragma: no branch
         cell.cell_contents = value
     else:
         def _cell_set_factory(value):
