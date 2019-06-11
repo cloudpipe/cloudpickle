@@ -269,41 +269,63 @@ def _find_imported_submodules(code, top_level_dependencies):
     return subimports
 
 
-def _make_cell_set_template_code():
-    """Get the Python compiler to emit LOAD_FAST(arg); STORE_DEREF
+def cell_set(cell, value):
+    """Set the value of a closure cell.
 
-    Notes
-    -----
-    In Python 3, we could use an easier function:
+    The point of this function is to set the cell_contents attribute of a cell
+    after its creation. This operation is necessary in case the cell contains a
+    reference to the function the cell belongs to, as when calling the
+    function's constructor
+    ``f = types.FunctionType(code, globals, name, argdefs, closure)``,
+    closure will not be able to contain the yet-to-be-created f.
 
-    .. code-block:: python
+    In Python3, cell_contents is writeable, so setting the contents of a cell
+    can be done simply using
+    >>> cell.cell_contents = value
 
-       def f():
-           cell = None
+    In Python2 however, this attribute is read only. For this reason, we need
+    to come up with more complicated hacks to set this attribute.
 
-           def _stub(value):
-               nonlocal cell
-               cell = value
+    The chosen approach is to create a function with a STORE_DEREF opcode,
+    which sets the content of a closure variable. Typically:
 
-           return _stub
+    >>> def inner(value):
+    ...     lambda: cell  # the lambda makes cell a closure
+    ...     cell = value  # cell is a closure, so this triggers a STORE_DEREF
 
-        _cell_set_template_code = f().__code__
+    (Note that in Python2, A STORE_DEREF can never be triggered from an inner
+    function. The function g for example here
+    >>> def f(var):
+    ...     def g():
+    ...         var += 1
+    ...     return g
 
-    This function is _only_ a LOAD_FAST(arg); STORE_DEREF, but that is
-    invalid syntax on Python 2. If we use this function we also don't need
-    to do the weird freevars/cellvars swap below
+    will not modify the closure variable ``var```inplace, but instead try to
+    load a local variable var and increment it. As g does not assign the local
+    variable ``var`` any initial value, calling f(1)() will fail at runtime.)
+
+    Our objective is to set the value of a given cell ``cell``. So we need to
+    somewhat reference our ``cell`` object into the ``inner`` function so that
+    this object (and not the smoke cell of the lambda function) gets affected
+    by the STORE_DEREF operation.
+
+    In inner, ``cell`` is referenced as a cell variable (an enclosing variable
+    that is referenced by inner function). If we create a new function cell_set
+    with the exact same code as ``inner``, but with ``cell`` marked as a free
+    variable instead, the STORE_DEREF will be applied on its closure -
+    ``cell``, which we can specify explicitly during construction! The new
+    cell_set variable thus actually sets the contents of a specified cell!
     """
-    def inner(value):
-        lambda: cell  # make ``cell`` a closure so that we get a STORE_DEREF
-        cell = value
+    if PY3:  # pragma: no branch
+        cell.cell_contents = value
+    else:
+        def inner(value):
+            lambda: cell
+            cell = value
 
-    co = inner.__code__
+        co = inner.__code__
 
-    # NOTE: we are marking the cell variable as a free variable intentionally
-    # so that we simulate an inner function instead of the outer function. This
-    # is what gives us the ``nonlocal`` behavior in a Python 2 compatible way.
-    if PY2:  # pragma: no branch
-        return types.CodeType(
+        _cell_set_template_code = types.CodeType(
             co.co_argcount,
             co.co_nlocals,
             co.co_stacksize,
@@ -316,61 +338,13 @@ def _make_cell_set_template_code():
             co.co_name,
             co.co_firstlineno,
             co.co_lnotab,
-            co.co_cellvars,  # this is the trickery
-            (),
+            co.co_cellvars,  # co_freevars is initialized with co_cellvars
+            (),  # co_cellvars is made empty
         )
-    else:
-        if hasattr(types.CodeType, "co_posonlyargcount"):  # pragma: no branch
-            return types.CodeType(
-                co.co_argcount,
-                co.co_posonlyargcount,  # Python3.8 with PEP570
-                co.co_kwonlyargcount,
-                co.co_nlocals,
-                co.co_stacksize,
-                co.co_flags,
-                co.co_code,
-                co.co_consts,
-                co.co_names,
-                co.co_varnames,
-                co.co_filename,
-                co.co_name,
-                co.co_firstlineno,
-                co.co_lnotab,
-                co.co_cellvars,  # this is the trickery
-                (),
-            )
-        else:
-            return types.CodeType(
-                co.co_argcount,
-                co.co_kwonlyargcount,
-                co.co_nlocals,
-                co.co_stacksize,
-                co.co_flags,
-                co.co_code,
-                co.co_consts,
-                co.co_names,
-                co.co_varnames,
-                co.co_filename,
-                co.co_name,
-                co.co_firstlineno,
-                co.co_lnotab,
-                co.co_cellvars,  # this is the trickery
-                (),
-            )
-
-_cell_set_template_code = _make_cell_set_template_code()
-
-
-def cell_set(cell, value):
-    """Set the value of a closure cell.
-    """
-    return types.FunctionType(
-        _cell_set_template_code,
-        {},
-        '_cell_set_inner',
-        (),
-        (cell,),
-    )(value)
+        _cell_set = types.FunctionType(
+            _cell_set_template_code, {}, '_cell_set',
+            (), (cell,),)
+        _cell_set(value)
 
 
 # relevant opcodes
