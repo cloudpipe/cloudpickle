@@ -279,12 +279,17 @@ def cell_set(cell, value):
     ``f = types.FunctionType(code, globals, name, argdefs, closure)``,
     closure will not be able to contain the yet-to-be-created f.
 
-    In Python3, cell_contents is writeable, so setting the contents of a cell
+    In Python3.7, cell_contents is writeable, so setting the contents of a cell
     can be done simply using
     >>> cell.cell_contents = value
 
-    In Python2 however, this attribute is read only. For this reason, we need
-    to come up with more complicated hacks to set this attribute.
+    In earlier Python3 versions, the cell_contents attribute of a cell is read
+    only, but this limitation can be worked around by leveraging the Python 3
+    ``nonlocal`` keyword.
+
+    In Python2 however, this attribute is read only, and there is no non-local
+    keyword. For this reason, we need to come up with more complicated hacks to
+    set this attribute.
 
     The chosen approach is to create a function with a STORE_DEREF opcode,
     which sets the content of a closure variable. Typically:
@@ -316,31 +321,45 @@ def cell_set(cell, value):
     ``cell``, which we can specify explicitly during construction! The new
     cell_set variable thus actually sets the contents of a specified cell!
     """
-    if PY3:  # pragma: no branch
+
+    if sys.version_info[:2] >= (3, 7):
         cell.cell_contents = value
     else:
-        def inner(value):
-            lambda: cell
-            cell = value
+        if PY2:  # pragma: no branch
+            def _cell_set_factory(value):
+                lambda: cell
+                cell = value
 
-        co = inner.__code__
+            co = _cell_set_factory.__code__
 
-        _cell_set_template_code = types.CodeType(
-            co.co_argcount,
-            co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags,
-            co.co_code,
-            co.co_consts,
-            co.co_names,
-            co.co_varnames,
-            co.co_filename,
-            co.co_name,
-            co.co_firstlineno,
-            co.co_lnotab,
-            co.co_cellvars,  # co_freevars is initialized with co_cellvars
-            (),  # co_cellvars is made empty
-        )
+            _cell_set_template_code = types.CodeType(
+                co.co_argcount,
+                co.co_nlocals,
+                co.co_stacksize,
+                co.co_flags,
+                co.co_code,
+                co.co_consts,
+                co.co_names,
+                co.co_varnames,
+                co.co_filename,
+                co.co_name,
+                co.co_firstlineno,
+                co.co_lnotab,
+                co.co_cellvars,  # co_freevars is initialized with co_cellvars
+                (),  # co_cellvars is made empty
+            )
+        else:
+            def _cell_set_factory():
+                cell = None
+
+                def inner(value):
+                    nonlocal cell
+                    cell = value
+                return inner
+
+            _cell_set_template_code = _cell_set_factory().__code__
+
+        co = _cell_set_factory().__code__
         _cell_set = types.FunctionType(
             _cell_set_template_code, {}, '_cell_set',
             (), (cell,),)
