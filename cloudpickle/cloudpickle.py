@@ -320,18 +320,22 @@ def cell_set(cell, value):
     variable instead, the STORE_DEREF will be applied on its closure -
     ``cell``, which we can specify explicitly during construction! The new
     cell_set variable thus actually sets the contents of a specified cell!
+
+    Note: we do not make use of the ``nonlocal`` keyword to set the contents of
+    a cell in early python3 versions to limit possible syntax errors in case
+    test and checker libraries decide to parse the whole file.
     """
 
     if sys.version_info[:2] >= (3, 7):
         cell.cell_contents = value
     else:
+        def _cell_set_factory(value):
+            lambda: cell
+            cell = value
+
+        co = _cell_set_factory.__code__
+
         if PY2:  # pragma: no branch
-            def _cell_set_factory(value):
-                lambda: cell
-                cell = value
-
-            co = _cell_set_factory.__code__
-
             _cell_set_template_code = types.CodeType(
                 co.co_argcount,
                 co.co_nlocals,
@@ -349,17 +353,24 @@ def cell_set(cell, value):
                 (),  # co_cellvars is made empty
             )
         else:
-            def _cell_set_factory():
-                cell = None
-
-                def inner(value):
-                    nonlocal cell
-                    cell = value
-                return inner
-
-            _cell_set_template_code = _cell_set_factory().__code__
-
-        co = _cell_set_factory().__code__
+            _cell_set_template_code = types.CodeType(
+                co.co_argcount,
+                co.co_kwonlyargcount,   # Python 3 only argument
+                co.co_nlocals,
+                co.co_stacksize,
+                co.co_flags,
+                co.co_code,
+                co.co_consts,
+                co.co_names,
+                co.co_varnames,
+                co.co_filename,
+                co.co_name,
+                co.co_firstlineno,
+                co.co_lnotab,
+                co.co_cellvars,  # co_freevars is initialized with co_cellvars
+                (),  # co_cellvars is made empty
+            )
+        co = _cell_set_factory.__code__
         _cell_set = types.FunctionType(
             _cell_set_template_code, {}, '_cell_set',
             (), (cell,),)
