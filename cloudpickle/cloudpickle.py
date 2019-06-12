@@ -329,53 +329,58 @@ def cell_set(cell, value):
     if sys.version_info[:2] >= (3, 7):  # pragma: no branch
         cell.cell_contents = value
     else:
-        def _cell_set_factory(value):
-            lambda: cell
-            cell = value
-
-        co = _cell_set_factory.__code__
-
-        if PY2:  # pragma: no branch
-            _cell_set_template_code = types.CodeType(
-                co.co_argcount,
-                co.co_nlocals,
-                co.co_stacksize,
-                co.co_flags,
-                co.co_code,
-                co.co_consts,
-                co.co_names,
-                co.co_varnames,
-                co.co_filename,
-                co.co_name,
-                co.co_firstlineno,
-                co.co_lnotab,
-                co.co_cellvars,  # co_freevars is initialized with co_cellvars
-                (),  # co_cellvars is made empty
-            )
-        else:
-            _cell_set_template_code = types.CodeType(
-                co.co_argcount,
-                co.co_kwonlyargcount,   # Python 3 only argument
-                co.co_nlocals,
-                co.co_stacksize,
-                co.co_flags,
-                co.co_code,
-                co.co_consts,
-                co.co_names,
-                co.co_varnames,
-                co.co_filename,
-                co.co_name,
-                co.co_firstlineno,
-                co.co_lnotab,
-                co.co_cellvars,  # co_freevars is initialized with co_cellvars
-                (),  # co_cellvars is made empty
-            )
-        co = _cell_set_factory.__code__
         _cell_set = types.FunctionType(
             _cell_set_template_code, {}, '_cell_set',
             (), (cell,),)
         _cell_set(value)
 
+
+def _make_cell_set_template_code():
+    def _cell_set_factory(value):
+        lambda: cell
+        cell = value
+
+    co = _cell_set_factory.__code__
+
+    if PY2:  # pragma: no branch
+        _cell_set_template_code = types.CodeType(
+            co.co_argcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            co.co_name,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_cellvars,  # co_freevars is initialized with co_cellvars
+            (),  # co_cellvars is made empty
+        )
+    else:
+        _cell_set_template_code = types.CodeType(
+            co.co_argcount,
+            co.co_kwonlyargcount,   # Python 3 only argument
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            co.co_name,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_cellvars,  # co_freevars is initialized with co_cellvars
+            (),  # co_cellvars is made empty
+        )
+    return _cell_set_template_code
+
+
+_cell_set_template_code = _make_cell_set_template_code()
 
 # relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
