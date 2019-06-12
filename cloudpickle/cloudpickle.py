@@ -882,8 +882,9 @@ class CloudPickler(Pickler):
             if PY3:  # pragma: no branch
                 self.save_reduce(types.MethodType, (obj.__func__, obj.__self__), obj=obj)
             else:
-                self.save_reduce(types.MethodType, (obj.__func__, obj.__self__, obj.__self__.__class__),
-                                 obj=obj)
+                self.save_reduce(
+                    types.MethodType,
+                    (obj.__func__, obj.__self__, type(obj.__self__)), obj=obj)
 
     dispatch[types.MethodType] = save_instancemethod
 

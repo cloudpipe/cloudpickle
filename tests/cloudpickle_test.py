@@ -431,6 +431,15 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(A.test_sm(), "sm")
         self.assertEqual(A.test_cm(), "cm")
 
+    def test_bound_classmethod(self):
+        class A:
+            @classmethod
+            def test_cm(cls):
+                return "cm"
+
+        A.test_cm = pickle_depickle(A.test_cm, protocol=self.protocol)
+        self.assertEqual(A.test_cm(), "cm")
+
     def test_method_descriptors(self):
         f = pickle_depickle(str.upper)
         self.assertEqual(f('abc'), 'ABC')
