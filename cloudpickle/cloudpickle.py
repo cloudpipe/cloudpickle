@@ -287,9 +287,9 @@ def cell_set(cell, value):
     only, but this limitation can be worked around by leveraging the Python 3
     ``nonlocal`` keyword.
 
-    In Python2 however, this attribute is read only, and there is no non-local
-    keyword. For this reason, we need to come up with more complicated hacks to
-    set this attribute.
+    In Python2 however, this attribute is read only, and there is no
+    ``nonlocal`` keyword. For this reason, we need to come up with more
+    complicated hacks to set this attribute.
 
     The chosen approach is to create a function with a STORE_DEREF opcode,
     which sets the content of a closure variable. Typically:
@@ -315,9 +315,9 @@ def cell_set(cell, value):
     by the STORE_DEREF operation.
 
     In inner, ``cell`` is referenced as a cell variable (an enclosing variable
-    that is referenced by inner function). If we create a new function cell_set
-    with the exact same code as ``inner``, but with ``cell`` marked as a free
-    variable instead, the STORE_DEREF will be applied on its closure -
+    that is referenced by the inner function). If we create a new function
+    cell_set with the exact same code as ``inner``, but with ``cell`` marked as
+    a free variable instead, the STORE_DEREF will be applied on its closure -
     ``cell``, which we can specify explicitly during construction! The new
     cell_set variable thus actually sets the contents of a specified cell!
 
