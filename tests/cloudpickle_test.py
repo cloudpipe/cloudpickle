@@ -984,6 +984,11 @@ class CloudPickleTest(unittest.TestCase):
         # logging.Logger object
         self.check_logger('cloudpickle.dummy_test_logger')
 
+    def test_getset_descriptor(self):
+        assert isinstance(float.real, types.GetSetDescriptorType)
+        depickled_descriptor = pickle_depickle(float.real)
+        self.assertIs(depickled_descriptor, float.real)
+
     def test_abc(self):
 
         @abc.abstractmethod

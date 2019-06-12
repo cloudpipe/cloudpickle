@@ -848,6 +848,11 @@ class CloudPickler(Pickler):
         method_descriptor = type(str.upper)
         dispatch[method_descriptor] = save_builtin_function_or_method
 
+    def save_getset_descriptor(self, obj):
+        return self.save_reduce(getattr, (obj.__objclass__, obj.__name__))
+
+    dispatch[types.GetSetDescriptorType] = save_getset_descriptor
+
     def save_global(self, obj, name=None, pack=struct.pack):
         """
         Save a "global".
