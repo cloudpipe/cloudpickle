@@ -330,8 +330,7 @@ def cell_set(cell, value):
         cell.cell_contents = value
     else:
         _cell_set = types.FunctionType(
-            _cell_set_template_code, {}, '_cell_set',
-            (), (cell,),)
+            _cell_set_template_code, {}, '_cell_set', (), (cell,),)
         _cell_set(value)
 
 
