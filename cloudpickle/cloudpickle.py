@@ -379,7 +379,8 @@ def _make_cell_set_template_code():
     return _cell_set_template_code
 
 
-_cell_set_template_code = _make_cell_set_template_code()
+if sys.version_info[:2] < (3, 7):
+    _cell_set_template_code = _make_cell_set_template_code()
 
 # relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
