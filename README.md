@@ -15,11 +15,15 @@ Among other things, `cloudpickle` supports pickling for **lambda functions**
 along with **functions and classes defined interactively** in the
 `__main__` module (for instance in a script, a shell or a Jupyter notebook).
 
-**`cloudpickle` uses `pickle.HIGHEST_PROTOCOL` by default**: it is meant to
-send objects between processes running the **same version of Python**.
+Cloudpickle can only be used to send objects between the **exact same version
+of Python**.
 
 Using `cloudpickle` for **long-term object storage is not supported and
-discouraged.**
+strongly discouraged.**
+
+**Security notice**: one should **only load pickle data from trusted sources** as
+otherwise `pickle.load` can lead to arbitrary code execution resulting in a critical
+security vulnerability.
 
 
 Installation
