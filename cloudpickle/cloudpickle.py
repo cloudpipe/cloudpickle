@@ -646,8 +646,9 @@ class CloudPickler(Pickler):
         # must be *initialized* (in an empty state)  during class creation and
         # updated during class re-hydratation.
         # However, a class __dict__ is read-only, and does not support direct
-        # item assignement. Instead, way to update a class __dict__  is to call
-        # setattr(k, v) on the underlying class, which has the same effect.
+        # item assignement. Instead, the way to update a class __dict__  is to
+        # call setattr(k, v) on the underlying class, which has the same
+        # effect.
         # There is one corner case: if the __dict__ class has itself a
         # "__dict__" key (this means that the class likely overrides the
         # __dict__ property of its instances), setattr("__dict__", v) will try
