@@ -4,6 +4,9 @@
 - Fix a bug affecting bound classmethod saving on Python 2.
   ([issue #288](https://github.com/cloudpipe/cloudpickle/issues/288))
 
+- Add support for pickling "getset" descriptors
+  ([issue #290](https://github.com/cloudpipe/cloudpickle/pull/290))
+
 1.2.1
 =====
 
