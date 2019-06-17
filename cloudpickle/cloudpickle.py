@@ -656,10 +656,11 @@ class CloudPickler(Pickler):
         # result, if it exists, the class __dict__ must contain its __dict__
         # item when it is initialized and fed to the class reconstructor.
         __dict__ = clsdict.pop('__dict__', None)
-        if __dict__ is not None:
-            # Native pickle memoization of dict objects prevents us from
-            # reference cycles even if __dict__ is now saved before obj is
-            # memoized.
+
+        # As __dict__ is part of obj's reconstructor args, __dict__ will be
+        # saved before obj is memoized. To prevent infinite recursion, we
+        # must make sure that __dict__ does not contain a reference to obj.
+        if getattr(__dict__, '__objclass__', None) is not obj:
             type_kwargs['__dict__'] = __dict__
 
         save = self.save
