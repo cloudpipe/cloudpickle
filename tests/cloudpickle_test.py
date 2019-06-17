@@ -1870,7 +1870,7 @@ class CloudPickleTest(unittest.TestCase):
     def test___dict__attribute_not_dropped_during_pickling(self):
         # Test https://github.com/cloudpipe/cloudpickle/issues/282. cloudpickle
         # used to drop __dict__ attributes of classes at pickling time.
-        pickle_filename = os.path.join(self.tmpdir, 'class_with___dict__.pkl')
+        pickle_filename= os.path.join(self.tmpdir, 'class_with_dict.pkl')
         _dict = {'some_attribute': 1}
         class A:
             __dict__ = _dict
