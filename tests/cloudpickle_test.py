@@ -1887,7 +1887,7 @@ class CloudPickleTest(unittest.TestCase):
         # could have been reused directly.
         child_process_script = """
             import pickle
-            with open("{filename}", "rb") as f:
+            with open(r"{filename}", "rb") as f:
                 depickled_a = pickle.load(f)
             assert depickled_a.__dict__ == {_dict}, depickled_a.__dict__
         """.format(filename=pickle_filename, _dict=_dict)
