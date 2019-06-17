@@ -667,7 +667,8 @@ class CloudPickler(Pickler):
         # Because non-overriden __dict__ attributes will be generated
         # automatically at class reconstruction anyways, no information is
         # lost.
-        if (not isinstance(__dict__, types.GetSetDescriptorType) and
+        if (__dict__ is not None and
+                not isinstance(__dict__, types.GetSetDescriptorType) and
                 getattr(__dict__, '__objclass__', None) is not obj):
             type_kwargs['__dict__'] = __dict__
 
