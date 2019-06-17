@@ -658,9 +658,17 @@ class CloudPickler(Pickler):
         __dict__ = clsdict.pop('__dict__', None)
 
         # As __dict__ is part of obj's reconstructor args, __dict__ will be
-        # saved before obj is memoized. To prevent infinite recursion, we
-        # must make sure that __dict__ does not contain a reference to obj.
-        if getattr(__dict__, '__objclass__', None) is not obj:
+        # saved before obj is memoized. Thus, we must make sure that cyclic
+        # references between __dict__ and obj will not trigger infinite
+        # recursion, i.e that __dict__ is memoized before its populated with
+        # obj. If __dict__ is a dict, references to obj inside __dict__ are
+        # safe. But if __dict__ is not overriden, it is a getset_descriptor
+        # that contains an unsafe reference to obj, and we must not save it.
+        # Because non-overriden __dict__ attributes will be generated
+        # automatically at class reconstruction anyways, no information is
+        # lost.
+        if (not isinstance(__dict__, types.GetSetDescriptorType) and
+                getattr(__dict__, '__objclass__', None) is not obj):
             type_kwargs['__dict__'] = __dict__
 
         save = self.save

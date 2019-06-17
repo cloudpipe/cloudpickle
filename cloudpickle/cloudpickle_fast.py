@@ -72,7 +72,8 @@ def _class_getnewargs(obj):
         type_kwargs["__slots__"] = obj.__slots__
 
     __dict__ = obj.__dict__.get('__dict__', None)
-    if getattr(__dict__, '__objclass__', None) is not obj:
+    if (not isinstance(__dict__, types.GetSetDescriptorType) and
+            getattr(__dict__, '__objclass__', None) is not obj):
         type_kwargs['__dict__'] = __dict__
 
     return (type(obj), obj.__name__, obj.__bases__, type_kwargs,
