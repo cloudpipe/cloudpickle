@@ -65,6 +65,7 @@ try:
 except ImportError:
     Enum = None
 
+
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
