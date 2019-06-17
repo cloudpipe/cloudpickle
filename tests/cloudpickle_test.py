@@ -1872,7 +1872,7 @@ class CloudPickleTest(unittest.TestCase):
         # used to drop __dict__ attributes of classes at pickling time.
         pickle_filename= os.path.join(self.tmpdir, 'class_with_dict.pkl')
         _dict = {'some_attribute': 1}
-        class A:
+        class A(object):
             __dict__ = _dict
         a = A()
         self.assertEqual(a.__dict__, _dict)
