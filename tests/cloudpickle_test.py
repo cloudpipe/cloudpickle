@@ -1880,9 +1880,11 @@ class CloudPickleTest(unittest.TestCase):
         with open(pickle_filename, "wb") as f:
             cloudpickle.dump(a, f, protocol=self.protocol)
 
-        # Depickle the class in a new python session to make sure the class is
-        # fully-recreated, and not looked-up in existing cloudpickle
-        # class-tracking constructs.
+        # Check that the dynamic class defintion is fully reconstructed in a
+        # new Python subprocess and check the assertion that the content of the
+        # __dict__ attribute has the expected content there. Testing this in
+        # the main process is not enough because the existing class definition
+        # could have been reused directly.
         child_process_script = """
             import pickle
             with open("{filename}", "rb") as f:
