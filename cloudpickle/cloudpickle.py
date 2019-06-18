@@ -651,7 +651,7 @@ class CloudPickler(Pickler):
         # effect.
         # There is one corner case: if the __dict__ class has itself a
         # "__dict__" key (this means that the class likely overrides the
-        # __dict__ property of its instances), setattr("__dict__", v) will try
+        # __dict__ property of its instances), setattr(klass, "__dict__", v) will try
         # to modify the read-only class __dict__ instead, and fail. As a
         # result, if it exists, the class __dict__ must contain its __dict__
         # item when it is initialized and fed to the class reconstructor.
