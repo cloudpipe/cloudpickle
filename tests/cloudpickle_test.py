@@ -670,10 +670,9 @@ class CloudPickleTest(unittest.TestCase):
         # builtin function from the __builtin__ module
         assert pickle_depickle(zip, protocol=self.protocol) is zip
 
-        from sys import getcheckinterval
+        from os import mkdir
         # builtin function from a "regular" module
-        assert pickle_depickle(
-            getcheckinterval, protocol=self.protocol) is getcheckinterval
+        assert pickle_depickle(mkdir, protocol=self.protocol) is mkdir
 
     @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
                         sys.version_info[:2] == (3, 5),
