@@ -85,6 +85,23 @@ Running the tests
       PYTHONPATH='.:tests' py.test
 
 
+Note about function Annotations
+-------------------------------
+
+Note that because of design issues `Python`'s `typing` module, `cloudpickle` will
+not pickle dynamic function annotations on `Python` 3.4, 3.5 and 3.6:
+
+```python
+>>> import typing
+>>> import cloudpickle
+>>> def f(x: typing.Union[list, int]):
+...     return x
+>>> f
+<function __main__.f(x:Union[list, int])>
+>>> cloudpickle.loads(cloudpickle.dumps(f))  # drops f's annotations
+<function __main__.f(x)>
+```
+
 History
 -------
 

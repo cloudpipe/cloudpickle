@@ -1,6 +1,12 @@
 1.2.2
 =====
 
+- Revert the change introduced in
+  ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
+  attempting to pickle functions annotations for Python 3.4 to 3.6. It is not
+  possible to pickle complex typing constructs for those versions (see
+  [issue #193]( https://github.com/cloudpipe/cloudpickle/issues/193))
+
 - Fix a bug affecting bound classmethod saving on Python 2.
   ([issue #288](https://github.com/cloudpipe/cloudpickle/issues/288))
 
