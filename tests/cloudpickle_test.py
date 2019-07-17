@@ -1650,7 +1650,6 @@ class CloudPickleTest(unittest.TestCase):
         t = typing.Union[list, int]
         assert pickle_depickle(t) == t
 
-
     def test_instance_with_slots(self):
         for slots in [["registered_attribute"], "registered_attribute"]:
             class ClassWithSlots(object):
