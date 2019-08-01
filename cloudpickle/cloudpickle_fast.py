@@ -142,7 +142,6 @@ def _class_getstate(obj):
         # checks, but pickle the list of registered subclasses of obj.
         clsdict.pop('_abc_impl', None)
         (registry, _, _, _) = abc._get_dump(obj)
-
         clsdict["_abc_impl"] = [subclass_weakref()
                                 for subclass_weakref in registry]
 
