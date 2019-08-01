@@ -1,6 +1,10 @@
 1.2.2
 =====
 
+- Dont pickle the abc cache of dynamically defined classes for Python 3.6-
+  (This was already the case for python3.7+)
+  ([issue #302](https://github.com/cloudpipe/cloudpickle/issues/302))
+
 - Fix a bug affecting bound classmethod saving on Python 2.
   ([issue #288](https://github.com/cloudpipe/cloudpickle/issues/288))
 
