@@ -632,8 +632,12 @@ class CloudPickler(Pickler):
                 clsdict.pop('_abc_impl', None)
                 (registry, _, _, _) = abc._get_dump(obj)
 
-            clsdict["_abc_impl"] = [subclass_weakref()
-                                    for subclass_weakref in registry]
+                clsdict["_abc_impl"] = [subclass_weakref()
+                                        for subclass_weakref in registry]
+            else:
+                # In the above if clause, registry is a set of weakrefs -- in
+                # this case, registry is a WeakSet
+                clsdict["_abc_impl"] = [type_ for type_ in registry]
 
         # On PyPy, __doc__ is a readonly attribute, so we need to include it in
         # the initial skeleton class.  This is safe because we know that the
