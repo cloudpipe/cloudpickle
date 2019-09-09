@@ -1620,9 +1620,9 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__doc__, f.__doc__)
 
-    @unittest.skipIf(sys.version_info < (3, 4),
-                     """This syntax won't work on py2 and pickling annotations
-                     isn't supported for py34 and below.""")
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "This syntax won't work on py2 and pickling annotations "
+                     "isn't supported for py37 and below.")
     def test_wraps_preserves_function_annotations(self):
         from functools import wraps
 
@@ -1638,6 +1638,16 @@ class CloudPickleTest(unittest.TestCase):
         f2 = pickle_depickle(g, protocol=self.protocol)
 
         self.assertEqual(f2.__annotations__, f.__annotations__)
+
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     """This syntax won't work on py2 and pickling annotations
+                     isn't supported for py37 and below.""")
+    def test_type_hint(self):
+        # Try to pickle compound typing constructs. This would typically fail
+        # on Python < 3.7 (See #193)
+        import typing
+        t = typing.Union[list, int]
+        assert pickle_depickle(t) == t
 
     def test_instance_with_slots(self):
         for slots in [["registered_attribute"], "registered_attribute"]:

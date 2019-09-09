@@ -747,7 +747,9 @@ class CloudPickler(Pickler):
             'doc': func.__doc__,
             '_cloudpickle_submodules': submodules
         }
-        if hasattr(func, '__annotations__') and sys.version_info >= (3, 4):
+        if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
+            # Although annotations were added in Python3.4, It is not possible
+            # to properly pickle them until Python3.7. (See #193)
             state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
