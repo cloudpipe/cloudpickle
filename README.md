@@ -88,8 +88,10 @@ Running the tests
 Note about function Annotations
 -------------------------------
 
-Note that because of design issues `Python`'s `typing` module, `cloudpickle` will
-not pickle dynamic function annotations on `Python` 3.4, 3.5 and 3.6:
+Note that because of design issues `Python`'s `typing` module, `cloudpickle`
+supports pickling type annotations of dynamic functions for `Python` 3.7 and
+later.  On `Python` 3.4, 3.5 and 3.6, those type annotations will be dropped
+silently during pickling (example below):
 
 ```python
 >>> import typing
