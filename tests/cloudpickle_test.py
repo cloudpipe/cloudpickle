@@ -901,6 +901,20 @@ class CloudPickleTest(unittest.TestCase):
         f = cloudpickle.loads(s)
         f() # test
 
+    def test_lazy_tensorflow2_submodule(self):
+        # Non-regression test to check a workaround for a weird behavior
+        # of tensorflow 2.0 lazy modules:
+        # https://github.com/cloudpipe/cloudpickle/issues/304
+        # https://github.com/tensorflow/tensorflow/issues/32159
+        tf = pytest.importorskip("tensorflow")
+
+        def f():
+            tf.keras.Sequential
+
+        f()  # smoke check to verify that f is usable prior to pickling
+        f_copy = pickle_depickle(f, protocol=self.protocol)
+        f_copy()  # should not raise anything
+
     def test_multiprocess(self):
         # running a function pickled by another process (a la dask.distributed)
         def scope():
