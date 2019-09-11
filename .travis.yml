@@ -90,7 +90,7 @@ before_install:
 install:
   - $PYTHON_EXE -m pip install .
   - $PYTHON_EXE -m pip install --upgrade -r dev-requirements.txt
-  - $PYTHON_EXE -m pip install tornado
+  - $PYTHON_EXE -m pip install tornado tensorflow>=2.0.0-rc0
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
         if [[ "$PYTHON_NIGHTLY" == "1" ]]; then
           $PYTHON_EXE -m pip install git+https://github.com/cython/cython git+https://github.com/numpy/numpy;
