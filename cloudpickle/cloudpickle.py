@@ -127,11 +127,10 @@ def _lookup_class_or_track(class_tracker_id, class_def):
 if sys.version_info[:2] >= (3, 5):
     from pickle import _getattribute
 else:
-    # pickle._getattribute is a python3.5 addition and enchancement of getattr,
-    # that can handle dotted attribute names. In cloudpickle for python2,
-    # handling dotted names is not needed, so we simply define _getattribute as
-    # a wrapper around getattr. A similar function exists in 3.4, but does not
-    # have the same signature, so we redifine it here.
+    # pickle._getattribute is a python3.5 addition and enhancement of getattr,
+    # that can handle dotted attribute names. This function does not exist in
+    # python2. A similar function exists in 3.4, but does not have the same
+    # signature, so we redefine it here.
     def _getattribute(obj, name):
         for subpath in name.split('.'):
             if subpath == '<locals>':
