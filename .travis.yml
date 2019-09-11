@@ -98,7 +98,8 @@ install:
     if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
         if [[ "$TRAVIS_PYTHON_VERSION" == "3.8-dev" ]] || [[ "$PYTHON_NIGHTLY" == "1" ]]; then
             # installing scipy from pip builds it from source; thus we need to
-            # install blas implementation on our system
+            # install blas implementation on our system. This ought to be
+            # deleted once scipy has proper binary wheels for 3.8
             if [[ $TRAVIS_OS_NAME == "linux" ]]; then
                 sudo apt-get install libopenblas-dev
                 $PYTHON_EXE -m pip install numpy scipy
