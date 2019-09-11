@@ -124,18 +124,27 @@ def _lookup_class_or_track(class_tracker_id, class_def):
     return class_def
 
 
-def _getattribute(obj, name):
-    for subpath in name.split('.'):
-        if subpath == '<locals>':
-            raise AttributeError("Can't get local attribute {!r} on {!r}"
-                                 .format(name, obj))
-        try:
-            parent = obj
-            obj = getattr(obj, subpath)
-        except AttributeError:
-            raise AttributeError("Can't get attribute {!r} on {!r}"
-                                 .format(name, obj))
-    return obj, parent
+if sys.version_info[:2] >= (3, 5):
+    from pickle import _getattribute
+else:
+
+    # pickle._getattribute is a python3.5 addition and enchancement of getattr,
+    # that can handle dotted attribute names. In cloudpickle for python2,
+    # handling dotted names is not needed, so we simply define _getattribute as
+    # a wrapper around getattr. A similar function exists in 3.4, but does not
+    # have the same signature, so we redifine it here.
+    def _getattribute(obj, name):
+        for subpath in name.split('.'):
+            if subpath == '<locals>':
+                raise AttributeError("Can't get local attribute {!r} on {!r}"
+                                     .format(name, obj))
+            try:
+                parent = obj
+                obj = getattr(obj, subpath)
+            except AttributeError:
+                raise AttributeError("Can't get attribute {!r} on {!r}"
+                                     .format(name, obj))
+        return obj, parent
 
 
 def _whichmodule(obj, name):
@@ -271,7 +280,7 @@ def _find_imported_submodules(code, top_level_dependencies):
                     tokens = set(submodule_relative_path.split('.'))
                     if not tokens - set(code.co_names):
                         subimports.append(
-                            _getattribute(x, submodule_relative_path))
+                            _getattribute(x, submodule_relative_path)[0])
     return subimports
 
 
