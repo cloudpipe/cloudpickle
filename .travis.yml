@@ -14,9 +14,12 @@ matrix:
       python: "pypy3"
     - os: linux
       env: PYTHON_NIGHTLY=1
+      if: commit_message =~ /\[ci python-nightly\]/
       python: 3.7
     - os: linux
       python: 3.7
+    - os: linux
+      python: "3.8-dev"
     - os: linux
       python: 3.6
     - os: linux
@@ -34,9 +37,9 @@ matrix:
       python: 3.7
       sudo: required
       env: PROJECT=distributed
-           TEST_REQUIREMENTS="pytest pytest-timeout numpy pandas mock bokeh"
+           TEST_REQUIREMENTS="pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3"
            PROJECT_URL=https://github.com/dask/distributed.git
-           PYTEST_ADDOPTS="--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args\""
+           PYTEST_ADDOPTS="--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_workspace_concurrency and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args\""
       if: commit_message =~ /(\[ci downstream\]|\[ci distributed\])/
     - os: linux
       env: PROJECT=loky TEST_REQUIREMENTS="pytest psutil"
@@ -91,11 +94,18 @@ install:
   - $PYTHON_EXE -m pip install .
   - $PYTHON_EXE -m pip install --upgrade -r dev-requirements.txt
   - $PYTHON_EXE -m pip install tornado
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
-        if [[ "$PYTHON_NIGHTLY" == "1" ]]; then
-          $PYTHON_EXE -m pip install git+https://github.com/cython/cython git+https://github.com/numpy/numpy;
+  - |
+    if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then
+        if [[ "$TRAVIS_PYTHON_VERSION" == "3.8-dev" ]] || [[ "$PYTHON_NIGHTLY" == "1" ]]; then
+            # installing scipy from pip builds it from source; thus we need to
+            # install blas implementation on our system. This ought to be
+            # deleted once scipy has proper binary wheels for 3.8
+            if [[ $TRAVIS_OS_NAME == "linux" ]]; then
+                sudo apt-get install libopenblas-dev
+                $PYTHON_EXE -m pip install numpy scipy
+            fi
         else
-          $PYTHON_EXE -m pip install numpy scipy;
+            $PYTHON_EXE -m pip install numpy scipy
         fi
     fi
   - if [[ $PROJECT != "" ]]; then
