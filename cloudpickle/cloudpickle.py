@@ -43,7 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import print_function
 
 import dis
-from functools import partial
+import functools
 import io
 import itertools
 import logging
@@ -1067,6 +1067,28 @@ class CloudPickler(Pickler):
 
         dispatch[types.MappingProxyType] = save_mappingproxy
 
+    # In CPython, functions decorated with functools.lru_cache are actually
+    # instances of a non-serializable built-in type. We pickle them by pickling
+    # the underlying function, along with the size of the lru cache. We do
+    # **not** attempt to pickle the contents of the function's cache.
+    if hasattr(functools, 'lru_cache'):  # pragma: no branch
+        _lru_cache_instance = functools.lru_cache()(lambda: None)
+
+        # PyPy's lru_cache returns a regular function object that closes over
+        # the cache state. We can't easily treat this specially beacuse
+        # Pickle's dispatching is purely type-based.
+        if not isinstance(_lru_cache_instance, types.FunctionType):
+            # Assume CPython native LRU Cache.
+            def save_lru_cached_function(self, obj):
+                self.save_reduce(
+                    _rebuild_lru_cached_function,
+                    (obj.cache_info().maxsize, obj.__wrapped__),
+                    obj=obj,
+                )
+
+            dispatch[type(_lru_cache_instance)] = save_lru_cached_function
+        del _lru_cache_instance  # Remove from class namespace.
+
     """Special functions for Add-on libraries"""
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
@@ -1395,3 +1417,11 @@ def _is_dynamic(module):
         except ImportError:
             return True
         return False
+
+
+def _rebuild_lru_cached_function(maxsize, func):
+    """Reconstruct a function that was decorated with functools.lru_cache.
+
+    The rebuilt function will have an empty cache.
+    """
+    return functools.lru_cache(maxsize)(func)

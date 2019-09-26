@@ -1876,6 +1876,58 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
+    @unittest.skipIf(not hasattr(functools, "lru_cache"),
+                     "Old versions of Python do not have lru_cache.")
+    def test_pickle_lru_cached_function(self):
+
+        for maxsize in None, 1, 2:
+
+            @functools.lru_cache(maxsize=maxsize)
+            def func(x, y):
+                return x + y
+
+            # Populate original function's cache.
+            func(1, 2)
+
+            new_func = pickle_depickle(func, protocol=self.protocol)
+            assert type(new_func) == type(func)
+
+            # We don't attempt to pickle the original function's cache, so the
+            # new function should have an empty cache.
+            self._expect_cache_info(
+                new_func.cache_info(),
+                hits=0,
+                misses=0,
+                maxsize=maxsize,
+                currsize=0,
+            )
+
+            assert new_func(1, 2) == 3
+
+            self._expect_cache_info(
+                new_func.cache_info(),
+                hits=0,
+                misses=1,
+                maxsize=maxsize,
+                currsize=1,
+            )
+
+            assert new_func(1, 2) == 3
+
+            self._expect_cache_info(
+                new_func.cache_info(),
+                hits=1,
+                misses=1,
+                maxsize=maxsize,
+                currsize=1,
+            )
+
+    def _expect_cache_info(self, cache_info, hits, misses, maxsize, currsize):
+        assert cache_info.hits == hits
+        assert cache_info.misses == misses
+        assert cache_info.maxsize == maxsize
+        assert cache_info.currsize == currsize
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
