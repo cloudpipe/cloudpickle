@@ -50,6 +50,8 @@ from .testutils import assert_run_python_script
 
 _TEST_GLOBAL_VARIABLE = "default_value"
 
+IS_PYPY = platform.python_implementation() == 'PyPy'
+
 
 class RaiserOnPickle(object):
 
@@ -368,7 +370,7 @@ class CloudPickleTest(unittest.TestCase):
         partial_clone = pickle_depickle(partial_obj, protocol=self.protocol)
         self.assertEqual(partial_clone(4), 1)
 
-    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+    @pytest.mark.skipif(
                         reason="Skip numpy and scipy tests on PyPy")
     def test_ufunc(self):
         # test a numpy ufunc (universal function), which is a C-based function
@@ -476,7 +478,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(mod.f(5), mod2.f(5))
         self.assertEqual(mod.Foo().method(5), mod2.Foo().method(5))
 
-        if platform.python_implementation() != 'PyPy':
+        if not IS_PYPY:
             # XXX: this fails with excessive recursion on PyPy.
             mod3 = subprocess_pickle_echo(mod, protocol=self.protocol)
             self.assertEqual(mod.x, mod3.x)
@@ -639,7 +641,7 @@ class CloudPickleTest(unittest.TestCase):
         dynamic_module = types.ModuleType('dynamic_module')
         assert _is_dynamic(dynamic_module)
 
-        if platform.python_implementation() == 'PyPy':
+        if IS_PYPY:
             import _codecs
             assert not _is_dynamic(_codecs)
 
@@ -674,8 +676,7 @@ class CloudPickleTest(unittest.TestCase):
         # builtin function from a "regular" module
         assert pickle_depickle(mkdir, protocol=self.protocol) is mkdir
 
-    @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
-                        sys.version_info[:2] == (3, 5),
+    @pytest.mark.skipif(IS_PYPY and sys.version_info[:2] == (3, 5),
                         reason="bug of pypy3.5 in builtin-type constructors")
     def test_builtin_type_constructor(self):
         # Due to a bug in pypy3.5, cloudpickling builtin-type constructors
@@ -750,7 +751,7 @@ class CloudPickleTest(unittest.TestCase):
             # Roundtripping a classmethod_descriptor results in a
             # builtin_function_or_method (CPython upstream issue).
             assert depickled_clsdict_meth(arg) == clsdict_clsmethod(float, arg)
-        if platform.python_implementation() == 'PyPy':
+        if IS_PYPY:
             # builtin-classmethods are simple classmethod in PyPy (not
             # callable). We test equality of types and the functionality of the
             # __func__ attribute instead. We do not test the the identity of
@@ -781,7 +782,7 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_clsdict_meth is clsdict_slotmethod
 
     @pytest.mark.skipif(
-        platform.python_implementation() == "PyPy" or
+        IS_PYPY or
         sys.version_info[:1] < (3,),
         reason="No known staticmethod example in the python 2 / pypy stdlib")
     def test_builtin_staticmethod(self):
@@ -1499,7 +1500,7 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
-    @pytest.mark.skipif(platform.python_implementation() == 'PyPy',
+    @pytest.mark.skipif(IS_PYPY,
                         reason="Skip PyPy because memory grows too much")
     def test_interactive_remote_function_calls_no_memory_leak(self):
         code = """if __name__ == "__main__":
@@ -1876,9 +1877,9 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
-    @unittest.skipIf(not hasattr(functools, "lru_cache")
-                     or platform.python_implementation() == 'PyPy',
-                     "Old versions of Python do not have lru_cache.")
+    @unittest.skipIf(IS_PYPY or not hasattr(functools, "lru_cache"),
+                     "Old versions of Python do not have lru_cache. "
+                     "PyPy's lru_cache is a regular function.")
     def test_pickle_lru_cached_function(self):
 
         for maxsize in None, 1, 2:
