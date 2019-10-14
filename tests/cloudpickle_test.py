@@ -1876,7 +1876,8 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
-    @unittest.skipIf(not hasattr(functools, "lru_cache"),
+    @unittest.skipIf(not hasattr(functools, "lru_cache")
+                     or platform.python_implementation() == 'PyPy',
                      "Old versions of Python do not have lru_cache.")
     def test_pickle_lru_cached_function(self):
 
