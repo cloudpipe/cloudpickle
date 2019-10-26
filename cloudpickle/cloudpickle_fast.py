@@ -68,7 +68,7 @@ def dumps(obj, protocol=None):
 
 def _class_getnewargs(obj):
     type_kwargs = {}
-    if hasattr(obj, "__slots__"):
+    if "__slots__" in obj.__dict__:
         type_kwargs["__slots__"] = obj.__slots__
 
     __dict__ = obj.__dict__.get('__dict__', None)
