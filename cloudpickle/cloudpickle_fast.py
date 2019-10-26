@@ -143,7 +143,7 @@ def _class_getstate(obj):
         (registry, _, _, _) = abc._get_dump(obj)
         clsdict["_abc_impl"] = [subclass_weakref()
                                 for subclass_weakref in registry]
-    if hasattr(obj, "__slots__"):
+    if "__slots__" in clsdict:
         # pickle string length optimization: member descriptors of obj are
         # created automatically from obj's __slots__ attribute, no need to
         # save them in obj's state
