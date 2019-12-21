@@ -15,6 +15,10 @@
   instances on Python 3.7+
   ([PR #351](https://github.com/cloudpipe/cloudpickle/pull/351))
 
+- Add support for pickling dynamic classes subclassing `typing.Generic`
+  instances on Python 3.5+
+  ([PR #318](https://github.com/cloudpipe/cloudpickle/pull/318))
+
 1.3.0
 =====
 

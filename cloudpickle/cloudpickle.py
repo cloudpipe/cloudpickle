@@ -611,11 +611,6 @@ class CloudPickler(Pickler):
         if isinstance(__dict__, property):
             type_kwargs['__dict__'] = __dict__
 
-        if sys.version_info < (3, 7):
-            # Although annotations were added in Python 3.4, It is not possible
-            # to properly pickle them until Python 3.7. (See #193)
-            clsdict.pop('__annotations__', None)
-
         save = self.save
         write = self.write
 
@@ -715,9 +710,7 @@ class CloudPickler(Pickler):
             'doc': func.__doc__,
             '_cloudpickle_submodules': submodules
         }
-        if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
-            # Although annotations were added in Python3.4, It is not possible
-            # to properly pickle them until Python3.7. (See #193)
+        if hasattr(func, '__annotations__'):
             state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
@@ -800,6 +793,12 @@ class CloudPickler(Pickler):
         elif obj in _BUILTIN_TYPE_NAMES:
             return self.save_reduce(
                 _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
+
+        decomposed_generic = _try_decompose_generic(obj)
+        if decomposed_generic is not None:
+            class_tracker_id = _get_or_create_tracker_id(obj)
+            reduce_args = (*decomposed_generic, class_tracker_id)
+            return self.save_reduce(_make_generic, reduce_args, obj=obj)
         elif name is not None:
             Pickler.save_global(self, obj, name=name)
         elif not _is_importable_by_name(obj, name=name):
@@ -1284,3 +1283,61 @@ def _get_bases(typ):
         # For regular class objects
         bases_attr = '__bases__'
     return getattr(typ, bases_attr)
+
+
+def _make_generic(origin, args, class_tracker_id):
+    return _lookup_class_or_track(class_tracker_id, origin[args])
+
+
+if sys.version_info >= (3, 7):
+    def _try_decompose_generic(obj):
+        return None
+else:
+    def _try_decompose_generic(obj):
+        origin = getattr(obj, '__origin__', None)
+        if origin is None:
+            return _try_decompose_special_generic(obj)
+        args = obj.__args__
+        if origin is typing.Callable and args[0] is not Ellipsis:
+            args = (list(args[:-1]), args[-1])
+        return origin, args
+
+    Type_ClassVar = type(typing.ClassVar)
+
+    try:
+        import typing_extensions
+    except ImportError:
+        def _try_decompose_special_generic(obj):
+            if type(obj) is Type_ClassVar:
+                t = getattr(obj, '__type__', None)
+                if t is None:
+                    return None
+                return typing.ClassVar, t
+
+            return None
+    else:
+        Literal = typing_extensions.Literal
+        Type_Literal = type(typing_extensions.Literal)
+        Final = typing_extensions.Final
+        Type_Final = type(typing_extensions.Final)
+
+        def _try_decompose_special_generic(obj):
+            if type(obj) is Type_ClassVar:
+                t = getattr(obj, '__type__', None)
+                if t is None:
+                    return None
+                return typing.ClassVar, t
+
+            if type(obj) is Type_Literal:
+                v = getattr(obj, '__values__', None)
+                if v is None:
+                    return None
+                return Literal, v
+
+            if type(obj) is Type_Final:
+                t = getattr(obj, '__type__', None)
+                if t is None:
+                    return None
+                return Final, t
+
+            return None
