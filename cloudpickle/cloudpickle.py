@@ -151,9 +151,10 @@ def _whichmodule(obj, name):
     module_name = getattr(obj, '__module__', None)
     if module_name is not None:
         return module_name
-    # Protect the iteration by using a list copy of sys.modules against dynamic
-    # modules that trigger imports of other modules upon calls to getattr.
-    for module_name, module in list(sys.modules.items()):
+    # Protect the iteration by using a copy of sys.modules against dynamic
+    # modules that trigger imports of other modules upon calls to getattr or
+    # other threads importing at the same time.
+    for module_name, module in sys.modules.copy().items():
         if module_name == '__main__' or module is None:
             continue
         try:
