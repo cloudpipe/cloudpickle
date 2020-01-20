@@ -6,6 +6,8 @@
 
 1.2.3
 =====
+- Fix a bug affecting dynamic modules occuring with modified builtins
+  ([issue #316](https://github.com/cloudpipe/cloudpickle/issues/316))
 
 - Fix a bug affecting cloudpickle when non-modules objects are added into
   sys.modules
