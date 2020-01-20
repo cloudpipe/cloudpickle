@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
+import builtins
 import dis
 from functools import partial
 import io
@@ -510,6 +511,7 @@ class CloudPickler(Pickler):
         Save a module as an import
         """
         if _is_dynamic(obj):
+            obj.__dict__.pop('__builtins__', None)
             self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
                              obj=obj)
         else:
@@ -1149,6 +1151,7 @@ def subimport(name):
 def dynamic_subimport(name, vars):
     mod = types.ModuleType(name)
     mod.__dict__.update(vars)
+    mod.__dict__['__builtins__'] = builtins.__dict__
     return mod
 
 
