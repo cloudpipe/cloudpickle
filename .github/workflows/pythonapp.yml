@@ -6,10 +6,9 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            python_version: 3.7
-     
+        os: [ubuntu-latest]
+        python_version: [3.7]
+
     runs-on: ${{ matrix.os }}
 
     steps:
