@@ -274,6 +274,7 @@ def _memoryview_reduce(obj):
 
 def _module_reduce(obj):
     if _is_dynamic(obj):
+        obj.__dict__.pop('__builtins__', None)
         return dynamic_subimport, (obj.__name__, vars(obj))
     else:
         return subimport, (obj.__name__,)
