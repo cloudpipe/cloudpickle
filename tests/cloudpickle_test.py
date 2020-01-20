@@ -528,6 +528,33 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             os.unlink(pickled_func_path)
 
+    def test_module_with_unpicklable_builtin(self):
+        # Reproducer of https://github.com/cloudpipe/cloudpickle/issues/316
+        # Some modules such as scipy inject some unpicklable objects into the
+        # __builtins__ module, which appears in every module's __dict__ under
+        # the '__builtins__' key. In such cases, cloudpickle used to fail
+        # when pickling dynamic modules.
+        class UnpickleableObject:
+            def __reduce__(self):
+                raise ValueError('Unpicklable object')
+
+        mod = types.ModuleType("mod")
+
+        exec('f = lambda x: abs(x)', mod.__dict__)
+        assert mod.f(-1) == 1
+        assert '__builtins__' in mod.__dict__
+
+        unpicklable_obj = UnpickleableObject()
+        with pytest.raises(ValueError):
+            cloudpickle.dumps(unpicklable_obj)
+
+        # Emulate the behavior of scipy by injecting an unpickleable object
+        # into mod's builtins
+        mod.__dict__['__builtins__']['unpickleable_object'] = unpicklable_obj
+
+        depickled_mod = pickle_depickle(mod, protocol=self.protocol)
+        assert depickled_mod.f(-1) == 1
+
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
         # property. Otherwise, this will lead to an ImportError if pickled in
