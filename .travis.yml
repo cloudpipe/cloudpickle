@@ -128,7 +128,6 @@ before_script:
   - $PYTHON_EXE -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
   - $PYTHON_EXE ci/install_coverage_subprocess_pth.py
 script:
-  - $PYTHON_EXE -c "import sys; print(sys.version)"
   - COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' $PYTHON_EXE -m pytest -r s
   - |
     if [[ $PROJECT != "" ]]; then
