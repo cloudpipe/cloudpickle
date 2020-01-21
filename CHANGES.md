@@ -1,6 +1,10 @@
 1.2.3
 =====
 
+- Fix a bug when a thread imports a module while cloudpickle iterates
+  over the module list
+  ([PR #322](https://github.com/cloudpipe/cloudpickle/pull/322)).
+
 1.2.2
 =====
 
