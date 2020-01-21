@@ -42,7 +42,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
-import builtins
 import dis
 from functools import partial
 import io
@@ -91,6 +90,7 @@ if sys.version_info[0] < 3:  # pragma: no branch
         from cStringIO import StringIO
     except ImportError:
         from StringIO import StringIO
+    import __builtin__ as builtins
     string_types = (basestring,)  # noqa
     PY3 = False
     PY2 = True
@@ -102,6 +102,7 @@ else:
     PY3 = True
     PY2 = False
     from importlib._bootstrap import _find_spec
+    import builtins
 
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 

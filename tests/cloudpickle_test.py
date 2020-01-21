@@ -534,7 +534,7 @@ class CloudPickleTest(unittest.TestCase):
         # __builtins__ module, which appears in every module's __dict__ under
         # the '__builtins__' key. In such cases, cloudpickle used to fail
         # when pickling dynamic modules.
-        class UnpickleableObject:
+        class UnpickleableObject(object):
             def __reduce__(self):
                 raise ValueError('Unpicklable object')
 
