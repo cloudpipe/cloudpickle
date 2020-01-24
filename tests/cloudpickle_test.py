@@ -549,12 +549,23 @@ class CloudPickleTest(unittest.TestCase):
             cloudpickle.dumps(unpicklable_obj)
 
         # Emulate the behavior of scipy by injecting an unpickleable object
-        # into mod's builtins
-        mod.__dict__['__builtins__']['unpickleable_object'] = unpicklable_obj
+        # into mod's builtins.
+        # The __builtins__ entry of mod's __dict__ can either be the
+        # __builtins__ module, or the __builtins__ module's __dict__. #316
+        # happens only in the latter case.
+        if isinstance(mod.__dict__['__builtins__'], dict):
+            mod.__dict__['__builtins__']['unpickleable_obj'] = unpicklable_obj
+        elif isinstance(mod.__dict__['__builtins__'], types.ModuleType):
+            mod.__dict__['__builtins__'].unpickleable_obj = unpicklable_obj
 
         depickled_mod = pickle_depickle(mod, protocol=self.protocol)
         assert '__builtins__' in depickled_mod.__dict__
-        assert "abs" in depickled_mod.__builtins__
+
+        if isinstance(depickled_mod.__dict__['__builtins__'], dict):
+            assert "abs" in depickled_mod.__builtins__
+        elif isinstance(
+                depickled_mod.__dict__['__builtins__'], types.ModuleType):
+            assert hasattr(depickled_mod.__builtins__, "abs")
         assert depickled_mod.f(-1) == 1
 
     def test_load_dynamic_module_in_grandchild_process(self):
