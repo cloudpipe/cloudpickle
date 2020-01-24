@@ -553,6 +553,8 @@ class CloudPickleTest(unittest.TestCase):
         mod.__dict__['__builtins__']['unpickleable_object'] = unpicklable_obj
 
         depickled_mod = pickle_depickle(mod, protocol=self.protocol)
+        assert '__builtins__' in depickled_mod.__dict__
+        assert "abs" in depickled_mod.__builtins__
         assert depickled_mod.f(-1) == 1
 
     def test_load_dynamic_module_in_grandchild_process(self):
