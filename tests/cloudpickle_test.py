@@ -528,7 +528,7 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             os.unlink(pickled_func_path)
 
-    def test_module_with_unpicklable_builtin(self):
+    def test_dynamic_module_with_unpicklable_builtin(self):
         # Reproducer of https://github.com/cloudpipe/cloudpickle/issues/316
         # Some modules such as scipy inject some unpicklable objects into the
         # __builtins__ module, which appears in every module's __dict__ under
