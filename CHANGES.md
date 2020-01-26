@@ -1,5 +1,6 @@
-1.2.3
+1.3.0
 =====
+
 - Fix a bug affecting dynamic modules occuring with modified builtins
   ([issue #316](https://github.com/cloudpipe/cloudpickle/issues/316))
 
