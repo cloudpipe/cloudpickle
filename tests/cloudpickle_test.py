@@ -1093,34 +1093,40 @@ class CloudPickleTest(unittest.TestCase):
             sys.modules.pop('NonModuleObject')
 
     def test_faulty_module(self):
-        for module_name in ['_missing_module', None]:
-            class FaultyModule(object):
-                def __getattr__(self, name):
-                    # This throws an exception while looking up within
-                    # pickle.whichmodule or getattr(module, name, None)
-                    raise Exception()
+        for base_class in (object, types.ModuleType):
+            for module_name in ['_missing_module', None]:
+                class FaultyModule(base_class):
+                    def __getattr__(self, name):
+                        # This throws an exception while looking up within
+                        # pickle.whichmodule or getattr(module, name, None)
+                        raise Exception()
 
-            class Foo(object):
-                __module__ = module_name
+                class Foo(object):
+                    __module__ = module_name
 
-                def foo(self):
+                    def foo(self):
+                        return "it works!"
+
+                def foo():
                     return "it works!"
 
-            def foo():
-                return "it works!"
+                foo.__module__ = module_name
 
-            foo.__module__ = module_name
+                if base_class is types.ModuleType:  # noqa
+                    faulty_module = FaultyModule('_faulty_module')
+                else:
+                    faulty_module = FaultyModule()
+                sys.modules["_faulty_module"] = faulty_module
 
-            sys.modules["_faulty_module"] = FaultyModule()
-            try:
-                # Test whichmodule in save_global.
-                self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
+                try:
+                    # Test whichmodule in save_global.
+                    self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
 
-                # Test whichmodule in save_function.
-                cloned = pickle_depickle(foo, protocol=self.protocol)
-                self.assertEqual(cloned(), "it works!")
-            finally:
-                sys.modules.pop("_faulty_module", None)
+                    # Test whichmodule in save_function.
+                    cloned = pickle_depickle(foo, protocol=self.protocol)
+                    self.assertEqual(cloned(), "it works!")
+                finally:
+                    sys.modules.pop("_faulty_module", None)
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
