@@ -57,18 +57,6 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
-      run: |
-        python -m pip install $TEST_REQUIREMENTS
-        pushd ..
-        git clone $PROJECT_URL;
-        python -m pip install ./$PROJECT;
-        popd;
+    - uses: .github/actions/install_downstream_project.yml
     - name: Test the downstream project
-      run: |
-        pushd ../$PROJECT
-        python -m pytest -vl
-        TEST_RETURN_CODE=$?
-        popd
-        if [[ "$TEST_RETURN_CODE" != "0" ]]; then
-          exit $TEST_RETURN_CODE
-        fi
+    - uses: .github/actions/test_downstream_project.yml
