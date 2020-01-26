@@ -1048,6 +1048,50 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(set(weakset), {depickled1, depickled2})
 
+    def test_non_module_object_passing_whichmodule_test(self):
+        # https://github.com/cloudpipe/cloudpickle/pull/326: cloudpickle should
+        # not try to instrospect non-modules object when trying to discover the
+        # module of a function/class
+        def func(x):
+            return x ** 2
+
+        func.__module__ = "NonModuleObject"
+
+        class NonModuleObject(object):
+            def __getattr__(self, name):
+                # We whitelist func so that a _whichmodule(func, None) call returns
+                # the NonModuleObject instance if a type check on the entries
+                # of sys.modules is not carried out, but manipulating this
+                # instance thinking it really is a module later on in the
+                # pickling process of func errors out
+                if name == 'func':
+                    return func
+                else:
+                    raise ValueError
+
+        non_module_object = NonModuleObject()
+
+        assert func(2) == 4
+        assert func is non_module_object.func
+
+        # Any manipulation of non_module_object relying on attribute access
+        # will raise an Exception
+        with pytest.raises(ValueError):
+            _is_dynamic(non_module_object)
+
+        try:
+            sys.modules['NonModuleObject'] = non_module_object
+
+            func_module_name = _whichmodule(func, None)
+            assert func_module_name != 'NonModuleObject'
+            assert func_module_name is None
+
+            depickled_func = pickle_depickle(func, protocol=self.protocol)
+            assert depickled_func(2) == 4
+
+        finally:
+            sys.modules.pop('NonModuleObject')
+
     def test_faulty_module(self):
         for module_name in ['_missing_module', None]:
             class FaultyModule(object):
