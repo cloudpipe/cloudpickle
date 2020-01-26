@@ -57,6 +57,6 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
-      uses: .github/actions/install_downstream_project.yml
+      uses: ./.github/actions/install_downstream_project.yml
     - name: Test the downstream project
-      uses: .github/actions/test_downstream_project.yml
+      uses: ./.github/actions/test_downstream_project.yml
