@@ -1119,6 +1119,20 @@ class CloudPickleTest(unittest.TestCase):
         cloned = pickle_depickle(func, protocol=self.protocol)
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
+    def test_property(self):
+        class MyObject:
+            _value = 1
+
+            @property
+            def value(self):
+                return self._value
+
+        my_object = MyObject()
+        assert my_object.value == 1
+
+        depickled_obj = pickle_depickle(my_object)
+        assert depickled_obj.value == 1
+
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
         t1 = MyTuple(1, 2, 3)
