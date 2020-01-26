@@ -39,7 +39,7 @@ jobs:
         pip install pytest
         pytest
 
-  downstream-build:
+  distributed-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci distributed]')"
     env:
@@ -60,6 +60,35 @@ jobs:
       run: |
         chmod +x ./.github/scripts/install_downstream_project.sh
         ./.github/scripts/install_downstream_project.sh
+    - name: Test the downstream project
+      run: |
+        chmod +x ./.github/scripts/test_downstream_project.sh
+        ./.github/scripts/test_downstream_project.sh
+  joblib-downstream-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci joblib]')"
+    env:
+      PROJECT: joblib
+      TEST_REQUIREMENTS: "pytest numpy distributed"
+      PROJECT_URL: https://github.com/joblib/joblib.git
+    strategy:
+      matrix:
+        python_version: [3.7]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Install project and dependencies
+      run: |
+        chmod +x ./.github/scripts/install_downstream_project.sh
+        ./.github/scripts/install_downstream_project.sh
+    - name: Vendor current cloudpickle inside joblib
+      run: |
+        pushd ../joblib/joblib/externals
+        source vendor_cloudpickle.sh ../../../cloudpickle
+        popd
     - name: Test the downstream project
       run: |
         chmod +x ./.github/scripts/test_downstream_project.sh
