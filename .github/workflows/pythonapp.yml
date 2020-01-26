@@ -41,7 +41,7 @@ jobs:
 
   downstream-build:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[ci distributed]')"
+    if: "contains(github.event.head_commit.message, '[ci distributed]')"
     env:
       PROJECT: distributed
       TEST_REQUIREMENTS: pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
