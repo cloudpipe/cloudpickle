@@ -22,6 +22,7 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -e .
         pip install -r dev-requirements.txt
+        python ci/install_coverage_subprocess_pth.py
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
     - name: Run linting
