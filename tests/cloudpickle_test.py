@@ -1055,7 +1055,7 @@ class CloudPickleTest(unittest.TestCase):
         def func(x):
             return x ** 2
 
-        func.__module__ = "NonModuleObject"
+        func.__module__ = None
 
         class NonModuleObject(object):
             def __getattr__(self, name):
