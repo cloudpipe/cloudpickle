@@ -140,6 +140,7 @@ jobs:
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
     - name: Test the downstream project
       run: |
+        PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
         COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
         pytest -vl $PROJECT_DIR/tests/test_basic.py::test_simple_serialization
         pytest -vl $PROJECT_DIR/tests/test_basic.py::test_complex_serialization
