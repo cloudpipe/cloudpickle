@@ -57,6 +57,10 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
-      uses: ./.github/actions/install-downstream-project
+      run: |
+        chmod +x ./.github/scripts/install_downstream_project.sh
+        ./.github/scripts/install_downstream_project.sh
     - name: Test the downstream project
-      uses: ./.github/actions/test-downstream-project
+      run: |
+        chmod +x ./.github/scripts/test_downstream_project.sh
+        ./.github/scripts/test_downstream_project.sh
