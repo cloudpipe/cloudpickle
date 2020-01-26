@@ -42,7 +42,7 @@ except ImportError:
 import cloudpickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
-from cloudpickle.cloudpickle import _extract_class_dict
+from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
