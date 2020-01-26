@@ -58,6 +58,8 @@ jobs:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
       run: |
+        python -V
+        python -m pip install fsspec
         python -m pip install $TEST_REQUIREMENTS
         pushd ..
         git clone $PROJECT_URL;
