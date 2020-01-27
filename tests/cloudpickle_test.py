@@ -1097,7 +1097,11 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             sys.modules.pop('NonModuleObject')
 
-    def test_faulty_module(self):
+    def test_unrelated_faulty_module(self):
+        # Check that pickling a dynamically defined function or class does not
+        # fail when introspecting the currently loaded modules in sys.modules
+        # as long as those faulty modules are unrelated to the class or
+        # function we are currently pickling.
         for base_class in (object, types.ModuleType):
             for module_name in ['_missing_module', None]:
                 class FaultyModule(base_class):
