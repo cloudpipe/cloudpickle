@@ -38,7 +38,7 @@ jobs:
       run: |
         python ci/install_coverage_subprocess_pth.py
         export
-        COVERAGE_PROCESS_START=.coveragerc \
+        COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
           PYTHONPATH='.:tests' python -m pytest -r s
         coverage combine --append
         coverage xml -i
