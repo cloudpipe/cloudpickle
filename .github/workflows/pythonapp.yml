@@ -96,7 +96,7 @@ jobs:
 
   distributed-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci distributed]')"
+    if: "contains(github.event.head_commit.message, '[ci distributed]') || contains(github.event.head_commit.message, '[ci downstream]')"
     env:
       PROJECT: distributed
       TEST_REQUIREMENTS: pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
@@ -121,7 +121,7 @@ jobs:
         ./.github/scripts/test_downstream_project.sh
   joblib-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci joblib]')"
+    if: "contains(github.event.head_commit.message, '[ci joblib]') || contains(github.event.head_commit.message, '[ci downstream]')"
     env:
       PROJECT: joblib
       TEST_REQUIREMENTS: "pytest numpy distributed"
@@ -150,7 +150,7 @@ jobs:
         ./.github/scripts/test_downstream_project.sh
   loky-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci loky]')"
+    if: "contains(github.event.head_commit.message, '[ci loky]') || contains(github.event.head_commit.message, '[ci downstream]')"
     env:
       PROJECT: loky
       TEST_REQUIREMENTS: "pytest psutil"
@@ -174,7 +174,7 @@ jobs:
         ./.github/scripts/test_downstream_project.sh
   ray-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci ray]')"
+    if: "contains(github.event.head_commit.message, '[ci ray]') || contains(github.event.head_commit.message, '[ci downstream]')"
     env:
       PROJECT: ray
     strategy:
