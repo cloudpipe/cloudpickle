@@ -61,7 +61,7 @@ jobs:
         pushd cpython
         # ./configure
         # make
-        python -m venv "$VENV_DIR"
+        # python -m venv "$VENV_DIR"
         popd
         popd
         echo ::set-env name=PYTHON_EXE::$VENV_DIR/bin/python
