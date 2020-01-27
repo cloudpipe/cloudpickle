@@ -1076,7 +1076,7 @@ class CloudPickleTest(unittest.TestCase):
 
         # Any manipulation of non_module_object relying on attribute access
         # will raise an Exception
-        with pytest.raises(ValueError):
+        with pytest.raises(AttributeError):
             _is_dynamic(non_module_object)
 
         try:
