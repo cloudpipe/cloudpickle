@@ -20,23 +20,57 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
-    - name: Set up Python Nightly (if necessary)
+    - name: export path to python executable
       run: |
         export
-        if [[ "$PYTHON_NIGHTLY" == "true" ]]; then
-          pushd ..;
-          export VENV_DIR="$PWD"
-          git clone https://github.com/python/cpython.git;
-          pushd cpython;
-          ./configure;
-          make;
-          ./python -m venv "$VENV_DIR";
-          popd;
-          popd;
-          export PYTHON_EXE="$VENV_DIR/bin/python";
-        else
           export PYTHON_EXE="python";
         fi
+    - name: Install project and dependencies
+      run: |
+        $PYTHON_EXE -m pip install --upgrade pip
+        $PYTHON_EXE -m pip install -e .
+        $PYTHON_EXE -m pip install -r dev-requirements.txt
+        $PYTHON_EXE ci/install_coverage_subprocess_pth.py
+    - name: Display Python version
+      run: $PYTHON_EXE -c "import sys; print(sys.version)"
+    - name: Run linting
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        $PYTHON_EXE -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
+          --show-source --statistics
+        # exit-zero treats all errors as warnings.  The GitHub editor is 127
+        # chars wide
+        $PYTHON_EXE -m flake8 . --count --exit-zero --max-complexity=10 \
+          --max-line-length=127 --statistics
+    - name: Test with pytest
+      run: |
+        COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
+          PYTHONPATH='.:tests' $PYTHON_EXE -m pytest -r s
+        coverage combine --append
+        coverage xml -i
+    - name: Publish coverage results
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+
+  python-nightly-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci python-nightly]')"
+    steps:
+    - name: Set up Python Nightly
+      run: |
+        export
+        pushd ..;
+        export VENV_DIR="$PWD"
+        git clone https://github.com/python/cpython.git;
+        pushd cpython;
+        ./configure;
+        make;
+        ./python -m venv "$VENV_DIR";
+        popd;
+        popd;
+        export PYTHON_EXE="$VENV_DIR/bin/python";
     - name: Install project and dependencies
       run: |
         $PYTHON_EXE -m pip install --upgrade pip
