@@ -32,16 +32,20 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
     - name: Export path to python executable
+      shell: bash
       run: echo ::set-env name=PYTHON_EXE::python
     - name: Install project and dependencies
+      shell: bash
       run: |
         $PYTHON_EXE -m pip install --upgrade pip
         $PYTHON_EXE -m pip install -e .
         $PYTHON_EXE -m pip install -r dev-requirements.txt
         $PYTHON_EXE ci/install_coverage_subprocess_pth.py
     - name: Display Python version
+      shell: bash
       run: $PYTHON_EXE -c "import sys; print(sys.version)"
     - name: Run linting
+      shell: bash
       run: |
         # stop the build if there are Python syntax errors or undefined names
         $PYTHON_EXE -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
@@ -51,6 +55,7 @@ jobs:
         $PYTHON_EXE -m flake8 . --count --exit-zero --max-complexity=10 \
           --max-line-length=127 --statistics
     - name: Test with pytest
+      shell: bash
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
           PYTHONPATH='.:tests' $PYTHON_EXE -m pytest -r s
