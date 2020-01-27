@@ -1,6 +1,10 @@
 1.2.3
 =====
 
+- Fix a bug affecting cloudpickle when non-modules objects are added into
+  sys.modules
+  ([PR #326](https://github.com/cloudpipe/cloudpickle/pull/326)).
+
 - Fix a bug when a thread imports a module while cloudpickle iterates
   over the module list
   ([PR #322](https://github.com/cloudpipe/cloudpickle/pull/322)).
