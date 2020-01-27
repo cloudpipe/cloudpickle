@@ -43,8 +43,10 @@ jobs:
         coverage combine --append
         coverage xml -i
     - name: Publish coverage results
-      run: |
-        curl -s https://codecov.io/bash | bash
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
 
   distributed-downstream-build:
     runs-on: ubuntu-latest
