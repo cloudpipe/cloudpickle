@@ -55,18 +55,19 @@ jobs:
     - name: Set up Python Nightly
       run: |
         export
-        pushd ..;
-        export VENV_DIR="$PWD/python38"
-        git clone https://github.com/python/cpython.git;
-        pushd cpython;
-        ./configure;
-        make;
-        ./python -m venv "$VENV_DIR";
-        popd;
-        popd;
+        pushd ..
+        export VENV_DIR="$PWD/python38
+        git clone https://github.com/python/cpython.git
+        pushd cpython
+        # ./configure
+        # make
+        python -m venv "$VENV_DIR"
+        popd
+        popd
         echo ::set-env name=PYTHON_EXE::$VENV_DIR/bin/python
     - name: Install project and dependencies
       run: |
+        ls
         $PYTHON_EXE -m pip install --upgrade pip
         $PYTHON_EXE -m pip install -e .
         $PYTHON_EXE -m pip install -r dev-requirements.txt
