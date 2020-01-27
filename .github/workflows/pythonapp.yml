@@ -68,10 +68,10 @@ jobs:
     - name: Install project and dependencies
       run: |
         ls
-        $PYTHON_EXE -m pip install --upgrade pip
-        $PYTHON_EXE -m pip install -e .
-        $PYTHON_EXE -m pip install -r dev-requirements.txt
-        $PYTHON_EXE ci/install_coverage_subprocess_pth.py
+        python -m pip install --upgrade pip
+        # $PYTHON_EXE -m pip install -e .
+        # $PYTHON_EXE -m pip install -r dev-requirements.txt
+        # $PYTHON_EXE ci/install_coverage_subprocess_pth.py
     - name: Display Python version
       run: $PYTHON_EXE -c "import sys; print(sys.version)"
     - name: Run linting
