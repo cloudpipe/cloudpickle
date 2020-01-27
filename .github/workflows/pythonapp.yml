@@ -36,8 +36,14 @@ jobs:
           --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        pip install pytest
-        pytest
+        python ci/install_coverage_subprocess_pth.py
+        COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" \
+          PYTHONPATH='.:tests' python -m pytest -r s
+        coverage combine --append
+        coverage xml -i
+    - name: Publish coverage results
+      run: |
+        curl -s https://codecov.io/bash | bash
 
   distributed-downstream-build:
     runs-on: ubuntu-latest
