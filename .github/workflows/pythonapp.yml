@@ -8,9 +8,6 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python_version: [3.7]
-        include:
-          - python_nightly: "true"
-            if: "contains(github.event.head_commit.message, '[ci python-nightly]')"
 
     runs-on: ${{ matrix.os }}
 
@@ -20,11 +17,9 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
-    - name: export path to python executable
+    - name: Export path to python executable
       run: |
-        export
-          export PYTHON_EXE="python";
-        fi
+        export PYTHON_EXE="python"
     - name: Install project and dependencies
       run: |
         $PYTHON_EXE -m pip install --upgrade pip
