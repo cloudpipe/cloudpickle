@@ -64,7 +64,7 @@ jobs:
         ./python -m venv "$VENV_DIR"
         popd
         popd
-        echo ::add-path::$VENV_DIR/bin/python
+        echo ::add-path::$VENV_DIR/bin/
     - name: Install project and dependencies
       run: |
         python -c 'import sys; print(sys.version)'
