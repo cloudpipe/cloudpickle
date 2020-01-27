@@ -19,7 +19,7 @@ jobs:
         python-version: ${{ matrix.python_version }}
     - name: Export path to python executable
       run: |
-        export PYTHON_EXE="python"
+        echo "set-env name=PYTHON_EXE::python"
     - name: Install project and dependencies
       run: |
         $PYTHON_EXE -m pip install --upgrade pip
@@ -65,7 +65,7 @@ jobs:
         ./python -m venv "$VENV_DIR";
         popd;
         popd;
-        export PYTHON_EXE="$VENV_DIR/bin/python";
+        echo "set-env name=PYTHON_EXE::$VENV_DIR/bin/python"
     - name: Install project and dependencies
       run: |
         $PYTHON_EXE -m pip install --upgrade pip
