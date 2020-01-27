@@ -52,26 +52,25 @@ jobs:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci python-nightly]')"
     steps:
+    - uses: actions/checkout@v1
     - name: Set up Python Nightly
       run: |
-        export
         pushd ..
         export VENV_DIR=$PWD/python38
         git clone https://github.com/python/cpython.git
         pushd cpython
-        # ./configure
-        # make
-        # python -m venv "$VENV_DIR"
+        ./configure
+        make
+        python -m venv "$VENV_DIR"
         popd
         popd
         echo ::set-env name=PYTHON_EXE::$VENV_DIR/bin/python
     - name: Install project and dependencies
       run: |
-        ls
-        python -m pip install --upgrade pip
-        # $PYTHON_EXE -m pip install -e .
-        # $PYTHON_EXE -m pip install -r dev-requirements.txt
-        # $PYTHON_EXE ci/install_coverage_subprocess_pth.py
+        $PYTHON_EXE -m pip install --upgrade pip
+        $PYTHON_EXE -m pip install -e .
+        $PYTHON_EXE -m pip install -r dev-requirements.txt
+        $PYTHON_EXE ci/install_coverage_subprocess_pth.py
     - name: Display Python version
       run: $PYTHON_EXE -c "import sys; print(sys.version)"
     - name: Run linting
