@@ -1121,17 +1121,43 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_property(self):
         class MyObject:
-            _value = 1
+            _read_only_value = 1
+            _read_write_value = 1
 
             @property
-            def value(self):
-                return self._value
+            def read_only_value(self):
+                return self._read_only_value
+
+            @property
+            def read_write_value(self):
+                return self._read_write_value
+
+            @read_write_value.setter
+            def read_write_value(self, value):
+                self._read_write_value = value
+
+
 
         my_object = MyObject()
-        assert my_object.value == 1
+
+        assert my_object.read_only_value == 1
+
+        with pytest.raises(AttributeError):
+            my_object.read_only_value = 2
+        my_object.read_write_value = 2
 
         depickled_obj = pickle_depickle(my_object)
-        assert depickled_obj.value == 1
+
+        assert depickled_obj.read_only_value == 1
+        assert depickled_obj.read_write_value == 2
+
+        # make sure the depickled read_only_value attribute is still read-only
+        with pytest.raises(AttributeError):
+            my_object.read_only_value = 2
+
+        # make sure the depickled read_write_value attribute is writeable
+        depickled_obj.read_write_value = 3
+
 
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
