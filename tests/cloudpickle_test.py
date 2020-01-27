@@ -1533,7 +1533,13 @@ class CloudPickleTest(unittest.TestCase):
             # grown by more than a few MB as closures are garbage collected at
             # the end of each remote function call.
             growth = w.memsize() - reference_size
-            assert growth < 1e7, growth
+
+            # Note that an "empty" Python interpreter on MacOS uses a
+            # significantly bigger amount of memory than on Linux systems
+            # (~10MB vs ~1MB), so the upper-bound on the memory use growth used
+            # below is only tight on Mac, and could be largely reduced on
+            # Linux.
+            assert growth < 1.5e7, growth
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
