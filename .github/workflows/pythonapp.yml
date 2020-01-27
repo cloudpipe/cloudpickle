@@ -37,7 +37,8 @@ jobs:
     - name: Test with pytest
       run: |
         python ci/install_coverage_subprocess_pth.py
-        COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" \
+        export
+        COVERAGE_PROCESS_START=.coveragerc \
           PYTHONPATH='.:tests' python -m pytest -r s
         coverage combine --append
         coverage xml -i
