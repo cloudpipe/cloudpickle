@@ -7,7 +7,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python_version: [3.7]
+        python_version: [2.7, 3.5, 3.6, 3.7, 3.8]
+        include:
+          - os: windows-latest
+            python_version: 2.7
+          - os: windows-latest
+            python_version: 3.7
+          - os: macos-latest
+            python_version: 3.7
 
     runs-on: ${{ matrix.os }}
 
