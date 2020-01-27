@@ -56,7 +56,7 @@ jobs:
       run: |
         export
         pushd ..;
-        export VENV_DIR="$PWD"
+        export VENV_DIR="$PWD/python38"
         git clone https://github.com/python/cpython.git;
         pushd cpython;
         ./configure;
