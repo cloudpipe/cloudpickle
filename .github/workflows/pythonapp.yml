@@ -55,6 +55,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Set up Python Nightly
       run: |
+        sudo apt-get install sqlite3 libsqlite3-dev
         pushd ..
         export VENV_DIR=$PWD/python38
         git clone https://github.com/python/cpython.git
