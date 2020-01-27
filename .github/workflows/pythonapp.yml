@@ -133,7 +133,7 @@ jobs:
     if: "contains(github.event.head_commit.message, '[ci joblib]') || contains(github.event.head_commit.message, '[ci downstream]')"
     env:
       PROJECT: joblib
-      TEST_REQUIREMENTS: "pytest numpy distributed"
+      TEST_REQUIREMENTS: "threadpoolctl pytest numpy distributed"
       PROJECT_URL: https://github.com/joblib/joblib.git
     strategy:
       matrix:
