@@ -1119,6 +1119,50 @@ class CloudPickleTest(unittest.TestCase):
         cloned = pickle_depickle(func, protocol=self.protocol)
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
+    def test_property(self):
+        class MyObject:
+            _read_only_value = 1
+            _read_write_value = 1
+
+            @property
+            def read_only_value(self):
+                "A read-only attribute"
+                return self._read_only_value
+
+            @property
+            def read_write_value(self):
+                return self._read_write_value
+
+            @read_write_value.setter
+            def read_write_value(self, value):
+                self._read_write_value = value
+
+
+
+        my_object = MyObject()
+
+        assert my_object.read_only_value == 1
+        assert MyObject.read_only_value.__doc__ == "A read-only attribute"
+
+        with pytest.raises(AttributeError):
+            my_object.read_only_value = 2
+        my_object.read_write_value = 2
+
+        depickled_obj = pickle_depickle(my_object)
+
+        assert depickled_obj.read_only_value == 1
+        assert depickled_obj.read_write_value == 2
+
+        # make sure the depickled read_only_value attribute is still read-only
+        with pytest.raises(AttributeError):
+            my_object.read_only_value = 2
+
+        # make sure the depickled read_write_value attribute is writeable
+        depickled_obj.read_write_value = 3
+        assert depickled_obj.read_write_value == 3
+        type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
+
+
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
         t1 = MyTuple(1, 2, 3)
