@@ -1067,7 +1067,7 @@ class CloudPickleTest(unittest.TestCase):
                 if name == 'func':
                     return func
                 else:
-                    raise ValueError
+                    raise AttributeError
 
         non_module_object = NonModuleObject()
 
