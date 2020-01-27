@@ -8,6 +8,9 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python_version: [3.7]
+        include:
+          - if: "contains(github.event.head_commit.message, '[ci python-nightly]')"
+          - python_nightly: "true"
 
     runs-on: ${{ matrix.os }}
 
@@ -17,28 +20,44 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
+    - name: Set up Python Nightly (if necessary)
+      run: |
+        export
+        if [[ "$PYTHON_NIGHTLY" == "true" ]]; then
+          pushd ..;
+          export VENV_DIR="$PWD"
+          git clone https://github.com/python/cpython.git;
+          pushd cpython;
+          ./configure;
+          make;
+          ./python -m venv "$VENV_DIR";
+          popd;
+          popd;
+          export PYTHON_EXE="$VENV_DIR/bin/python";
+        else
+          export PYTHON_EXE="python";
+        fi
     - name: Install project and dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install -e .
-        pip install -r dev-requirements.txt
-        python ci/install_coverage_subprocess_pth.py
+        $PYTHON_EXE -m pip install --upgrade pip
+        $PYTHON_EXE -m pip install -e .
+        $PYTHON_EXE -m pip install -r dev-requirements.txt
+        $PYTHON_EXE ci/install_coverage_subprocess_pth.py
     - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
+      run: $PYTHON_EXE -c "import sys; print(sys.version)"
     - name: Run linting
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        python -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
+        $PYTHON_EXE -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
           --show-source --statistics
         # exit-zero treats all errors as warnings.  The GitHub editor is 127
         # chars wide
-        python -m flake8 . --count --exit-zero --max-complexity=10 \
+        $PYTHON_EXE -m flake8 . --count --exit-zero --max-complexity=10 \
           --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        python ci/install_coverage_subprocess_pth.py
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
-          PYTHONPATH='.:tests' python -m pytest -r s
+          PYTHONPATH='.:tests' $PYTHON_EXE -m pytest -r s
         coverage combine --append
         coverage xml -i
     - name: Publish coverage results
@@ -141,14 +160,14 @@ jobs:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
       run: |
-        pip install --upgrade -r dev-requirements.txt
-        pip install setproctitle psutil ray==0.6.4
-        PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
+        $PYTHON_EXE -m pip install --upgrade -r dev-requirements.txt
+        $PYTHON_EXE -m pip install setproctitle psutil ray==0.6.4
+        PROJECT_DIR="$($PYTHON_EXE -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
     - name: Test the downstream project
       run: |
-        PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
+        PROJECT_DIR="$($PYTHON_EXE -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
         COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
         pytest -vl $PROJECT_DIR/tests/test_basic.py::test_simple_serialization
         pytest -vl $PROJECT_DIR/tests/test_basic.py::test_complex_serialization

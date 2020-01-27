@@ -1,5 +1,5 @@
   pushd ../$PROJECT
-  python -m pytest -vl
+  $PYTHON_EXE -m pytest -vl
   TEST_RETURN_CODE=$?
   popd
   if [[ "$TEST_RETURN_CODE" != "0" ]]; then
