@@ -6,15 +6,22 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python_version: [2.7, 3.5, 3.6, 3.7, 3.8]
-        include:
-        - os: windows-latest
-          python_version: 2.7
-        - os: windows-latest
-          python_version: 3.7
-        - os: macos-latest
-          python_version: 3.7
+        exclude:
+          # do not test each porsisbl (os, python version) configuration
+          - os: windows-latest
+            python_version: 3.5
+          - os: windows-latest
+            python_version: 3.6
+          - os: windows-latest
+            python_version: 3.8
+          - os: macos-latest
+            python_version: 3.5
+          - os: macos-latest
+            python_version: 3.6
+          - os: macos-latest
+            python_version: 3.8
 
     runs-on: ${{ matrix.os }}
 
