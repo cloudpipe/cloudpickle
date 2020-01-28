@@ -1052,13 +1052,13 @@ class CloudPickleTest(unittest.TestCase):
         # https://github.com/cloudpipe/cloudpickle/pull/326: cloudpickle should
         # not try to instrospect non-modules object when trying to discover the
         # module of a function/class. This happenened because codecov injects
-        # tuples (and not modules) into sys.modules, but type-checks where not
+        # tuples (and not modules) into sys.modules, but type-checks were not
         # carried out on the entries of sys.modules, causing cloupdickle to
         # then error in unexpected ways
         def func(x):
             return x ** 2
 
-        # trigger a loop during the execution of whichmodule(func) by
+        # Trigger a loop during the execution of whichmodule(func) by
         # explicitly setting the function's module to None
         func.__module__ = None
 
