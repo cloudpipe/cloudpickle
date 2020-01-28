@@ -131,12 +131,10 @@ jobs:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
       run: |
-        chmod +x ./.github/scripts/install_downstream_project.sh
-        ./.github/scripts/install_downstream_project.sh
+        bash ./.github/scripts/install_downstream_project.sh
     - name: Test the downstream project
       run: |
-        chmod +x ./.github/scripts/test_downstream_project.sh
-        ./.github/scripts/test_downstream_project.sh
+        bash ./.github/scripts/test_downstream_project.sh
   joblib-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci joblib]') || contains(github.event.head_commit.message, '[ci downstream]')"
@@ -155,8 +153,7 @@ jobs:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
       run: |
-        chmod +x ./.github/scripts/install_downstream_project.sh
-        ./.github/scripts/install_downstream_project.sh
+        bash ./.github/scripts/install_downstream_project.sh
     - name: Vendor current cloudpickle inside joblib
       run: |
         pushd ../joblib/joblib/externals
@@ -164,8 +161,7 @@ jobs:
         popd
     - name: Test the downstream project
       run: |
-        chmod +x ./.github/scripts/test_downstream_project.sh
-        ./.github/scripts/test_downstream_project.sh
+        bash ./.github/scripts/test_downstream_project.sh
   loky-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci loky]') || contains(github.event.head_commit.message, '[ci downstream]')"
@@ -184,12 +180,10 @@ jobs:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
       run: |
-        chmod +x ./.github/scripts/install_downstream_project.sh
-        ./.github/scripts/install_downstream_project.sh
+        bash ./.github/scripts/install_downstream_project.sh
     - name: Test the downstream project
       run: |
-        chmod +x ./.github/scripts/test_downstream_project.sh
-        ./.github/scripts/test_downstream_project.sh
+        bash ./.github/scripts/test_downstream_project.sh
   ray-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci ray]') || contains(github.event.head_commit.message, '[ci downstream]')"
