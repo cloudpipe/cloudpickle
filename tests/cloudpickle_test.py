@@ -42,7 +42,7 @@ except ImportError:
 import cloudpickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
-from cloudpickle.cloudpickle import _extract_class_dict
+from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -1048,35 +1048,94 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(set(weakset), {depickled1, depickled2})
 
-    def test_faulty_module(self):
-        for module_name in ['_missing_module', None]:
-            class FaultyModule(object):
-                def __getattr__(self, name):
-                    # This throws an exception while looking up within
-                    # pickle.whichmodule or getattr(module, name, None)
-                    raise Exception()
+    def test_non_module_object_passing_whichmodule_test(self):
+        # https://github.com/cloudpipe/cloudpickle/pull/326: cloudpickle should
+        # not try to instrospect non-modules object when trying to discover the
+        # module of a function/class. This happenened because codecov injects
+        # tuples (and not modules) into sys.modules, but type-checks were not
+        # carried out on the entries of sys.modules, causing cloupdickle to
+        # then error in unexpected ways
+        def func(x):
+            return x ** 2
 
-            class Foo(object):
-                __module__ = module_name
+        # Trigger a loop during the execution of whichmodule(func) by
+        # explicitly setting the function's module to None
+        func.__module__ = None
 
-                def foo(self):
+        class NonModuleObject(object):
+            def __getattr__(self, name):
+                # We whitelist func so that a _whichmodule(func, None) call returns
+                # the NonModuleObject instance if a type check on the entries
+                # of sys.modules is not carried out, but manipulating this
+                # instance thinking it really is a module later on in the
+                # pickling process of func errors out
+                if name == 'func':
+                    return func
+                else:
+                    raise AttributeError
+
+        non_module_object = NonModuleObject()
+
+        assert func(2) == 4
+        assert func is non_module_object.func
+
+        # Any manipulation of non_module_object relying on attribute access
+        # will raise an Exception
+        with pytest.raises(AttributeError):
+            _is_dynamic(non_module_object)
+
+        try:
+            sys.modules['NonModuleObject'] = non_module_object
+
+            func_module_name = _whichmodule(func, None)
+            assert func_module_name != 'NonModuleObject'
+            assert func_module_name is None
+
+            depickled_func = pickle_depickle(func, protocol=self.protocol)
+            assert depickled_func(2) == 4
+
+        finally:
+            sys.modules.pop('NonModuleObject')
+
+    def test_unrelated_faulty_module(self):
+        # Check that pickling a dynamically defined function or class does not
+        # fail when introspecting the currently loaded modules in sys.modules
+        # as long as those faulty modules are unrelated to the class or
+        # function we are currently pickling.
+        for base_class in (object, types.ModuleType):
+            for module_name in ['_missing_module', None]:
+                class FaultyModule(base_class):
+                    def __getattr__(self, name):
+                        # This throws an exception while looking up within
+                        # pickle.whichmodule or getattr(module, name, None)
+                        raise Exception()
+
+                class Foo(object):
+                    __module__ = module_name
+
+                    def foo(self):
+                        return "it works!"
+
+                def foo():
                     return "it works!"
 
-            def foo():
-                return "it works!"
+                foo.__module__ = module_name
 
-            foo.__module__ = module_name
+                if base_class is types.ModuleType:  # noqa
+                    faulty_module = FaultyModule('_faulty_module')
+                else:
+                    faulty_module = FaultyModule()
+                sys.modules["_faulty_module"] = faulty_module
 
-            sys.modules["_faulty_module"] = FaultyModule()
-            try:
-                # Test whichmodule in save_global.
-                self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
+                try:
+                    # Test whichmodule in save_global.
+                    self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
 
-                # Test whichmodule in save_function.
-                cloned = pickle_depickle(foo, protocol=self.protocol)
-                self.assertEqual(cloned(), "it works!")
-            finally:
-                sys.modules.pop("_faulty_module", None)
+                    # Test whichmodule in save_function.
+                    cloned = pickle_depickle(foo, protocol=self.protocol)
+                    self.assertEqual(cloned(), "it works!")
+                finally:
+                    sys.modules.pop("_faulty_module", None)
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116

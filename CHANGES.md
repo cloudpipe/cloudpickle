@@ -1,6 +1,10 @@
 1.2.3
 =====
 
+- Fix a bug affecting cloudpickle when non-modules objects are added into
+  sys.modules
+  ([PR #326](https://github.com/cloudpipe/cloudpickle/pull/326)).
+  
 - Fix a regression in cloudpickle and python3.8 causing an error when trying to
   pickle property objects.
   ([PR #329](https://github.com/cloudpipe/cloudpickle/pull/329)).

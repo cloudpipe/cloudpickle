@@ -155,7 +155,13 @@ def _whichmodule(obj, name):
     # modules that trigger imports of other modules upon calls to getattr or
     # other threads importing at the same time.
     for module_name, module in sys.modules.copy().items():
-        if module_name == '__main__' or module is None:
+        # Some modules such as coverage can inject non-module objects inside
+        # sys.modules
+        if (
+                module_name == '__main__' or
+                module is None or
+                not isinstance(module, types.ModuleType)
+        ):
             continue
         try:
             if _getattribute(module, name)[0] is obj:
