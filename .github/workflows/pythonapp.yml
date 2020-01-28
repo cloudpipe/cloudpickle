@@ -1,4 +1,4 @@
-name: Python application
+name: Automated Tests
 
 on: [push]
 
