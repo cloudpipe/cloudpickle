@@ -9,19 +9,16 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python_version: [2.7, 3.5, 3.6, 3.7, 3.8]
         exclude:
-          # do not test each porsisbl (os, python version) configuration
-          - os: windows-latest
-            python_version: 3.5
+          # Do not test all minor version on all platforms, especially if they
+          # are not the oldest/newest supported versions
           - os: windows-latest
             python_version: 3.6
           - os: windows-latest
-            python_version: 3.8
-          - os: macos-latest
-            python_version: 3.5
+            python_version: 3.7
           - os: macos-latest
             python_version: 3.6
           - os: macos-latest
-            python_version: 3.8
+            python_version: 3.7
 
     runs-on: ${{ matrix.os }}
 
