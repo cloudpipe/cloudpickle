@@ -528,6 +528,46 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             os.unlink(pickled_func_path)
 
+    def test_dynamic_module_with_unpicklable_builtin(self):
+        # Reproducer of https://github.com/cloudpipe/cloudpickle/issues/316
+        # Some modules such as scipy inject some unpicklable objects into the
+        # __builtins__ module, which appears in every module's __dict__ under
+        # the '__builtins__' key. In such cases, cloudpickle used to fail
+        # when pickling dynamic modules.
+        class UnpickleableObject(object):
+            def __reduce__(self):
+                raise ValueError('Unpicklable object')
+
+        mod = types.ModuleType("mod")
+
+        exec('f = lambda x: abs(x)', mod.__dict__)
+        assert mod.f(-1) == 1
+        assert '__builtins__' in mod.__dict__
+
+        unpicklable_obj = UnpickleableObject()
+        with pytest.raises(ValueError):
+            cloudpickle.dumps(unpicklable_obj)
+
+        # Emulate the behavior of scipy by injecting an unpickleable object
+        # into mod's builtins.
+        # The __builtins__ entry of mod's __dict__ can either be the
+        # __builtins__ module, or the __builtins__ module's __dict__. #316
+        # happens only in the latter case.
+        if isinstance(mod.__dict__['__builtins__'], dict):
+            mod.__dict__['__builtins__']['unpickleable_obj'] = unpicklable_obj
+        elif isinstance(mod.__dict__['__builtins__'], types.ModuleType):
+            mod.__dict__['__builtins__'].unpickleable_obj = unpicklable_obj
+
+        depickled_mod = pickle_depickle(mod, protocol=self.protocol)
+        assert '__builtins__' in depickled_mod.__dict__
+
+        if isinstance(depickled_mod.__dict__['__builtins__'], dict):
+            assert "abs" in depickled_mod.__builtins__
+        elif isinstance(
+                depickled_mod.__dict__['__builtins__'], types.ModuleType):
+            assert hasattr(depickled_mod.__builtins__, "abs")
+        assert depickled_mod.f(-1) == 1
+
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
         # property. Otherwise, this will lead to an ImportError if pickled in

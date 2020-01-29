@@ -90,6 +90,7 @@ if sys.version_info[0] < 3:  # pragma: no branch
         from cStringIO import StringIO
     except ImportError:
         from StringIO import StringIO
+    import __builtin__ as builtins
     string_types = (basestring,)  # noqa
     PY3 = False
     PY2 = True
@@ -101,6 +102,7 @@ else:
     PY3 = True
     PY2 = False
     from importlib._bootstrap import _find_spec
+    import builtins
 
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
@@ -510,6 +512,7 @@ class CloudPickler(Pickler):
         Save a module as an import
         """
         if _is_dynamic(obj):
+            obj.__dict__.pop('__builtins__', None)
             self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
                              obj=obj)
         else:
@@ -1149,6 +1152,7 @@ def subimport(name):
 def dynamic_subimport(name, vars):
     mod = types.ModuleType(name)
     mod.__dict__.update(vars)
+    mod.__dict__['__builtins__'] = builtins.__dict__
     return mod
 
 
