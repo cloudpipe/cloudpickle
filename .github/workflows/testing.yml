@@ -16,11 +16,6 @@ jobs:
       run: |
         python -V
         python -m pip install flake8
-    - name: Look for syntax errors/undefined names
-      shell: bash
-      run: |
-        python -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
-          --show-source --statistics
     - name: Run flake8 on diff with upstream/master
       shell: bash
       run: |
@@ -64,6 +59,11 @@ jobs:
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
+    - name: Look for syntax errors/undefined names
+      shell: bash
+      run: |
+        python -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
+          --show-source --statistics
     - name: Test with pytest
       shell: bash
       run: |
