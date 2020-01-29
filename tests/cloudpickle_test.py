@@ -1179,7 +1179,9 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
     def test_property(self):
-        class MyObject:
+        # Note that the @property decorator only has an effect on new-style
+        # classes.
+        class MyObject(object):
             _read_only_value = 1
             _read_write_value = 1
 
