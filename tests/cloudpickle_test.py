@@ -1534,11 +1534,14 @@ class CloudPickleTest(unittest.TestCase):
             # the end of each remote function call.
             growth = w.memsize() - reference_size
 
-            # Note that an "empty" Python interpreter on MacOS uses a
-            # significantly bigger amount of memory than on Linux systems
-            # (~10MB vs ~1MB), so the upper-bound on the memory use growth used
-            # below is only tight on Mac, and could be largely reduced on
-            # Linux.
+            # For some reason, the memory growth after processing 100MB of
+            # data is ~10MB on MacOS, and ~1MB on Linux, so the upper bound on
+            # memory growth we use is only tight for MacOS. However,
+            # - 10MB is still 10x lower than the expected memory growth in case
+            # of a leak (which would be the total size of the processed data,
+            # 100MB)
+            # - the memory usage growth does not increase if using 10000
+            # iterations instead of 100 as used now (100x more data)
             assert growth < 1.5e7, growth
 
         """.format(protocol=self.protocol)
