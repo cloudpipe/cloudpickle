@@ -1179,7 +1179,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(cloned.__qualname__, func.__qualname__)
 
     def test_property(self):
-        class MyObject:
+        class MyObject(object):
             _read_only_value = 1
             _read_write_value = 1
 
