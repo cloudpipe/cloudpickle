@@ -133,6 +133,7 @@ jobs:
     - name: Test the downstream project
       run: |
         bash ./.github/scripts/test_downstream_project.sh
+
   joblib-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci joblib]') || contains(github.event.head_commit.message, '[ci downstream]')"
@@ -160,6 +161,7 @@ jobs:
     - name: Test the downstream project
       run: |
         bash ./.github/scripts/test_downstream_project.sh
+
   loky-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci loky]') || contains(github.event.head_commit.message, '[ci downstream]')"
@@ -182,6 +184,7 @@ jobs:
     - name: Test the downstream project
       run: |
         bash ./.github/scripts/test_downstream_project.sh
+
   ray-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.head_commit.message, '[ci ray]') || contains(github.event.head_commit.message, '[ci downstream]')"
