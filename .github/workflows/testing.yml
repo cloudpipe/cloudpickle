@@ -38,6 +38,7 @@ jobs:
         python -m pip install -e .
         python -m pip install -r dev-requirements.txt
         python ci/install_coverage_subprocess_pth.py
+        export
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
