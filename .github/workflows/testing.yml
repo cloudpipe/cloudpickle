@@ -15,12 +15,12 @@ jobs:
             python_version: 3.6
           - os: windows-latest
             python_version: 3.7
+          - os: windows-latest
+            python_version: "pypy3"
           - os: macos-latest
             python_version: 3.6
           - os: macos-latest
             python_version: 3.7
-          - os: macos-latest
-            python_version: "pypy3"
 
     runs-on: ${{ matrix.os }}
 
