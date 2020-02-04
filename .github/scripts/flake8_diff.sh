@@ -90,7 +90,6 @@ check_files() {
 if [[ "$MODIFIED_FILES" == "no_match" ]] || [[ "$MODIFIED_FILES" == "" ]]; then
     echo "No file has been modified"
 else
-
     check_files "$(echo "$MODIFIED_FILES" | grep -v ^examples)"
     echo -e "No problem detected by flake8\n"
 fi
