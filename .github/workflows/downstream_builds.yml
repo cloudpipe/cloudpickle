@@ -122,7 +122,6 @@ jobs:
 
   ray-downstream-build:
     runs-on: ubuntu-latest
-    if: "startsWith(github.event.comment.body, '/run ray') || startsWith(github.event.comment.body, '/run downstream')"
     env:
       PROJECT: ray
     strategy:
