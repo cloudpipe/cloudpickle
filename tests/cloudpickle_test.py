@@ -111,15 +111,15 @@ class CloudPickleTest(unittest.TestCase):
     @pytest.mark.skipif(
             platform.python_implementation() != "CPython" or
             (sys.version_info >= (3, 8, 0) and sys.version_info < (3, 8, 2)),
-            reason="Underlying bug fixed upstream starting Python3.8.2")
+            reason="Underlying bug fixed upstream starting Python 3.8.2")
     def test_reducer_override_reference_cycle(self):
-        # Early versions of Python3.8 introduced a reference cycle between a
+        # Early versions of Python 3.8 introduced a reference cycle between a
         # Pickler and it's reducer_override method. Because a Pickler
         # object references every object it has pickled through its memo, this
         # cycle prevented the garbage-collection of those external pickled
         # objects. See #327 as well as https://bugs.python.org/issue39492
-        # This bug was fixed in Python3.8.2, but is still present using
-        # cloudpickle and Python3.8.0/1, hence the skipif directive.
+        # This bug was fixed in Python 3.8.2, but is still present using
+        # cloudpickle and Python 3.8.0/1, hence the skipif directive.
         class MyClass:
             pass
 
