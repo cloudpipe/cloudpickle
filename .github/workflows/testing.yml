@@ -1,0 +1,224 @@
+name: Automated Tests
+
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install flake8
+      shell: bash
+      run: |
+        python -V
+        python -m pip install flake8
+    - name: Run flake8 on diff with upstream/master
+      shell: bash
+      run: |
+        bash ./.github/scripts/flake8_diff.sh
+
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python_version: [2.7, 3.5, 3.6, 3.7, 3.8, "pypy3"]
+        exclude:
+          # Do not test all minor versions on all platforms, especially if they
+          # are not the oldest/newest supported versions
+          - os: windows-latest
+            python_version: 3.6
+          - os: windows-latest
+            python_version: 3.7
+            # as of  4/02/2020, psutil won't build under PyPy + Windows
+          - os: windows-latest
+            python_version: "pypy3"
+          - os: macos-latest
+            python_version: 3.6
+          - os: macos-latest
+            python_version: 3.7
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Install project and dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e .
+        python -m pip install -r dev-requirements.txt
+        python ci/install_coverage_subprocess_pth.py
+        export
+    - name: Display Python version
+      shell: bash
+      run: python -c "import sys; print(sys.version)"
+    - name: Look for syntax errors/undefined names
+      shell: bash
+      run: |
+        python -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
+          --show-source --statistics
+    - name: Test with pytest
+      shell: bash
+      run: |
+        COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
+          PYTHONPATH='.:tests' python -m pytest -r s
+        coverage combine --append
+        coverage xml -i
+    - name: Publish coverage results
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+
+  python-nightly-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci python-nightly]')"
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python Nightly
+      run: |
+        sudo apt-get install sqlite3 libsqlite3-dev
+        pushd ..
+        export VENV_DIR=$PWD/python38
+        git clone https://github.com/python/cpython.git
+        pushd cpython
+        ./configure
+        make
+        ./python -m venv "$VENV_DIR"
+        popd
+        popd
+        echo ::add-path::$VENV_DIR/bin/
+    - name: Install project and dependencies
+      run: |
+        python -c 'import sys; print(sys.version)'
+        python -m pip install --upgrade pip
+        python -m pip install -e .
+        python -m pip install -r dev-requirements.txt
+        python ci/install_coverage_subprocess_pth.py
+    - name: Display Python version
+      run: python -c "import sys; print(sys.version)"
+    - name: Test with pytest
+      run: |
+        COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
+          PYTHONPATH='.:tests' python -m pytest -r s
+        coverage combine --append
+        coverage xml -i
+    - name: Publish coverage results
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+
+  distributed-downstream-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci distributed]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    env:
+      PROJECT: distributed
+      TEST_REQUIREMENTS: pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
+      PROJECT_URL: https://github.com/dask/distributed.git
+      PYTEST_ADDOPTS: "--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_workspace_concurrency and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args  and not test_remote_access\""
+    strategy:
+      matrix:
+        python_version: [3.7]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Install project and dependencies
+      run: |
+        bash ./.github/scripts/install_downstream_project.sh
+    - name: Test the downstream project
+      run: |
+        bash ./.github/scripts/test_downstream_project.sh
+
+  joblib-downstream-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci joblib]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    env:
+      PROJECT: joblib
+      TEST_REQUIREMENTS: "threadpoolctl pytest numpy distributed"
+      PROJECT_URL: https://github.com/joblib/joblib.git
+    strategy:
+      matrix:
+        python_version: [3.7]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Install project and dependencies
+      run: |
+        bash ./.github/scripts/install_downstream_project.sh
+    - name: Vendor current cloudpickle inside joblib
+      run: |
+        pushd ../joblib/joblib/externals
+        source vendor_cloudpickle.sh ../../../cloudpickle
+        popd
+    - name: Test the downstream project
+      run: |
+        bash ./.github/scripts/test_downstream_project.sh
+
+  loky-downstream-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci loky]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    env:
+      PROJECT: loky
+      TEST_REQUIREMENTS: "pytest psutil"
+      PROJECT_URL: https://github.com/tomMoral/loky.git
+    strategy:
+      matrix:
+        python_version: [3.7]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Install project and dependencies
+      run: |
+        bash ./.github/scripts/install_downstream_project.sh
+    - name: Test the downstream project
+      run: |
+        bash ./.github/scripts/test_downstream_project.sh
+
+  ray-downstream-build:
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, '[ci ray]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    env:
+      PROJECT: ray
+    strategy:
+      matrix:
+        python_version: [3.7]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Install project and dependencies
+      run: |
+        python -m pip install --upgrade -r dev-requirements.txt
+        python -m pip install setproctitle psutil ray==0.6.4
+        PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
+        rm $PROJECT_DIR/cloudpickle/cloudpickle.py
+        cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
+    - name: Test the downstream project
+      run: |
+        PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
+        COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_simple_serialization
+        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_complex_serialization
+        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_ray_recursive_objects
+        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_serialization_final_fallback
+        pytest -vl $PROJECT_DIR/tests/test_recursion.py
