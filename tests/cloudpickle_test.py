@@ -109,7 +109,8 @@ class CloudPickleTest(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     @pytest.mark.skipif(
-            sys.version_info >= (3, 8, 0) and sys.version_info < (3, 8, 2),
+            platform.python_implementation() != "CPython" or
+            (sys.version_info >= (3, 8, 0) and sys.version_info < (3, 8, 2)),
             reason="Underlying bug fixed upstream starting Python3.8.2")
     def test_reducer_override_reference_cycle(self):
         # Early versions of Python3.8 introduced a reference cycle between a
