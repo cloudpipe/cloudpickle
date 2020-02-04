@@ -33,6 +33,7 @@ jobs:
             python_version: 3.6
           - os: windows-latest
             python_version: 3.7
+            # as of  4/02/2020, psutil won't build under PyPy + Windows
           - os: windows-latest
             python_version: "pypy3"
           - os: macos-latest
@@ -123,7 +124,7 @@ jobs:
       PROJECT: distributed
       TEST_REQUIREMENTS: pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
       PROJECT_URL: https://github.com/pierreglaser/distributed.git
-      PYTEST_ADDOPTS: "--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_workspace_concurrency and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args  anod not test_remote_access\""
+      PYTEST_ADDOPTS: "--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_workspace_concurrency and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args  and not test_remote_access\""
     strategy:
       matrix:
         python_version: [3.7]
