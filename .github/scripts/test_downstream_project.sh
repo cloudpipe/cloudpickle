@@ -1,5 +1,5 @@
 pushd ../$PROJECT
-python -m pytest -vls -k remote_access
+python -m pytest -vl
 TEST_RETURN_CODE=$?
 popd
 if [[ "$TEST_RETURN_CODE" != "0" ]]; then
