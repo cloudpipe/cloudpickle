@@ -652,10 +652,34 @@ class CloudPickler(Pickler):
                 for k in obj.__slots__:
                     clsdict.pop(k, None)
 
-        # If type overrides __dict__ as a property, include it in the type
-        # kwargs. In Python 2, we can't set this attribute after construction.
+        # A class __dict__ is part of the class state. At unpickling time, it
+        # must be *initialized* (in an empty state)  during class creation and
+        # updated during class re-hydratation.
+        # However, a class __dict__ is read-only, and does not support direct
+        # item assignement. Instead, the way to update a class __dict__  is to
+        # call setattr(klass, k, v) on the underlying class, which has the same
+        # effect.
+        # There is one corner case: if the __dict__ class has itself a
+        # "__dict__" key (this means that the class likely overrides the
+        # __dict__ property of its instances), setattr(klass, "__dict__", v) will try
+        # to modify the read-only class __dict__ instead, and fail. As a
+        # result, if it exists, the class __dict__ must contain its __dict__
+        # item when it is initialized and fed to the class reconstructor.
         __dict__ = clsdict.pop('__dict__', None)
-        if isinstance(__dict__, property):
+
+        # As __dict__ is part of obj's reconstructor args, __dict__ will be
+        # saved before obj is memoized. Thus, we must make sure that cyclic
+        # references between __dict__ and obj will not trigger infinite
+        # recursion, i.e that __dict__ is memoized before its populated with
+        # obj. If __dict__ is a dict, references to obj inside __dict__ are
+        # safe. But if __dict__ is not overriden, it is a getset_descriptor
+        # that contains an unsafe reference to obj, and we must not save it.
+        # Because non-overriden __dict__ attributes will be generated
+        # automatically at class reconstruction anyways, no information is
+        # lost.
+        if (__dict__ is not None and
+                not isinstance(__dict__, types.GetSetDescriptorType) and
+                getattr(__dict__, '__objclass__', None) is not obj):
             type_kwargs['__dict__'] = __dict__
 
         save = self.save

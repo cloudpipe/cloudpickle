@@ -72,7 +72,8 @@ def _class_getnewargs(obj):
         type_kwargs["__slots__"] = obj.__slots__
 
     __dict__ = obj.__dict__.get('__dict__', None)
-    if isinstance(__dict__, property):
+    if (not isinstance(__dict__, types.GetSetDescriptorType) and
+            getattr(__dict__, '__objclass__', None) is not obj):
         type_kwargs['__dict__'] = __dict__
 
     return (type(obj), obj.__name__, obj.__bases__, type_kwargs,
@@ -153,7 +154,7 @@ def _class_getstate(obj):
             for k in obj.__slots__:
                 clsdict.pop(k, None)
 
-    clsdict.pop('__dict__', None)  # unpicklable property object
+    clsdict.pop('__dict__', None)  # specified in class reconstruction
 
     return (clsdict, {})
 

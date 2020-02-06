@@ -2052,6 +2052,31 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
+    def test___dict__attribute_not_dropped_during_pickling(self):
+        # Test https://github.com/cloudpipe/cloudpickle/issues/282. cloudpickle
+        # used to drop __dict__ attributes of classes at pickling time.
+        pickle_filename= os.path.join(self.tmpdir, 'class_with_dict.pkl')
+        _dict = {'some_attribute': 1}
+        class A(object):
+            __dict__ = _dict
+        a = A()
+        self.assertEqual(a.__dict__, _dict)
+
+        with open(pickle_filename, "wb") as f:
+            cloudpickle.dump(a, f, protocol=self.protocol)
+
+        # Check that the dynamic class defintion is fully reconstructed in a
+        # new Python subprocess and check the assertion that the content of the
+        # __dict__ attribute has the expected content there. Testing this in
+        # the main process is not enough because the existing class definition
+        # could have been reused directly.
+        child_process_script = """
+            import pickle
+            with open(r"{filename}", "rb") as f:
+                depickled_a = pickle.load(f)
+            assert depickled_a.__dict__ == {_dict}, depickled_a.__dict__
+        """.format(filename=pickle_filename, _dict=_dict)
+        assert_run_python_script(textwrap.dedent(child_process_script))
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
