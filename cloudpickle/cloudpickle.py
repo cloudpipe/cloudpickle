@@ -95,7 +95,6 @@ if sys.version_info[0] < 3:  # pragma: no branch
     PY3 = False
     PY2 = True
 else:
-    types.ClassType = type
     from pickle import _Pickler as Pickler
     from io import BytesIO as StringIO
     string_types = (str,)
@@ -889,7 +888,8 @@ class CloudPickler(Pickler):
             Pickler.save_global(self, obj, name=name)
 
     dispatch[type] = save_global
-    dispatch[types.ClassType] = save_global
+    if PY2:
+        dispatch[types.ClassType] = save_global
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
