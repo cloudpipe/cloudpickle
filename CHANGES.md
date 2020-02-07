@@ -1,5 +1,23 @@
+1.3.0
+=====
+
+- Fix a bug affecting dynamic modules occuring with modified builtins
+  ([issue #316](https://github.com/cloudpipe/cloudpickle/issues/316))
+
 1.2.3
 =====
+
+- Fix a bug affecting cloudpickle when non-modules objects are added into
+  sys.modules
+  ([PR #326](https://github.com/cloudpipe/cloudpickle/pull/326)).
+  
+- Fix a regression in cloudpickle and python3.8 causing an error when trying to
+  pickle property objects.
+  ([PR #329](https://github.com/cloudpipe/cloudpickle/pull/329)).
+
+- Fix a bug when a thread imports a module while cloudpickle iterates
+  over the module list
+  ([PR #322](https://github.com/cloudpipe/cloudpickle/pull/322)).
 
 - Add support for out-of-band pickling (Python 3.8 and later).
   https://docs.python.org/3/library/pickle.html#example
