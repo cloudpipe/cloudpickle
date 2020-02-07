@@ -889,7 +889,7 @@ class CloudPickler(Pickler):
 
     dispatch[type] = save_global
     if PY2:
-      dispatch[types.ClassType] = save_global
+        dispatch[types.ClassType] = save_global
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
