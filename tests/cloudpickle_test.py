@@ -2052,6 +2052,22 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
+    def test_out_of_band_buffers(self):
+        if self.protocol < 5:
+            pytest.skip("Need Pickle Protocol 5 or later")
+        np = pytest.importorskip("numpy")
+
+        class LocallyDefinedClass:
+            data = np.zeros(10)
+
+        data_instance = LocallyDefinedClass()
+        buffers = []
+        pickle_bytes = cloudpickle.dumps(data_instance, protocol=self.protocol,
+                                         buffer_callback=buffers.append)
+        assert len(buffers) == 1
+        reconstructed = pickle.loads(pickle_bytes, buffers=buffers)
+        np.testing.assert_allclose(reconstructed.data, data_instance.data)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
