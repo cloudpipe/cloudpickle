@@ -4,9 +4,6 @@
 - Fix a bug affecting dynamic modules occuring with modified builtins
   ([issue #316](https://github.com/cloudpipe/cloudpickle/issues/316))
 
-1.2.3
-=====
-
 - Fix a bug affecting cloudpickle when non-modules objects are added into
   sys.modules
   ([PR #326](https://github.com/cloudpipe/cloudpickle/pull/326)).
@@ -22,6 +19,10 @@
 - Add support for out-of-band pickling (Python 3.8 and later).
   https://docs.python.org/3/library/pickle.html#example
   ([issue #308](https://github.com/cloudpipe/cloudpickle/pull/308))
+
+- Fix a side effect that would redefine `types.ClassTypes` as `type`
+  when importing cloudpickle.
+  ([issue #337](https://github.com/cloudpipe/cloudpickle/pull/337))
 
 1.2.2
 =====
