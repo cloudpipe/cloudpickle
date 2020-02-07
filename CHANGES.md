@@ -1,6 +1,10 @@
 1.2.3
 =====
 
+- Add support for out-of-band pickling (Python 3.8 and later).
+  https://docs.python.org/3/library/pickle.html#example
+  ([issue #308](https://github.com/cloudpipe/cloudpickle/pull/308))
+
 1.2.2
 =====
 
