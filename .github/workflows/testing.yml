@@ -84,7 +84,7 @@ jobs:
 
   python-nightly-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci python-nightly]')"
+    if: "contains(github.event.pull_request.labels.*.name, 'ci python-nightly')"
     steps:
     - uses: actions/checkout@v1
     - name: Set up Python Nightly
@@ -123,7 +123,7 @@ jobs:
 
   distributed-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci distributed]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
       TEST_REQUIREMENTS: pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
@@ -147,7 +147,7 @@ jobs:
 
   joblib-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci joblib]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    if: "contains(github.event.pull_request.labels.*.name, 'ci joblib') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: joblib
       TEST_REQUIREMENTS: "threadpoolctl pytest numpy distributed"
@@ -175,7 +175,7 @@ jobs:
 
   loky-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci loky]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    if: "contains(github.event.pull_request.labels.*.name, 'ci loky') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: loky
       TEST_REQUIREMENTS: "pytest psutil"
@@ -198,7 +198,7 @@ jobs:
 
   ray-downstream-build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[ci ray]') || contains(github.event.head_commit.message, '[ci downstream]')"
+    if: "contains(github.event.pull_request.labels.*.name, 'ci ray') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: ray
     strategy:
