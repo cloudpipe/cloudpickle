@@ -10,18 +10,9 @@ from concurrent.futures import ProcessPoolExecutor
 
 import psutil
 from cloudpickle import dumps
+from subprocess import TimeoutExpired
 
 TIMEOUT = 60
-try:
-    from subprocess import TimeoutExpired
-    timeout_supported = True
-except ImportError:
-    # no support for timeout in Python 2
-    class TimeoutExpired(Exception):
-        pass
-    timeout_supported = False
-
-
 TEST_GLOBALS = "a test value"
 
 
@@ -46,20 +37,6 @@ def _make_cwd_env():
     return cloudpickle_repo_folder, env
 
 
-def _pack(input_data, protocol=None):
-    pickled_input_data = dumps(input_data, protocol=protocol)
-    # Under Windows + Python 2.7, subprocess / communicate truncate the data
-    # on some specific bytes. To avoid this issue, let's use the pure ASCII
-    # Base32 encoding to encapsulate the pickle message sent to the child
-    # process.
-    return base64.b32encode(pickled_input_data)
-
-
-def _unpack(packed_data):
-    decoded_data = base64.b32decode(packed_data)
-    return loads(decoded_data)
-
-
 def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
     """Echo function with a child Python process
 
@@ -80,17 +57,16 @@ def subprocess_pickle_echo(input_data, protocol=None, timeout=TIMEOUT):
     cwd, env = _make_cwd_env()
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, cwd=cwd, env=env,
                  bufsize=4096)
-    pickled_b32 = _pack(input_data, protocol=protocol)
+    pickle_string = dumps(input_data, protocol=protocol)
     try:
         comm_kwargs = {}
-        if timeout_supported:
-            comm_kwargs['timeout'] = timeout
-        out, err = proc.communicate(pickled_b32, **comm_kwargs)
+        comm_kwargs['timeout'] = timeout
+        out, err = proc.communicate(pickle_string, **comm_kwargs)
         if proc.returncode != 0 or len(err):
             message = "Subprocess returned %d: " % proc.returncode
             message += err.decode('utf-8')
             raise RuntimeError(message)
-        return _unpack(out)
+        return loads(out)
     except TimeoutExpired:
         proc.kill()
         out, err = proc.communicate()
@@ -121,11 +97,11 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None):
     if hasattr(stream_out, 'buffer'):
         stream_out = stream_out.buffer
 
-    input_bytes = base64.b32decode(_read_all_bytes(stream_in))
+    input_bytes = _read_all_bytes(stream_in)
     stream_in.close()
     obj = loads(input_bytes)
     repickled_bytes = dumps(obj, protocol=protocol)
-    stream_out.write(base64.b32encode(repickled_bytes))
+    stream_out.write(repickled_bytes)
     stream_out.close()
 
 
@@ -201,8 +177,7 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
         coverage_rc = os.environ.get("COVERAGE_PROCESS_START")
         if coverage_rc:
             kwargs['env']['COVERAGE_PROCESS_START'] = coverage_rc
-        if timeout_supported:
-            kwargs['timeout'] = timeout
+        kwargs['timeout'] = timeout
         try:
             try:
                 out = check_output(cmd, **kwargs)
