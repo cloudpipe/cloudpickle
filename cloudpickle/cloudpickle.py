@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
+import abc
 import dis
 from functools import partial
 import io
@@ -626,14 +627,26 @@ class CloudPickler(Pickler):
         clsdict = _extract_class_dict(obj)
         clsdict.pop('__weakref__', None)
 
-        # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
-        # This is a fix which breaks the cache but this only makes the first
-        # calls to issubclass slower.
-        if "_abc_impl" in clsdict:
-            import abc
-            (registry, _, _, _) = abc._get_dump(obj)
-            clsdict["_abc_impl"] = [subclass_weakref()
-                                    for subclass_weakref in registry]
+        if issubclass(type(obj), abc.ABCMeta):
+            # If obj is an instance of an ABCMeta subclass, dont pickle the
+            # cache/negative caches populated during isinstance/issubclass
+            # checks, but pickle the list of registered subclasses of obj.
+            clsdict.pop('_abc_cache', None)
+            clsdict.pop('_abc_negative_cache', None)
+            clsdict.pop('_abc_negative_cache_version', None)
+            registry = clsdict.pop('_abc_registry', None)
+            if registry is None:
+                # in Python3.7+, the abc caches and registered subclasses of a
+                # class are bundled into the single _abc_impl attribute
+                clsdict.pop('_abc_impl', None)
+                (registry, _, _, _) = abc._get_dump(obj)
+
+                clsdict["_abc_impl"] = [subclass_weakref()
+                                        for subclass_weakref in registry]
+            else:
+                # In the above if clause, registry is a set of weakrefs -- in
+                # this case, registry is a WeakSet
+                clsdict["_abc_impl"] = [type_ for type_ in registry]
 
         # On PyPy, __doc__ is a readonly attribute, so we need to include it in
         # the initial skeleton class.  This is safe because we know that the

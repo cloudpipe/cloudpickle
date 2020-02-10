@@ -136,13 +136,15 @@ def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop('__weakref__', None)
 
-    # For ABCMeta in python3.7+, remove _abc_impl as it is not picklable.
-    # This is a fix which breaks the cache but this only makes the first
-    # calls to issubclass slower.
-    if "_abc_impl" in clsdict:
+    if issubclass(type(obj), abc.ABCMeta):
+        # If obj is an instance of an ABCMeta subclass, dont pickle the
+        # cache/negative caches populated during isinstance/issubclass
+        # checks, but pickle the list of registered subclasses of obj.
+        clsdict.pop('_abc_impl', None)
         (registry, _, _, _) = abc._get_dump(obj)
         clsdict["_abc_impl"] = [subclass_weakref()
                                 for subclass_weakref in registry]
+
     if "__slots__" in clsdict:
         # pickle string length optimization: member descriptors of obj are
         # created automatically from obj's __slots__ attribute, no need to

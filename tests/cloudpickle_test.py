@@ -1050,6 +1050,32 @@ class CloudPickleTest(unittest.TestCase):
         depickled_descriptor = pickle_depickle(float.real)
         self.assertIs(depickled_descriptor, float.real)
 
+    def test_abc_cache_not_pickled(self):
+        # cloudpickle issue #302: make sure that cloudpickle does not pickle
+        # the caches populated during instance/subclass checks of abc.ABCMeta
+        # instances.
+        MyClass = abc.ABCMeta('MyClass', (), {})
+
+        class MyUnrelatedClass:
+            pass
+
+        class MyRelatedClass:
+            pass
+
+        MyClass.register(MyRelatedClass)
+
+        assert not issubclass(MyUnrelatedClass, MyClass)
+        assert issubclass(MyRelatedClass, MyClass)
+
+        s = cloudpickle.dumps(MyClass)
+
+        assert b"MyUnrelatedClass" not in s
+        assert b"MyRelatedClass" in s
+
+        depickled_class = cloudpickle.loads(s)
+        assert not issubclass(MyUnrelatedClass, depickled_class)
+        assert issubclass(MyRelatedClass, depickled_class)
+
     def test_abc(self):
 
         @abc.abstractmethod
