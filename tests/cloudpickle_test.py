@@ -204,9 +204,6 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
-    @pytest.mark.skipif(sys.version_info < (3, 4),
-                        reason="non-contiguous memoryview not implemented in "
-                               "old Python versions")
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
@@ -473,8 +470,6 @@ class CloudPickleTest(unittest.TestCase):
 
         g = pickle_depickle(F.f, protocol=self.protocol)
         self.assertEqual(g.__name__, F.f.__name__)
-        if sys.version_info[0] < 3:
-            self.assertEqual(g.im_class.__name__, F.f.im_class.__name__)
         # self.assertEqual(g(F(), 1), 2)  # still fails
 
     def test_module(self):
@@ -843,9 +838,8 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_clsdict_meth is clsdict_slotmethod
 
     @pytest.mark.skipif(
-        platform.python_implementation() == "PyPy" or
-        sys.version_info[:1] < (3,),
-        reason="No known staticmethod example in the python 2 / pypy stdlib")
+        platform.python_implementation() == "PyPy",
+        reason="No known staticmethod example in the pypy stdlib")
     def test_builtin_staticmethod(self):
         obj = "foo"  # str object
 
@@ -1740,33 +1734,6 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
-    @pytest.mark.skipif(sys.version_info >= (3, 0),
-                        reason="hardcoded pickle bytes for 2.7")
-    def test_function_pickle_compat_0_4_0(self):
-        # The result of `cloudpickle.dumps(lambda x: x)` in cloudpickle 0.4.0,
-        # Python 2.7
-        pickled = (b'\x80\x02ccloudpickle.cloudpickle\n_fill_function\nq\x00(c'
-            b'cloudpickle.cloudpickle\n_make_skel_func\nq\x01ccloudpickle.clou'
-            b'dpickle\n_builtin_type\nq\x02U\x08CodeTypeq\x03\x85q\x04Rq\x05(K'
-            b'\x01K\x01K\x01KCU\x04|\x00\x00Sq\x06N\x85q\x07)U\x01xq\x08\x85q'
-            b'\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
-            b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13NtR.')
-        self.assertEqual(42, cloudpickle.loads(pickled)(42))
-
-    @pytest.mark.skipif(sys.version_info >= (3, 0),
-                        reason="hardcoded pickle bytes for 2.7")
-    def test_function_pickle_compat_0_4_1(self):
-        # The result of `cloudpickle.dumps(lambda x: x)` in cloudpickle 0.4.1,
-        # Python 2.7
-        pickled = (b'\x80\x02ccloudpickle.cloudpickle\n_fill_function\nq\x00(c'
-            b'cloudpickle.cloudpickle\n_make_skel_func\nq\x01ccloudpickle.clou'
-            b'dpickle\n_builtin_type\nq\x02U\x08CodeTypeq\x03\x85q\x04Rq\x05(K'
-            b'\x01K\x01K\x01KCU\x04|\x00\x00Sq\x06N\x85q\x07)U\x01xq\x08\x85q'
-            b'\tU\x07<stdin>q\nU\x08<lambda>q\x0bK\x01U\x00q\x0c))tq\rRq\x0eJ'
-            b'\xff\xff\xff\xff}q\x0f\x87q\x10Rq\x11}q\x12N}q\x13U\x08__main__q'
-            b'\x14NtR.')
-        self.assertEqual(42, cloudpickle.loads(pickled)(42))
-
     def test_pickle_reraise(self):
         for exc_type in [Exception, ValueError, TypeError, RuntimeError]:
             obj = RaiserOnPickle(exc_type("foo"))
@@ -2006,9 +1973,6 @@ class CloudPickleTest(unittest.TestCase):
             cloned_func = pickle_depickle(func, protocol=self.protocol)
             assert cloned_func() == "hello from a {}!".format(source)
 
-    @pytest.mark.skipif(sys.version_info[0] < 3,
-                        reason="keyword only arguments were introduced in "
-                               "python 3")
     def test_interactively_defined_func_with_keyword_only_argument(self):
         # fixes https://github.com/cloudpipe/cloudpickle/issues/263
         # The source code of this test is bundled in a string and is ran from
