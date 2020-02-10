@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import print_function
 
 import abc
+import builtins
 import dis
 from functools import partial
 import io
@@ -59,6 +60,10 @@ import types
 import weakref
 import uuid
 import threading
+
+from pickle import _Pickler as Pickler
+from io import BytesIO
+from importlib._bootstrap import _find_spec
 
 
 try:
@@ -84,11 +89,6 @@ builtin_code_type = None
 if PYPY:
     # builtin-code objects only exist in pypy
     builtin_code_type = type(float.__new__.__code__)
-
-from pickle import _Pickler as Pickler
-from io import BytesIO
-from importlib._bootstrap import _find_spec
-import builtins
 
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
