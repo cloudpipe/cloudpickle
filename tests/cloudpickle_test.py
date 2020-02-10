@@ -1842,6 +1842,17 @@ class CloudPickleTest(unittest.TestCase):
                 with pytest.raises(AttributeError):
                     obj.non_registered_attribute = 1
 
+            class SubclassWithSlots(ClassWithSlots):
+                def __init__(self):
+                    self.unregistered_attribute = 1
+
+            obj = SubclassWithSlots()
+            s = cloudpickle.dumps(obj, protocol=self.protocol)
+            del SubclassWithSlots
+            depickled_obj = cloudpickle.loads(s)
+            assert depickled_obj.unregistered_attribute == 1
+
+
     @unittest.skipIf(not hasattr(types, "MappingProxyType"),
                      "Old versions of Python do not have this type.")
     def test_mappingproxy(self):

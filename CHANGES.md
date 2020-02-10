@@ -24,6 +24,9 @@
   when importing cloudpickle.
   ([issue #337](https://github.com/cloudpipe/cloudpickle/pull/337))
 
+- Fix a bug affecting subclasses of slotted classes.
+  ([issue #311](https://github.com/cloudpipe/cloudpickle/issues/311))
+
 1.2.2
 =====
 

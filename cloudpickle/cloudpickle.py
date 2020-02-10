@@ -640,7 +640,7 @@ class CloudPickler(Pickler):
         # doc can't participate in a cycle with the original class.
         type_kwargs = {'__doc__': clsdict.pop('__doc__', None)}
 
-        if hasattr(obj, "__slots__"):
+        if "__slots__" in clsdict:
             type_kwargs['__slots__'] = obj.__slots__
             # pickle string length optimization: member descriptors of obj are
             # created automatically from obj's __slots__ attribute, no need to

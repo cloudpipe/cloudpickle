@@ -68,7 +68,7 @@ def dumps(obj, protocol=None, buffer_callback=None):
 
 def _class_getnewargs(obj):
     type_kwargs = {}
-    if hasattr(obj, "__slots__"):
+    if "__slots__" in obj.__dict__:
         type_kwargs["__slots__"] = obj.__slots__
 
     __dict__ = obj.__dict__.get('__dict__', None)
@@ -143,7 +143,7 @@ def _class_getstate(obj):
         (registry, _, _, _) = abc._get_dump(obj)
         clsdict["_abc_impl"] = [subclass_weakref()
                                 for subclass_weakref in registry]
-    if hasattr(obj, "__slots__"):
+    if "__slots__" in clsdict:
         # pickle string length optimization: member descriptors of obj are
         # created automatically from obj's __slots__ attribute, no need to
         # save them in obj's state
