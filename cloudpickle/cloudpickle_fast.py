@@ -34,7 +34,7 @@ load, loads = _pickle.load, _pickle.loads
 
 
 # Shorthands similar to pickle.dump/pickle.dumps
-def dump(obj, file, protocol=None):
+def dump(obj, file, protocol=None, buffer_callback=None):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -44,10 +44,10 @@ def dump(obj, file, protocol=None):
     Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
     compatibility with older versions of Python.
     """
-    CloudPickler(file, protocol=protocol).dump(obj)
+    CloudPickler(file, protocol=protocol, buffer_callback=buffer_callback).dump(obj)
 
 
-def dumps(obj, protocol=None):
+def dumps(obj, protocol=None, buffer_callback=None):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -58,7 +58,7 @@ def dumps(obj, protocol=None):
     compatibility with older versions of Python.
     """
     with io.BytesIO() as file:
-        cp = CloudPickler(file, protocol=protocol)
+        cp = CloudPickler(file, protocol=protocol, buffer_callback=buffer_callback)
         cp.dump(obj)
         return file.getvalue()
 
@@ -274,6 +274,7 @@ def _memoryview_reduce(obj):
 
 def _module_reduce(obj):
     if _is_dynamic(obj):
+        obj.__dict__.pop('__builtins__', None)
         return dynamic_subimport, (obj.__name__, vars(obj))
     else:
         return subimport, (obj.__name__,)
@@ -289,6 +290,10 @@ def _logger_reduce(obj):
 
 def _root_logger_reduce(obj):
     return logging.getLogger, ()
+
+
+def _property_reduce(obj):
+    return property, (obj.fget, obj.fset, obj.fdel, obj.__doc__)
 
 
 def _weakset_reduce(obj):
@@ -406,6 +411,7 @@ class CloudPickler(Pickler):
     dispatch[logging.Logger] = _logger_reduce
     dispatch[logging.RootLogger] = _root_logger_reduce
     dispatch[memoryview] = _memoryview_reduce
+    dispatch[property] = _property_reduce
     dispatch[staticmethod] = _classmethod_reduce
     dispatch[types.CellType] = _cell_reduce
     dispatch[types.CodeType] = _code_reduce
@@ -415,10 +421,10 @@ class CloudPickler(Pickler):
     dispatch[types.MappingProxyType] = _mappingproxy_reduce
     dispatch[weakref.WeakSet] = _weakset_reduce
 
-    def __init__(self, file, protocol=None):
+    def __init__(self, file, protocol=None, buffer_callback=None):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
-        Pickler.__init__(self, file, protocol=protocol)
+        Pickler.__init__(self, file, protocol=protocol, buffer_callback=buffer_callback)
         # map functions __globals__ attribute ids, to ensure that functions
         # sharing the same global namespace at pickling time also share their
         # global namespace at unpickling time.

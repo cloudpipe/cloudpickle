@@ -90,17 +90,18 @@ if sys.version_info[0] < 3:  # pragma: no branch
         from cStringIO import StringIO
     except ImportError:
         from StringIO import StringIO
+    import __builtin__ as builtins
     string_types = (basestring,)  # noqa
     PY3 = False
     PY2 = True
 else:
-    types.ClassType = type
     from pickle import _Pickler as Pickler
     from io import BytesIO as StringIO
     string_types = (str,)
     PY3 = True
     PY2 = False
     from importlib._bootstrap import _find_spec
+    import builtins
 
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
@@ -151,10 +152,17 @@ def _whichmodule(obj, name):
     module_name = getattr(obj, '__module__', None)
     if module_name is not None:
         return module_name
-    # Protect the iteration by using a list copy of sys.modules against dynamic
-    # modules that trigger imports of other modules upon calls to getattr.
-    for module_name, module in list(sys.modules.items()):
-        if module_name == '__main__' or module is None:
+    # Protect the iteration by using a copy of sys.modules against dynamic
+    # modules that trigger imports of other modules upon calls to getattr or
+    # other threads importing at the same time.
+    for module_name, module in sys.modules.copy().items():
+        # Some modules such as coverage can inject non-module objects inside
+        # sys.modules
+        if (
+                module_name == '__main__' or
+                module is None or
+                not isinstance(module, types.ModuleType)
+        ):
             continue
         try:
             if _getattribute(module, name)[0] is obj:
@@ -503,6 +511,7 @@ class CloudPickler(Pickler):
         Save a module as an import
         """
         if _is_dynamic(obj):
+            obj.__dict__.pop('__builtins__', None)
             self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
                              obj=obj)
         else:
@@ -879,7 +888,8 @@ class CloudPickler(Pickler):
             Pickler.save_global(self, obj, name=name)
 
     dispatch[type] = save_global
-    dispatch[types.ClassType] = save_global
+    if PY2:
+        dispatch[types.ClassType] = save_global
 
     def save_instancemethod(self, obj):
         # Memoization rarely is ever useful due to python bounding
@@ -1142,6 +1152,7 @@ def subimport(name):
 def dynamic_subimport(name, vars):
     mod = types.ModuleType(name)
     mod.__dict__.update(vars)
+    mod.__dict__['__builtins__'] = builtins.__dict__
     return mod
 
 
