@@ -62,6 +62,7 @@ import uuid
 import threading
 
 from pickle import _Pickler as Pickler
+from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
 
@@ -110,21 +111,6 @@ def _lookup_class_or_track(class_tracker_id, class_def):
                 class_tracker_id, class_def)
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
     return class_def
-
-if sys.version_info[:2] >= (3, 5):
-    from pickle import _getattribute
-elif sys.version_info[:2] >= (3, 4):
-    from pickle import _getattribute as _py34_getattribute
-    #  pickle._getattribute does not return the parent under Python 3.4
-    def _getattribute(obj, name):
-        return _py34_getattribute(obj, name), None
-else:
-    # pickle._getattribute is a python3 addition and enchancement of getattr,
-    # that can handle dotted attribute names. In cloudpickle for python2,
-    # handling dotted names is not needed, so we simply define _getattribute as
-    # a wrapper around getattr.
-    def _getattribute(obj, name):
-        return getattr(obj, name, None), None
 
 
 def _whichmodule(obj, name):
@@ -383,39 +369,15 @@ def _builtin_type(name):
     return getattr(types, name)
 
 
-if sys.version_info < (3, 4):  # pragma: no branch
-    def _walk_global_ops(code):
-        """
-        Yield (opcode, argument number) tuples for all
-        global-referencing instructions in *code*.
-        """
-        code = getattr(code, 'co_code', b'')
-
-        n = len(code)
-        i = 0
-        extended_arg = 0
-        while i < n:
-            op = code[i]
-            i += 1
-            if op >= HAVE_ARGUMENT:
-                oparg = code[i] + code[i + 1] * 256 + extended_arg
-                extended_arg = 0
-                i += 2
-                if op == EXTENDED_ARG:
-                    extended_arg = oparg * 65536
-                if op in GLOBAL_OPS:
-                    yield op, oparg
-
-else:
-    def _walk_global_ops(code):
-        """
-        Yield (opcode, argument number) tuples for all
-        global-referencing instructions in *code*.
-        """
-        for instr in dis.get_instructions(code):
-            op = instr.opcode
-            if op in GLOBAL_OPS:
-                yield op, instr.arg
+def _walk_global_ops(code):
+    """
+    Yield (opcode, argument number) tuples for all
+    global-referencing instructions in *code*.
+    """
+    for instr in dis.get_instructions(code):
+        op = instr.opcode
+        if op in GLOBAL_OPS:
+            yield op, instr.arg
 
 
 def _extract_class_dict(cls):

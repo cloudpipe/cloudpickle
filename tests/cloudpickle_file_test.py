@@ -81,17 +81,6 @@ class CloudPickleFileTests(unittest.TestCase):
             self.assertEqual(self.teststring, unpickled.read())
         os.remove(self.tmpfilepath)
 
-    @pytest.mark.skipif(sys.version_info >= (3,),
-                        reason="only works on Python 2.x")
-    def test_temp_file(self):
-        with tempfile.NamedTemporaryFile(mode='ab+') as fp:
-            fp.write(self.teststring.encode('UTF-8'))
-            fp.seek(0)
-            f = fp.file
-            # FIXME this doesn't work yet: cloudpickle.dumps(fp)
-            newfile = pickle.loads(cloudpickle.dumps(f))
-            self.assertEqual(self.teststring, newfile.read())
-
     def test_pickling_special_file_handles(self):
         # Warning: if you want to run your tests with nose, add -s option
         for out in sys.stdout, sys.stderr:  # Regression test for SPARK-3415
