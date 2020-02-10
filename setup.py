@@ -39,7 +39,6 @@ dist = setup(
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: MacOS :: MacOS X',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
@@ -50,4 +49,5 @@ dist = setup(
         'Topic :: System :: Distributed Computing',
     ],
     test_suite='tests',
+    python_requires='>=3.5',
 )

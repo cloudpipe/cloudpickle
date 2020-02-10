@@ -1,3 +1,8 @@
+1.4.0 (in development)
+======================
+
+**This version requires Python 3.5 or later**
+
 1.3.0
 =====
 
