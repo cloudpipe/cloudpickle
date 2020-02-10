@@ -1966,23 +1966,14 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_interactively_defined_func_with_keyword_only_argument(self):
         # fixes https://github.com/cloudpipe/cloudpickle/issues/263
-        # The source code of this test is bundled in a string and is ran from
-        # the __main__ module of a subprocess in order to avoid a SyntaxError
-        # in python2 when pytest imports this file, as the keyword-only syntax
-        # is python3-only.
-        code = """
-        from cloudpickle import loads, dumps
-
         def f(a, *, b=1):
             return a + b
 
-        depickled_f = loads(dumps(f, protocol={protocol}))
+        depickled_f = pickle_depickle(f, protocol=self.protocol)
 
         for func in (f, depickled_f):
             assert func(2) == 3
-            assert func.__kwdefaults__ == {{'b': 1}}
-        """.format(protocol=self.protocol)
-        assert_run_python_script(textwrap.dedent(code))
+            assert func.__kwdefaults__ == {'b': 1}
 
     @pytest.mark.skipif(not hasattr(types.CodeType, "co_posonlyargcount"),
                         reason="Requires positional-only argument syntax")

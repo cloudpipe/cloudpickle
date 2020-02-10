@@ -515,13 +515,12 @@ class CloudPickler(Pickler):
         """
         members = dict((e.name, e.value) for e in obj)
 
-        # Python 2.7 with enum34 can have no qualname:
-        qualname = getattr(obj, "__qualname__", None)
-
-        self.save_reduce(_make_skeleton_enum,
-                         (obj.__bases__, obj.__name__, qualname, members,
-                          obj.__module__, _ensure_tracking(obj), None),
-                         obj=obj)
+        self.save_reduce(
+                _make_skeleton_enum,
+                (obj.__bases__, obj.__name__, obj.__qualname__,
+                 members, obj.__module__, _ensure_tracking(obj), None),
+                obj=obj
+         )
 
         # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
         # Those attributes are already handled by the metaclass.
@@ -1228,10 +1227,7 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
         classdict[member_name] = member_value
     enum_class = metacls.__new__(metacls, name, bases, classdict)
     enum_class.__module__ = module
-
-    # Python 2.7 compat
-    if qualname is not None:
-        enum_class.__qualname__ = qualname
+    enum_class.__qualname__ = qualname
 
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
