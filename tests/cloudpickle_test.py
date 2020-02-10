@@ -333,9 +333,6 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled_C.instance_of_C.it_works(), "woohoo!")
         self.assertEqual(depickled_instance.it_works(), "woohoo!")
 
-    @pytest.mark.skipif(sys.version_info >= (3, 4)
-                        and sys.version_info < (3, 4, 3),
-                        reason="subprocess has a bug in 3.4.0 to 3.4.2")
     def test_locally_defined_function_and_class(self):
         LOCAL_CONSTANT = 42
 
@@ -1861,8 +1858,6 @@ class CloudPickleTest(unittest.TestCase):
         pickle_depickle(DataClass, protocol=self.protocol)
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
-    @unittest.skipIf(sys.version_info[:2] < (3, 5),
-                     "Only support enum pickling on Python 3.5+")
     def test_locally_defined_enum(self):
         enum = pytest.importorskip("enum")
 
@@ -1894,8 +1889,6 @@ class CloudPickleTest(unittest.TestCase):
         green3 = pickle_depickle(Color.GREEN, protocol=self.protocol)
         assert green3 is Color.GREEN
 
-    @unittest.skipIf(sys.version_info[:2] < (3, 5),
-                     "Only support enum pickling on Python 3.5+")
     def test_locally_defined_intenum(self):
         enum = pytest.importorskip("enum")
         # Try again with a IntEnum defined with the functional API
@@ -1910,8 +1903,6 @@ class CloudPickleTest(unittest.TestCase):
         assert green1 is not ClonedDynamicColor.BLUE
         assert ClonedDynamicColor is DynamicColor
 
-    @unittest.skipIf(sys.version_info[:2] < (3, 5),
-                     "Only support enum pickling on Python 3.5+")
     def test_interactively_defined_enum(self):
         pytest.importorskip("enum")
         code = """if __name__ == "__main__":
