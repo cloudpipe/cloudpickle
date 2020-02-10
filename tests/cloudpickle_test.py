@@ -181,11 +181,7 @@ class CloudPickleTest(unittest.TestCase):
         def foo():
             sys.exit(0)
 
-        func_code = getattr(foo, '__code__', None)
-        if func_code is None:  # PY2 backwards compatibility
-            func_code = foo.func_code
-
-        self.assertTrue("exit" in func_code.co_names)
+        self.assertTrue("exit" in foo.__code__.co_names)
         cloudpickle.dumps(foo)
 
     def test_buffer(self):
