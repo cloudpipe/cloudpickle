@@ -1,7 +1,6 @@
 # cloudpickle
 
-[![Build Status](https://travis-ci.org/cloudpipe/cloudpickle.svg?branch=master
-    )](https://travis-ci.org/cloudpipe/cloudpickle)
+[![github-actions](https://github.com/cloudpipe/cloudpickle/workflows/Automated%20Tests/badge.svg)](https://github.com/cloudpipe/cloudpickle/actions)
 [![codecov.io](https://codecov.io/github/cloudpipe/cloudpickle/coverage.svg?branch=master)](https://codecov.io/github/cloudpipe/cloudpickle?branch=master)
 
 `cloudpickle` makes it possible to serialize Python constructs not supported
@@ -84,6 +83,25 @@ Running the tests
       pip install -r dev-requirements.txt
       PYTHONPATH='.:tests' py.test
 
+
+Note about function Annotations
+-------------------------------
+
+Note that because of design issues `Python`'s `typing` module, `cloudpickle`
+supports pickling type annotations of dynamic functions for `Python` 3.7 and
+later.  On `Python` 3.4, 3.5 and 3.6, those type annotations will be dropped
+silently during pickling (example below):
+
+```python
+>>> import typing
+>>> import cloudpickle
+>>> def f(x: typing.Union[list, int]):
+...     return x
+>>> f
+<function __main__.f(x:Union[list, int])>
+>>> cloudpickle.loads(cloudpickle.dumps(f))  # drops f's annotations
+<function __main__.f(x)>
+```
 
 History
 -------

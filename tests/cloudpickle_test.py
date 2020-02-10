@@ -42,7 +42,7 @@ except ImportError:
 import cloudpickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
-from cloudpickle.cloudpickle import _extract_class_dict
+from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -107,6 +107,28 @@ class CloudPickleTest(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
+
+    @pytest.mark.skipif(
+            platform.python_implementation() != "CPython" or
+            (sys.version_info >= (3, 8, 0) and sys.version_info < (3, 8, 2)),
+            reason="Underlying bug fixed upstream starting Python 3.8.2")
+    def test_reducer_override_reference_cycle(self):
+        # Early versions of Python 3.8 introduced a reference cycle between a
+        # Pickler and it's reducer_override method. Because a Pickler
+        # object references every object it has pickled through its memo, this
+        # cycle prevented the garbage-collection of those external pickled
+        # objects. See #327 as well as https://bugs.python.org/issue39492
+        # This bug was fixed in Python 3.8.2, but is still present using
+        # cloudpickle and Python 3.8.0/1, hence the skipif directive.
+        class MyClass:
+            pass
+
+        my_object = MyClass()
+        wr = weakref.ref(my_object)
+
+        cloudpickle.dumps(my_object)
+        del my_object
+        assert wr() is None, "'del'-ed my_object has not been collected"
 
     def test_itemgetter(self):
         d = range(10)
@@ -528,6 +550,46 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             os.unlink(pickled_func_path)
 
+    def test_dynamic_module_with_unpicklable_builtin(self):
+        # Reproducer of https://github.com/cloudpipe/cloudpickle/issues/316
+        # Some modules such as scipy inject some unpicklable objects into the
+        # __builtins__ module, which appears in every module's __dict__ under
+        # the '__builtins__' key. In such cases, cloudpickle used to fail
+        # when pickling dynamic modules.
+        class UnpickleableObject(object):
+            def __reduce__(self):
+                raise ValueError('Unpicklable object')
+
+        mod = types.ModuleType("mod")
+
+        exec('f = lambda x: abs(x)', mod.__dict__)
+        assert mod.f(-1) == 1
+        assert '__builtins__' in mod.__dict__
+
+        unpicklable_obj = UnpickleableObject()
+        with pytest.raises(ValueError):
+            cloudpickle.dumps(unpicklable_obj)
+
+        # Emulate the behavior of scipy by injecting an unpickleable object
+        # into mod's builtins.
+        # The __builtins__ entry of mod's __dict__ can either be the
+        # __builtins__ module, or the __builtins__ module's __dict__. #316
+        # happens only in the latter case.
+        if isinstance(mod.__dict__['__builtins__'], dict):
+            mod.__dict__['__builtins__']['unpickleable_obj'] = unpicklable_obj
+        elif isinstance(mod.__dict__['__builtins__'], types.ModuleType):
+            mod.__dict__['__builtins__'].unpickleable_obj = unpicklable_obj
+
+        depickled_mod = pickle_depickle(mod, protocol=self.protocol)
+        assert '__builtins__' in depickled_mod.__dict__
+
+        if isinstance(depickled_mod.__dict__['__builtins__'], dict):
+            assert "abs" in depickled_mod.__builtins__
+        elif isinstance(
+                depickled_mod.__dict__['__builtins__'], types.ModuleType):
+            assert hasattr(depickled_mod.__builtins__, "abs")
+        assert depickled_mod.f(-1) == 1
+
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
         # property. Otherwise, this will lead to an ImportError if pickled in
@@ -670,10 +732,9 @@ class CloudPickleTest(unittest.TestCase):
         # builtin function from the __builtin__ module
         assert pickle_depickle(zip, protocol=self.protocol) is zip
 
-        from sys import getcheckinterval
+        from os import mkdir
         # builtin function from a "regular" module
-        assert pickle_depickle(
-            getcheckinterval, protocol=self.protocol) is getcheckinterval
+        assert pickle_depickle(mkdir, protocol=self.protocol) is mkdir
 
     @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
                         sys.version_info[:2] == (3, 5),
@@ -1075,35 +1136,94 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(set(weakset), {depickled1, depickled2})
 
-    def test_faulty_module(self):
-        for module_name in ['_missing_module', None]:
-            class FaultyModule(object):
-                def __getattr__(self, name):
-                    # This throws an exception while looking up within
-                    # pickle.whichmodule or getattr(module, name, None)
-                    raise Exception()
+    def test_non_module_object_passing_whichmodule_test(self):
+        # https://github.com/cloudpipe/cloudpickle/pull/326: cloudpickle should
+        # not try to instrospect non-modules object when trying to discover the
+        # module of a function/class. This happenened because codecov injects
+        # tuples (and not modules) into sys.modules, but type-checks were not
+        # carried out on the entries of sys.modules, causing cloupdickle to
+        # then error in unexpected ways
+        def func(x):
+            return x ** 2
 
-            class Foo(object):
-                __module__ = module_name
+        # Trigger a loop during the execution of whichmodule(func) by
+        # explicitly setting the function's module to None
+        func.__module__ = None
 
-                def foo(self):
+        class NonModuleObject(object):
+            def __getattr__(self, name):
+                # We whitelist func so that a _whichmodule(func, None) call returns
+                # the NonModuleObject instance if a type check on the entries
+                # of sys.modules is not carried out, but manipulating this
+                # instance thinking it really is a module later on in the
+                # pickling process of func errors out
+                if name == 'func':
+                    return func
+                else:
+                    raise AttributeError
+
+        non_module_object = NonModuleObject()
+
+        assert func(2) == 4
+        assert func is non_module_object.func
+
+        # Any manipulation of non_module_object relying on attribute access
+        # will raise an Exception
+        with pytest.raises(AttributeError):
+            _is_dynamic(non_module_object)
+
+        try:
+            sys.modules['NonModuleObject'] = non_module_object
+
+            func_module_name = _whichmodule(func, None)
+            assert func_module_name != 'NonModuleObject'
+            assert func_module_name is None
+
+            depickled_func = pickle_depickle(func, protocol=self.protocol)
+            assert depickled_func(2) == 4
+
+        finally:
+            sys.modules.pop('NonModuleObject')
+
+    def test_unrelated_faulty_module(self):
+        # Check that pickling a dynamically defined function or class does not
+        # fail when introspecting the currently loaded modules in sys.modules
+        # as long as those faulty modules are unrelated to the class or
+        # function we are currently pickling.
+        for base_class in (object, types.ModuleType):
+            for module_name in ['_missing_module', None]:
+                class FaultyModule(base_class):
+                    def __getattr__(self, name):
+                        # This throws an exception while looking up within
+                        # pickle.whichmodule or getattr(module, name, None)
+                        raise Exception()
+
+                class Foo(object):
+                    __module__ = module_name
+
+                    def foo(self):
+                        return "it works!"
+
+                def foo():
                     return "it works!"
 
-            def foo():
-                return "it works!"
+                foo.__module__ = module_name
 
-            foo.__module__ = module_name
+                if base_class is types.ModuleType:  # noqa
+                    faulty_module = FaultyModule('_faulty_module')
+                else:
+                    faulty_module = FaultyModule()
+                sys.modules["_faulty_module"] = faulty_module
 
-            sys.modules["_faulty_module"] = FaultyModule()
-            try:
-                # Test whichmodule in save_global.
-                self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
+                try:
+                    # Test whichmodule in save_global.
+                    self.assertEqual(pickle_depickle(Foo()).foo(), "it works!")
 
-                # Test whichmodule in save_function.
-                cloned = pickle_depickle(foo, protocol=self.protocol)
-                self.assertEqual(cloned(), "it works!")
-            finally:
-                sys.modules.pop("_faulty_module", None)
+                    # Test whichmodule in save_function.
+                    cloned = pickle_depickle(foo, protocol=self.protocol)
+                    self.assertEqual(cloned(), "it works!")
+                finally:
+                    sys.modules.pop("_faulty_module", None)
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
@@ -1145,6 +1265,52 @@ class CloudPickleTest(unittest.TestCase):
         func.__qualname__ = '<modifiedlambda>'
         cloned = pickle_depickle(func, protocol=self.protocol)
         self.assertEqual(cloned.__qualname__, func.__qualname__)
+
+    def test_property(self):
+        # Note that the @property decorator only has an effect on new-style
+        # classes.
+        class MyObject(object):
+            _read_only_value = 1
+            _read_write_value = 1
+
+            @property
+            def read_only_value(self):
+                "A read-only attribute"
+                return self._read_only_value
+
+            @property
+            def read_write_value(self):
+                return self._read_write_value
+
+            @read_write_value.setter
+            def read_write_value(self, value):
+                self._read_write_value = value
+
+
+
+        my_object = MyObject()
+
+        assert my_object.read_only_value == 1
+        assert MyObject.read_only_value.__doc__ == "A read-only attribute"
+
+        with pytest.raises(AttributeError):
+            my_object.read_only_value = 2
+        my_object.read_write_value = 2
+
+        depickled_obj = pickle_depickle(my_object)
+
+        assert depickled_obj.read_only_value == 1
+        assert depickled_obj.read_write_value == 2
+
+        # make sure the depickled read_only_value attribute is still read-only
+        with pytest.raises(AttributeError):
+            my_object.read_only_value = 2
+
+        # make sure the depickled read_write_value attribute is writeable
+        depickled_obj.read_write_value = 3
+        assert depickled_obj.read_write_value == 3
+        type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
+
 
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
@@ -1560,7 +1726,16 @@ class CloudPickleTest(unittest.TestCase):
             # grown by more than a few MB as closures are garbage collected at
             # the end of each remote function call.
             growth = w.memsize() - reference_size
-            assert growth < 1e7, growth
+
+            # For some reason, the memory growth after processing 100MB of
+            # data is ~10MB on MacOS, and ~1MB on Linux, so the upper bound on
+            # memory growth we use is only tight for MacOS. However,
+            # - 10MB is still 10x lower than the expected memory growth in case
+            # of a leak (which would be the total size of the processed data,
+            # 100MB)
+            # - the memory usage growth does not increase if using 10000
+            # iterations instead of 100 as used now (100x more data)
+            assert growth < 1.5e7, growth
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
@@ -1647,9 +1822,9 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__doc__, f.__doc__)
 
-    @unittest.skipIf(sys.version_info < (3, 4),
-                     """This syntax won't work on py2 and pickling annotations
-                     isn't supported for py34 and below.""")
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "This syntax won't work on py2 and pickling annotations "
+                     "isn't supported for py37 and below.")
     def test_wraps_preserves_function_annotations(self):
         from functools import wraps
 
@@ -1665,6 +1840,16 @@ class CloudPickleTest(unittest.TestCase):
         f2 = pickle_depickle(g, protocol=self.protocol)
 
         self.assertEqual(f2.__annotations__, f.__annotations__)
+
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     """This syntax won't work on py2 and pickling annotations
+                     isn't supported for py37 and below.""")
+    def test_type_hint(self):
+        # Try to pickle compound typing constructs. This would typically fail
+        # on Python < 3.7 (See #193)
+        import typing
+        t = typing.Union[list, int]
+        assert pickle_depickle(t) == t
 
     def test_instance_with_slots(self):
         for slots in [["registered_attribute"], "registered_attribute"]:
@@ -1682,6 +1867,17 @@ class CloudPickleTest(unittest.TestCase):
                 self.assertEqual(obj.registered_attribute, 42)
                 with pytest.raises(AttributeError):
                     obj.non_registered_attribute = 1
+
+            class SubclassWithSlots(ClassWithSlots):
+                def __init__(self):
+                    self.unregistered_attribute = 1
+
+            obj = SubclassWithSlots()
+            s = cloudpickle.dumps(obj, protocol=self.protocol)
+            del SubclassWithSlots
+            depickled_obj = cloudpickle.loads(s)
+            assert depickled_obj.unregistered_attribute == 1
+
 
     @unittest.skipIf(not hasattr(types, "MappingProxyType"),
                      "Old versions of Python do not have this type.")
@@ -1892,6 +2088,22 @@ class CloudPickleTest(unittest.TestCase):
         a = A()
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
+
+    def test_out_of_band_buffers(self):
+        if self.protocol < 5:
+            pytest.skip("Need Pickle Protocol 5 or later")
+        np = pytest.importorskip("numpy")
+
+        class LocallyDefinedClass:
+            data = np.zeros(10)
+
+        data_instance = LocallyDefinedClass()
+        buffers = []
+        pickle_bytes = cloudpickle.dumps(data_instance, protocol=self.protocol,
+                                         buffer_callback=buffers.append)
+        assert len(buffers) == 1
+        reconstructed = pickle.loads(pickle_bytes, buffers=buffers)
+        np.testing.assert_allclose(reconstructed.data, data_instance.data)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):

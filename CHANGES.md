@@ -1,9 +1,44 @@
-1.2.2
+1.3.0
 =====
+
+- Fix a bug affecting dynamic modules occuring with modified builtins
+  ([issue #316](https://github.com/cloudpipe/cloudpickle/issues/316))
+
+- Fix a bug affecting cloudpickle when non-modules objects are added into
+  sys.modules
+  ([PR #326](https://github.com/cloudpipe/cloudpickle/pull/326)).
+  
+- Fix a regression in cloudpickle and python3.8 causing an error when trying to
+  pickle property objects.
+  ([PR #329](https://github.com/cloudpipe/cloudpickle/pull/329)).
+
+- Fix a bug when a thread imports a module while cloudpickle iterates
+  over the module list
+  ([PR #322](https://github.com/cloudpipe/cloudpickle/pull/322)).
+
+- Add support for out-of-band pickling (Python 3.8 and later).
+  https://docs.python.org/3/library/pickle.html#example
+  ([issue #308](https://github.com/cloudpipe/cloudpickle/pull/308))
+
+- Fix a side effect that would redefine `types.ClassTypes` as `type`
+  when importing cloudpickle.
+  ([issue #337](https://github.com/cloudpipe/cloudpickle/pull/337))
+
+- Fix a bug affecting subclasses of slotted classes.
+  ([issue #311](https://github.com/cloudpipe/cloudpickle/issues/311))
 
 - Dont pickle the abc cache of dynamically defined classes for Python 3.6-
   (This was already the case for python3.7+)
   ([issue #302](https://github.com/cloudpipe/cloudpickle/issues/302))
+
+1.2.2
+=====
+
+- Revert the change introduced in
+  ([issue #276](https://github.com/cloudpipe/cloudpickle/pull/276))
+  attempting to pickle functions annotations for Python 3.4 to 3.6. It is not
+  possible to pickle complex typing constructs for those versions (see
+  [issue #193]( https://github.com/cloudpipe/cloudpickle/issues/193))
 
 - Fix a bug affecting bound classmethod saving on Python 2.
   ([issue #288](https://github.com/cloudpipe/cloudpickle/issues/288))
