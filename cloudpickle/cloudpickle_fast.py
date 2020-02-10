@@ -27,7 +27,7 @@ from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _is_global, _builtin_type,
     Enum, _ensure_tracking,  _make_skeleton_class, _make_skeleton_enum,
-    _extract_class_dict, string_types, dynamic_subimport, subimport
+    _extract_class_dict, dynamic_subimport, subimport
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -149,7 +149,7 @@ def _class_getstate(obj):
         # pickle string length optimization: member descriptors of obj are
         # created automatically from obj's __slots__ attribute, no need to
         # save them in obj's state
-        if isinstance(obj.__slots__, string_types):
+        if isinstance(obj.__slots__, str):
             clsdict.pop(obj.__slots__)
         else:
             for k in obj.__slots__:
