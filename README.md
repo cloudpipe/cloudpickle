@@ -1,6 +1,6 @@
 # cloudpickle
 
-[![github-actions](https://github.com/cloudpipe/cloudpickle/workflows/.github/workflows/testing.yml/badge.svg)](https://github.com/cloudpipe/cloudpickle/actions)
+[![github-actions](https://github.com/cloudpipe/cloudpickle/workflows/Automated%20Tests/badge.svg)](https://github.com/cloudpipe/cloudpickle/actions)
 [![codecov.io](https://codecov.io/github/cloudpipe/cloudpickle/coverage.svg?branch=master)](https://codecov.io/github/cloudpipe/cloudpickle?branch=master)
 
 `cloudpickle` makes it possible to serialize Python constructs not supported
