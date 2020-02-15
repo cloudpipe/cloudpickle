@@ -3,6 +3,11 @@ flake8
 pytest
 pytest-cov
 psutil
+# To be able to test tornado coroutines
+tornado
+# To be able to test numpy specific things
+# but do not build numpy from source on Python nightly
+numpy; python_version <= '3.8'
 # Code coverage uploader for Travis:
 codecov
 coverage
