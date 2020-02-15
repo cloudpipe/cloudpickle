@@ -60,17 +60,13 @@ import types
 import weakref
 import uuid
 import threading
+from enum import Enum
 
 from pickle import _Pickler as Pickler
 from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
 
-
-try:
-    from enum import Enum
-except ImportError:
-    Enum = None
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
@@ -580,6 +576,7 @@ class CloudPickler(Pickler):
 
         # If type overrides __dict__ as a property, include it in the type
         # kwargs. In Python 2, we can't set this attribute after construction.
+        # XXX: can this ever happen in Python 3? If so add a test.
         __dict__ = clsdict.pop('__dict__', None)
         if isinstance(__dict__, property):
             type_kwargs['__dict__'] = __dict__
@@ -786,51 +783,6 @@ class CloudPickler(Pickler):
 
     dispatch[types.MethodType] = save_instancemethod
 
-    def save_inst(self, obj):
-        """Inner logic to save instance. Based off pickle.save_inst"""
-        cls = obj.__class__
-
-        # Try the dispatch table (pickle module doesn't do it)
-        f = self.dispatch.get(cls)
-        if f:
-            f(self, obj)  # Call unbound method with explicit self
-            return
-
-        memo = self.memo
-        write = self.write
-        save = self.save
-
-        if hasattr(obj, '__getinitargs__'):
-            args = obj.__getinitargs__()
-            len(args)  # XXX Assert it's a sequence
-            pickle._keep_alive(args, memo)
-        else:
-            args = ()
-
-        write(pickle.MARK)
-
-        if self.bin:
-            save(cls)
-            for arg in args:
-                save(arg)
-            write(pickle.OBJ)
-        else:
-            for arg in args:
-                save(arg)
-            write(pickle.INST + cls.__module__ + '\n' + cls.__name__ + '\n')
-
-        self.memoize(obj)
-
-        try:
-            getstate = obj.__getstate__
-        except AttributeError:
-            stuff = obj.__dict__
-        else:
-            stuff = getstate()
-            pickle._keep_alive(stuff, memo)
-        save(stuff)
-        write(pickle.BUILD)
-
     def save_property(self, obj):
         # properties not correctly saved in python
         self.save_reduce(property, (obj.fget, obj.fset, obj.fdel, obj.__doc__),
@@ -924,11 +876,7 @@ class CloudPickler(Pickler):
     def save_not_implemented(self, obj):
         self.save_reduce(_gen_not_implemented, ())
 
-    try:               # Python 2
-        dispatch[file] = save_file
-    except NameError:  # Python 3  # pragma: no branch
-        dispatch[io.TextIOWrapper] = save_file
-
+    dispatch[io.TextIOWrapper] = save_file
     dispatch[type(Ellipsis)] = save_ellipsis
     dispatch[type(NotImplemented)] = save_not_implemented
 
@@ -1241,41 +1189,25 @@ def _is_dynamic(module):
     if hasattr(module, '__file__'):
         return False
 
-    if hasattr(module, '__spec__'):
-        if module.__spec__ is not None:
-            return False
-
-        # In PyPy, Some built-in modules such as _codecs can have their
-        # __spec__ attribute set to None despite being imported.  For such
-        # modules, the ``_find_spec`` utility of the standard library is used.
-        parent_name = module.__name__.rpartition('.')[0]
-        if parent_name:  # pragma: no cover
-            # This code handles the case where an imported package (and not
-            # module) remains with __spec__ set to None. It is however untested
-            # as no package in the PyPy stdlib has __spec__ set to None after
-            # it is imported.
-            try:
-                parent = sys.modules[parent_name]
-            except KeyError:
-                msg = "parent {!r} not in sys.modules"
-                raise ImportError(msg.format(parent_name))
-            else:
-                pkgpath = parent.__path__
-        else:
-            pkgpath = None
-        return _find_spec(module.__name__, pkgpath, module) is None
-
-    else:
-        # Backward compat for Python 2
-        import imp
-        try:
-            path = None
-            for part in module.__name__.split('.'):
-                if path is not None:
-                    path = [path]
-                f, path, description = imp.find_module(part, path)
-                if f is not None:
-                    f.close()
-        except ImportError:
-            return True
+    if module.__spec__ is not None:
         return False
+
+    # In PyPy, Some built-in modules such as _codecs can have their
+    # __spec__ attribute set to None despite being imported.  For such
+    # modules, the ``_find_spec`` utility of the standard library is used.
+    parent_name = module.__name__.rpartition('.')[0]
+    if parent_name:  # pragma: no cover
+        # This code handles the case where an imported package (and not
+        # module) remains with __spec__ set to None. It is however untested
+        # as no package in the PyPy stdlib has __spec__ set to None after
+        # it is imported.
+        try:
+            parent = sys.modules[parent_name]
+        except KeyError:
+            msg = "parent {!r} not in sys.modules"
+            raise ImportError(msg.format(parent_name))
+        else:
+            pkgpath = parent.__path__
+    else:
+        pkgpath = None
+    return _find_spec(module.__name__, pkgpath, module) is None
