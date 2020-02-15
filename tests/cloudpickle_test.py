@@ -21,6 +21,7 @@ import types
 import unittest
 import weakref
 import os
+import enum
 
 import pytest
 
@@ -1855,8 +1856,6 @@ class CloudPickleTest(unittest.TestCase):
         assert data.x == pickle_depickle(data, protocol=self.protocol).x == 42
 
     def test_locally_defined_enum(self):
-        enum = pytest.importorskip("enum")
-
         class StringEnum(str, enum.Enum):
             """Enum when all members are also (and must be) strings"""
 
@@ -1886,7 +1885,6 @@ class CloudPickleTest(unittest.TestCase):
         assert green3 is Color.GREEN
 
     def test_locally_defined_intenum(self):
-        enum = pytest.importorskip("enum")
         # Try again with a IntEnum defined with the functional API
         DynamicColor = enum.IntEnum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
 
@@ -1900,7 +1898,6 @@ class CloudPickleTest(unittest.TestCase):
         assert ClonedDynamicColor is DynamicColor
 
     def test_interactively_defined_enum(self):
-        pytest.importorskip("enum")
         code = """if __name__ == "__main__":
         from enum import Enum
         from testutils import subprocess_worker
