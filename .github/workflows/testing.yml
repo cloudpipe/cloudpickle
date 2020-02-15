@@ -82,33 +82,26 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
 
-  python-nightly-build:
-    runs-on: ubuntu-latest
-    if: "contains(github.event.pull_request.labels.*.name, 'ci python-nightly')"
+  python-nightly:
+    runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python Nightly
+    - name: Install Python from ppa:deadsnakes/nightly
       run: |
-        sudo apt-get install sqlite3 libsqlite3-dev
-        pushd ..
-        export VENV_DIR=$PWD/python38
-        git clone https://github.com/python/cpython.git
-        pushd cpython
-        ./configure
-        make
-        ./python -m venv "$VENV_DIR"
-        popd
-        popd
-        echo ::add-path::$VENV_DIR/bin/
-    - name: Install project and dependencies
-      run: |
-        python -c 'import sys; print(sys.version)'
-        python -m pip install --upgrade pip
-        python -m pip install -e .
-        python -m pip install -r dev-requirements.txt
-        python ci/install_coverage_subprocess_pth.py
+        sudo add-apt-repository ppa:deadsnakes/nightly
+        sudo apt update
+        sudo apt install python3.9 python3.9-venv python3.9-dev
+        python3.9 -m venv nightly-venv
+        echo ::add-path::nightly-venv/bin
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
+    - name: Install project and dependencies
+      run: |
+        set -e
+        python -m pip install --upgrade pip
+        python -m pip install -r dev-requirements.txt
+        python -m pip install -e .
+        python ci/install_coverage_subprocess_pth.py
     - name: Test with pytest
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
