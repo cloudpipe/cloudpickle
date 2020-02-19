@@ -1802,6 +1802,47 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__annotations__, f.__annotations__)
 
+    @unittest.skipIf(sys.version_info >= (3, 7),
+                     "pickling annotations is supported starting Python 3.7")
+    def test_annotations_silent_dropping(self):
+        # Because of limitations of typing module, cloudpickle does not pickle
+        # the type annotations of a dynamic function or class for Python < 3.7
+
+        class UnpicklableAnnotation:
+            # Mock Annotation metaclass that errors out loudly if we try to
+            # pickle one of its instances
+            def __reduce__(self):
+                raise Exception("not picklable")
+
+        unpickleable_annotation = UnpicklableAnnotation()
+
+        def f(a: unpickleable_annotation):
+            return a
+
+        class A:
+            a: unpickleable_annotation
+
+        with pytest.raises(Exception):
+            cloudpickle.dumps(f.__annotations__)
+
+        with pytest.raises(Exception):
+            cloudpickle.dumps(A.__annotations__)
+
+        f_pickle_string = cloudpickle.dumps(f, protocol=self.protocol)
+        A_pickle_string = cloudpickle.dumps(A, protocol=self.protocol)
+
+        code = """if 1:
+        import pickle
+
+        depickled_f = pickle.loads({s1})
+        assert depickled_f.__annotations__ == {{}}
+
+        depickled_a = pickle.loads({s2})
+        assert not hasattr(depickled_a, "__annotations__")
+        """.format(s1=f_pickle_string, s2=A_pickle_string,
+                   protocol=self.protocol)
+        assert_run_python_script(code)
+
     @unittest.skipIf(sys.version_info < (3, 7),
                      """This syntax won't work on py2 and pickling annotations
                      isn't supported for py37 and below.""")
