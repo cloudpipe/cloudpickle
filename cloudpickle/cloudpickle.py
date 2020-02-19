@@ -581,6 +581,11 @@ class CloudPickler(Pickler):
         if isinstance(__dict__, property):
             type_kwargs['__dict__'] = __dict__
 
+        if sys.version_info < (3, 7):
+            # Although annotations were added in Python 3.4, It is not possible
+            # to properly pickle them until Python 3.7. (See #193)
+            clsdict.pop('__annotations__', None)
+
         save = self.save
         write = self.write
 
