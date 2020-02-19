@@ -1804,7 +1804,7 @@ class CloudPickleTest(unittest.TestCase):
 
     @unittest.skipIf(sys.version_info >= (3, 7),
                      "pickling annotations is supported starting Python 3.7")
-    def test_annotations_silent_dropping(self):
+    def test_function_annotations_silent_dropping(self):
         # Because of limitations of typing module, cloudpickle does not pickle
         # the type annotations of a dynamic function or class for Python < 3.7
 
@@ -1819,29 +1819,55 @@ class CloudPickleTest(unittest.TestCase):
         def f(a: unpickleable_annotation):
             return a
 
-        class A:
-            a: unpickleable_annotation
-
         with pytest.raises(Exception):
             cloudpickle.dumps(f.__annotations__)
 
-        with pytest.raises(Exception):
+        depickled_f = pickle_depickle(f, protocol=self.protocol)
+        assert depickled_f.__annotations__ == {}
+
+    @unittest.skipIf(sys.version_info >= (3, 7) or sys.version_info < (3, 6),
+                     "pickling annotations is supported starting Python 3.7")
+    def test_class_annotations_silent_dropping(self):
+        # Because of limitations of typing module, cloudpickle does not pickle
+        # the type annotations of a dynamic function or class for Python < 3.7
+
+        # Pickling and unpickling must be done in different processes when
+        # testing dynamic classes (see #313)
+
+        code = '''if 1:
+        import cloudpickle
+        import sys
+
+        class UnpicklableAnnotation:
+            # Mock Annotation metaclass that errors out loudly if we try to
+            # pickle one of its instances
+            def __reduce__(self):
+                raise Exception("not picklable")
+
+        unpickleable_annotation = UnpicklableAnnotation()
+
+        class A:
+            a: unpickleable_annotation
+
+        try:
             cloudpickle.dumps(A.__annotations__)
+        except Exception:
+            pass
+        else:
+            raise AssertionError
 
-        f_pickle_string = cloudpickle.dumps(f, protocol=self.protocol)
-        A_pickle_string = cloudpickle.dumps(A, protocol=self.protocol)
+        sys.stdout.buffer.write(cloudpickle.dumps(A, protocol={protocol}))
+        '''
+        cmd = [sys.executable, '-c', code.format(protocol=self.protocol)]
+        proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        proc.wait()
+        out, err = proc.communicate()
+        assert proc.returncode == 0, err
 
-        code = """if 1:
-        import pickle
-
-        depickled_f = pickle.loads({s1})
-        assert depickled_f.__annotations__ == {{}}
-
-        depickled_a = pickle.loads({s2})
+        depickled_a = pickle.loads(out)
         assert not hasattr(depickled_a, "__annotations__")
-        """.format(s1=f_pickle_string, s2=A_pickle_string,
-                   protocol=self.protocol)
-        assert_run_python_script(code)
 
     @unittest.skipIf(sys.version_info < (3, 7),
                      """This syntax won't work on py2 and pickling annotations

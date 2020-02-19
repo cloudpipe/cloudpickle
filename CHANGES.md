@@ -3,6 +3,10 @@
 
 **This version requires Python 3.5 or later**
 
+- Stop pickling the annotations of a dynamic class for Python < 3.6
+  (follow up on #276)
+  ([issue #347](https://github.com/cloudpipe/cloudpickle/issues/347))
+
 1.3.0
 =====
 
