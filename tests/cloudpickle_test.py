@@ -22,6 +22,8 @@ import unittest
 import weakref
 import os
 import enum
+import typing
+from functools import wraps
 
 import pytest
 
@@ -1784,11 +1786,9 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(f2.__doc__, f.__doc__)
 
     @unittest.skipIf(sys.version_info < (3, 7),
-                     "This syntax won't work on py2 and pickling annotations "
-                     "isn't supported for py37 and below.")
+                     "Pickling type annotations isn't supported for py36 and "
+                     "below.")
     def test_wraps_preserves_function_annotations(self):
-        from functools import wraps
-
         def f(x):
             pass
 
@@ -1802,13 +1802,79 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__annotations__, f.__annotations__)
 
+    @unittest.skipIf(sys.version_info >= (3, 7),
+                     "pickling annotations is supported starting Python 3.7")
+    def test_function_annotations_silent_dropping(self):
+        # Because of limitations of typing module, cloudpickle does not pickle
+        # the type annotations of a dynamic function or class for Python < 3.7
+
+        class UnpicklableAnnotation:
+            # Mock Annotation metaclass that errors out loudly if we try to
+            # pickle one of its instances
+            def __reduce__(self):
+                raise Exception("not picklable")
+
+        unpickleable_annotation = UnpicklableAnnotation()
+
+        def f(a: unpickleable_annotation):
+            return a
+
+        with pytest.raises(Exception):
+            cloudpickle.dumps(f.__annotations__)
+
+        depickled_f = pickle_depickle(f, protocol=self.protocol)
+        assert depickled_f.__annotations__ == {}
+
+    @unittest.skipIf(sys.version_info >= (3, 7) or sys.version_info < (3, 6),
+                     "pickling annotations is supported starting Python 3.7")
+    def test_class_annotations_silent_dropping(self):
+        # Because of limitations of typing module, cloudpickle does not pickle
+        # the type annotations of a dynamic function or class for Python < 3.7
+
+        # Pickling and unpickling must be done in different processes when
+        # testing dynamic classes (see #313)
+
+        code = '''if 1:
+        import cloudpickle
+        import sys
+
+        class UnpicklableAnnotation:
+            # Mock Annotation metaclass that errors out loudly if we try to
+            # pickle one of its instances
+            def __reduce__(self):
+                raise Exception("not picklable")
+
+        unpickleable_annotation = UnpicklableAnnotation()
+
+        class A:
+            a: unpickleable_annotation
+
+        try:
+            cloudpickle.dumps(A.__annotations__)
+        except Exception:
+            pass
+        else:
+            raise AssertionError
+
+        sys.stdout.buffer.write(cloudpickle.dumps(A, protocol={protocol}))
+        '''
+        cmd = [sys.executable, '-c', code.format(protocol=self.protocol)]
+        proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        proc.wait()
+        out, err = proc.communicate()
+        assert proc.returncode == 0, err
+
+        depickled_a = pickle.loads(out)
+        assert not hasattr(depickled_a, "__annotations__")
+
     @unittest.skipIf(sys.version_info < (3, 7),
-                     """This syntax won't work on py2 and pickling annotations
-                     isn't supported for py37 and below.""")
+                     "Pickling type hints isn't supported for py36"
+                     " and below.")
     def test_type_hint(self):
         # Try to pickle compound typing constructs. This would typically fail
         # on Python < 3.7 (See #193)
-        import typing
         t = typing.Union[list, int]
         assert pickle_depickle(t) == t
 
