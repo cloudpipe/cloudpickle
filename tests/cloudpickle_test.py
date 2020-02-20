@@ -22,6 +22,8 @@ import unittest
 import weakref
 import os
 import enum
+import typing
+from functools import wraps
 
 import pytest
 
@@ -1784,11 +1786,9 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(f2.__doc__, f.__doc__)
 
     @unittest.skipIf(sys.version_info < (3, 7),
-                     "This syntax won't work on py2 and pickling annotations "
-                     "isn't supported for py37 and below.")
+                     "Pickling type annotations isn't supported for py36 and "
+                     "below.")
     def test_wraps_preserves_function_annotations(self):
-        from functools import wraps
-
         def f(x):
             pass
 
@@ -1870,12 +1870,11 @@ class CloudPickleTest(unittest.TestCase):
         assert not hasattr(depickled_a, "__annotations__")
 
     @unittest.skipIf(sys.version_info < (3, 7),
-                     """This syntax won't work on py2 and pickling annotations
-                     isn't supported for py37 and below.""")
+                     "Pickling type hints isn't supported for py36"
+                     " and below.")
     def test_type_hint(self):
         # Try to pickle compound typing constructs. This would typically fail
         # on Python < 3.7 (See #193)
-        import typing
         t = typing.Union[list, int]
         assert pickle_depickle(t) == t
 
