@@ -2130,6 +2130,53 @@ class CloudPickleTest(unittest.TestCase):
         from typing import AnyStr
         assert AnyStr is pickle_depickle(AnyStr, protocol=self.protocol)
 
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "Pickling generics not supported below py37")
+    def test_generic(self):
+        from typing import (
+            Optional, TypeVar, Generic, Tuple, Callable,
+            Dict, Any, ClassVar, NoReturn, Union, List,
+        )
+
+        T = TypeVar('T')
+
+        class C(Generic[T]):
+            pass
+
+        objs = [
+            C, C[int],
+            T, Any, NoReturn, Optional, Generic,
+            Union, ClassVar,
+            Optional[int],
+            Generic[T],
+            Callable[[int], Any],
+            Callable[..., Any],
+            Callable[[], Any],
+            Tuple[int, ...],
+            Tuple[int, C[int]],
+            ClassVar[C[int]],
+            List[int],
+            Dict[int, str],
+        ]
+
+        for obj in objs:
+            _ = pickle_depickle(obj, protocol=self.protocol)
+
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "Pickling generics not supported below py37")
+    def test_generic_extensions(self):
+        typing_extensions = pytest.importorskip('typing_extensions')
+
+        objs = [
+            typing_extensions.Literal,
+            typing_extensions.Final,
+            typing_extensions.Literal['a'],
+            typing_extensions.Final[int],
+        ]
+
+        for obj in objs:
+            _ = pickle_depickle(obj, protocol=self.protocol)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
