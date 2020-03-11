@@ -1,3 +1,4 @@
+import typing
 from .mod import module_function
 
 
@@ -13,3 +14,4 @@ class _SingletonClass(object):
 
 
 some_singleton = _SingletonClass()
+T = typing.TypeVar('T')
