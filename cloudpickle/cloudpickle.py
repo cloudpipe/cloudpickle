@@ -45,7 +45,6 @@ from __future__ import print_function
 import abc
 import builtins
 import dis
-from functools import partial
 import io
 import itertools
 import logging
@@ -55,7 +54,6 @@ import pickle
 import platform
 import struct
 import sys
-import traceback
 import types
 import weakref
 import uuid
