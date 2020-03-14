@@ -2208,7 +2208,6 @@ class CloudPickleTest(unittest.TestCase):
                 obj = MyClass()
                 assert worker.run(check_annotations, obj, type_) == "ok"
 
-
     @unittest.skipIf(sys.version_info < (3, 7),
                      "Pickling generics not supported below py37")
     def test_generic_extensions(self):
