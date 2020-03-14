@@ -147,8 +147,9 @@ if sys.version_info[:2] < (3, 7):
     # would always be set to "typing" even when the TypeVar T would be defined
     # in a different module.
     #
-    # For such older Python versions, we treat all TypeVar instances as
-    # non-importable TypeVar instances to avoid this issue.
+    # For such older Python versions, we ignore the __module__ attribute of
+    # TypeVar instances and instead exhaustively lookup those instances in all
+    # currently imported modules via the _whichmodule function.
     def _get_module_attr(obj):
         if isinstance(obj, typing.TypeVar):
             return None
