@@ -644,9 +644,8 @@ class CloudPickler(Pickler):
         else:
             # "Regular" class definition:
             tp = type(obj)
-            bases = _get_bases(obj)
             self.save_reduce(_make_skeleton_class,
-                             (tp, obj.__name__, bases, type_kwargs,
+                             (tp, obj.__name__, _get_bases(obj), type_kwargs,
                               _ensure_tracking(obj), None),
                              obj=obj)
 
@@ -1164,15 +1163,11 @@ def _make_skeleton_class(type_constructor, name, bases, type_kwargs,
     The "extra" variable is meant to be a dict (or None) that can be used for
     forward compatibility shall the need arise.
     """
-    skeleton_class = _make_new_class(type_constructor, name, bases, type_kwargs)
-    return _lookup_class_or_track(class_tracker_id, skeleton_class)
-
-
-def _make_new_class(type_constructor, name, bases, type_kwargs):
-    return types.new_class(
+    skeleton_class = types.new_class(
         name, bases, {'metaclass': type_constructor},
         lambda ns: ns.update(type_kwargs)
     )
+    return _lookup_class_or_track(class_tracker_id, skeleton_class)
 
 
 def _rehydrate_skeleton_class(skeleton_class, class_dict):
@@ -1280,7 +1275,9 @@ def _typevar_reduce(obj):
 
 def _get_bases(typ):
     if hasattr(typ, '__orig_bases__'):
+        # For generic types (see PEP 560)
         bases_attr = '__orig_bases__'
     else:
+        # For regular class objects
         bases_attr = '__bases__'
     return getattr(typ, bases_attr)

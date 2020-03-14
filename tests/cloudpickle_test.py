@@ -2139,67 +2139,15 @@ class CloudPickleTest(unittest.TestCase):
 
     @unittest.skipIf(sys.version_info < (3, 7),
                      "Pickling generics not supported below py37")
-    def test_generic(self):
-        from typing import (
-            Optional, TypeVar, Generic, Tuple, Callable,
-            Dict, Any, ClassVar, NoReturn, Union, List,
-        )
-
-        T = TypeVar('T')
-
-        class C(Generic[T]):
-            pass
-
-        objs = [
-            C, C[int],
-            T, Any, NoReturn, Optional, Generic,
-            Union, ClassVar,
-            Optional[int],
-            Generic[T],
-            Callable[[int], Any],
-            Callable[..., Any],
-            Callable[[], Any],
-            Tuple[int, ...],
-            Tuple[int, C[int]],
-            ClassVar[C[int]],
-            List[int],
-            Dict[int, str],
-        ]
-
-        for obj in objs:
-            _ = pickle_depickle(obj, protocol=self.protocol)
+    def test_generic_type(self):
+        for obj in _generic_objects_to_test():
+            pickle_depickle(obj, protocol=self.protocol)
 
     @unittest.skipIf(sys.version_info < (3, 7),
                      "Pickling type hints not supported below py37")
     def test_locally_defined_class_with_type_hints(self):
-        from typing import (
-            Optional, TypeVar, Generic, Tuple, Callable,
-            Dict, Any, ClassVar, NoReturn, Union, List,
-        )
-
-        T = TypeVar('T')
-
-        class C(Generic[T]):
-            pass
-
-        all_types = [
-            C, C[int],
-            T, Any, NoReturn, Optional, Generic,
-            Union, ClassVar,
-            Optional[int],
-            Generic[T],
-            Callable[[int], Any],
-            Callable[..., Any],
-            Callable[[], Any],
-            Tuple[int, ...],
-            Tuple[int, C[int]],
-            ClassVar[C[int]],
-            List[int],
-            Dict[int, str],
-        ]
-
         with subprocess_worker(protocol=self.protocol) as worker:
-            for type_ in all_types:
+            for type_ in _generic_objects_to_test():
                 # The type annotation syntax causes a SyntaxError on Python 3.5
                 code = textwrap.dedent("""\
                 class MyClass:
@@ -2220,21 +2168,6 @@ class CloudPickleTest(unittest.TestCase):
                 obj = MyClass()
                 assert check_annotations(obj, type_) == "ok"
                 assert worker.run(check_annotations, obj, type_) == "ok"
-
-    @unittest.skipIf(sys.version_info < (3, 7),
-                     "Pickling generics not supported below py37")
-    def test_generic_extensions(self):
-        typing_extensions = pytest.importorskip('typing_extensions')
-
-        objs = [
-            typing_extensions.Literal,
-            typing_extensions.Final,
-            typing_extensions.Literal['a'],
-            typing_extensions.Final[int],
-        ]
-
-        for obj in objs:
-            _ = pickle_depickle(obj, protocol=self.protocol)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
@@ -2265,6 +2198,16 @@ def test_lookup_module_and_qualname_stdlib_typevar():
     module, name = module_and_name
     assert module is typing
     assert name == 'AnyStr'
+
+
+def _generic_objects_to_test():
+    T = typing.TypeVar('T')
+
+    class C(typing.Generic[T]):
+        pass
+
+    yield C
+    yield C[int]
 
 
 if __name__ == '__main__':

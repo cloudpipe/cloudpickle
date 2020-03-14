@@ -11,6 +11,9 @@
   and expand the support for pickling `TypeVar` instances (dynamic or non-dynamic)
   to Python 3.5-3.6 ([PR #350](https://github.com/cloudpipe/cloudpickle/pull/350))
 
+- Add support for pickling dynamic generics on 3.7+
+  ([PR #351](https://github.com/cloudpipe/cloudpickle/pull/351))
+
 1.3.0
 =====
 
