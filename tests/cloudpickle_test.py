@@ -2212,6 +2212,7 @@ class CloudPickleTest(unittest.TestCase):
                     return "ok"
 
                 obj = MyClass()
+                assert check_annotations(obj, type_) == "ok"
                 assert worker.run(check_annotations, obj, type_) == "ok"
 
     @unittest.skipIf(sys.version_info < (3, 7),
