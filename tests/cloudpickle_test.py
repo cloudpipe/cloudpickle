@@ -46,6 +46,7 @@ import cloudpickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
+from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -2110,10 +2111,54 @@ class CloudPickleTest(unittest.TestCase):
         reconstructed = pickle.loads(pickle_bytes, buffers=buffers)
         np.testing.assert_allclose(reconstructed.data, data_instance.data)
 
+    def test_pickle_dynamic_typevar(self):
+        T = typing.TypeVar('T')
+        depickled_T = pickle_depickle(T, protocol=self.protocol)
+        attr_list = [
+            "__name__", "__bound__", "__constraints__", "__covariant__",
+            "__contravariant__"
+        ]
+        for attr in attr_list:
+            assert getattr(T, attr) == getattr(depickled_T, attr)
+
+    def test_pickle_importable_typevar(self):
+        from .mypkg import T
+        T1 = pickle_depickle(T, protocol=self.protocol)
+        assert T1 is T
+
+        # Standard Library TypeVar
+        from typing import AnyStr
+        assert AnyStr is pickle_depickle(AnyStr, protocol=self.protocol)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
     protocol = 2
+
+
+def test_lookup_module_and_qualname_dynamic_typevar():
+    T = typing.TypeVar('T')
+    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
+    assert module_and_name is None
+
+
+def test_lookup_module_and_qualname_importable_typevar():
+    from . import mypkg
+    T = mypkg.T
+    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
+    assert module_and_name is not None
+    module, name = module_and_name
+    assert module is mypkg
+    assert name == 'T'
+
+
+def test_lookup_module_and_qualname_stdlib_typevar():
+    module_and_name = _lookup_module_and_qualname(typing.AnyStr,
+                                                  name=typing.AnyStr.__name__)
+    assert module_and_name is not None
+    module, name = module_and_name
+    assert module is typing
+    assert name == 'AnyStr'
 
 
 if __name__ == '__main__':
