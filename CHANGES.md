@@ -6,6 +6,7 @@
 - Stop pickling the annotations of a dynamic class for Python < 3.6
   (follow up on #276)
   ([issue #347](https://github.com/cloudpipe/cloudpickle/issues/347))
+
 - Fix a bug affecting the pickling of dynamic `TypeVar` instances on Python 3.7+,
   and expand the support for pickling `TypeVar` instances (dynamic or non-dynamic)
   to Python 3.5-3.6 ([PR #350](https://github.com/cloudpipe/cloudpickle/pull/350))
