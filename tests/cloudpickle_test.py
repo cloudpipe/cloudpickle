@@ -50,6 +50,7 @@ from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
+from .testutils import subprocess_worker
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -2161,6 +2162,52 @@ class CloudPickleTest(unittest.TestCase):
 
         for obj in objs:
             _ = pickle_depickle(obj, protocol=self.protocol)
+
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "Pickling type hints not supported below py37")
+    def test_locally_defined_class_with_type_hints(self):
+        from typing import (
+            Optional, TypeVar, Generic, Tuple, Callable,
+            Dict, Any, ClassVar, NoReturn, Union, List,
+        )
+
+        T = TypeVar('T')
+
+        class C(Generic[T]):
+            pass
+
+        all_types = [
+            C, C[int],
+            T, Any, NoReturn, Optional, Generic,
+            Union, ClassVar,
+            Optional[int],
+            Generic[T],
+            Callable[[int], Any],
+            Callable[..., Any],
+            Callable[[], Any],
+            Tuple[int, ...],
+            Tuple[int, C[int]],
+            ClassVar[C[int]],
+            List[int],
+            Dict[int, str],
+        ]
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            for type_ in all_types:
+                class MyClass:
+                    attribute: type_
+
+                    def method(self, arg: type_) -> type_:
+                        return arg
+
+                def check_annotations(obj, expected_type):
+                    assert obj.__annotations__["attribute"] is expected_type
+                    assert obj.method.__annotations__["arg"] is expected_type
+                    return "ok"
+
+                obj = MyClass()
+                assert worker.run(check_annotations, obj, type_) == "ok"
+
 
     @unittest.skipIf(sys.version_info < (3, 7),
                      "Pickling generics not supported below py37")
