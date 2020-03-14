@@ -2194,11 +2194,17 @@ class CloudPickleTest(unittest.TestCase):
 
         with subprocess_worker(protocol=self.protocol) as worker:
             for type_ in all_types:
+                # The type annotation syntax causes a SyntaxError on Python 3.5
+                code = textwrap.dedent("""\
                 class MyClass:
                     attribute: type_
 
                     def method(self, arg: type_) -> type_:
                         return arg
+                """)
+                ns = {"type_": type_}
+                exec(code, ns)
+                MyClass = ns["MyClass"]
 
                 def check_annotations(obj, expected_type):
                     assert obj.__annotations__["attribute"] is expected_type
