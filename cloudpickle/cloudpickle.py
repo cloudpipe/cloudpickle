@@ -143,6 +143,12 @@ def _whichmodule(obj, name):
 
 
 if sys.version_info[:2] < (3, 7):
+    # Workaround bug in old Python versions: prior to Python 3.7, T.__module__
+    # would always be set to "typing" even when the TypeVar T would be defined
+    # in a different module.
+    #
+    # For such older Python versions, we treat all TypeVar instances as
+    # non-importable TypeVar instances to avoid this issue.
     def _get_module_attr(obj):
         if isinstance(obj, typing.TypeVar):
             return None
@@ -154,13 +160,16 @@ else:
 
 def _is_importable_by_name(obj, name=None):
     """Determine if obj can be pickled as attribute of a file-backed module"""
-    return _lookup_module_and_qualname(obj, name) is not None
+    return _lookup_module_and_qualname(obj, name=name) is not None
 
 
 def _lookup_module_and_qualname(obj, name=None):
     if name is None:
         name = getattr(obj, '__qualname__', None)
-    if name is None:
+    if name is None:  # pragma: no cover
+        # This used to be needed for Python 2.7 support but is probably not
+        # needed anymore. However we keep the __name__ introspection in case
+        # users of cloudpickle rely on this old behavior for unknown reasons.
         name = getattr(obj, '__name__', None)
 
     module_name = _whichmodule(obj, name)
@@ -1255,7 +1264,8 @@ def _decompose_typevar(obj):
 
 
 def _typevar_reduce(obj):
-    module_and_name = _lookup_module_and_qualname(obj, obj.__name__)
+    # TypeVar instances have no __qualname__ hence we pass the name explicitly.
+    module_and_name = _lookup_module_and_qualname(obj, name=obj.__name__)
     if module_and_name is None:
         return (_make_typevar, _decompose_typevar(obj))
     return (getattr, module_and_name)

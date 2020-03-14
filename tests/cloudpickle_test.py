@@ -2128,14 +2128,14 @@ class Protocol2CloudPickleTest(CloudPickleTest):
 
 def test_lookup_module_and_qualname_dynamic_typevar():
     T = typing.TypeVar('T')
-    module_and_name = _lookup_module_and_qualname(T, T.__name__)
+    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is None
 
 
 def test_lookup_module_and_qualname_importable_typevar():
     from . import mypkg
     T = mypkg.T
-    module_and_name = _lookup_module_and_qualname(T, T.__name__)
+    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
     module, name = module_and_name
     assert module is mypkg
@@ -2143,7 +2143,8 @@ def test_lookup_module_and_qualname_importable_typevar():
 
 
 def test_lookup_module_and_qualname_stdlib_typevar():
-    module_and_name = _lookup_module_and_qualname(typing.AnyStr, typing.AnyStr.__name__)
+    module_and_name = _lookup_module_and_qualname(typing.AnyStr,
+                                                  name=typing.AnyStr.__name__)
     assert module_and_name is not None
     module, name = module_and_name
     assert module is typing
