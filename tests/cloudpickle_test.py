@@ -2122,6 +2122,12 @@ class CloudPickleTest(unittest.TestCase):
         for attr in attr_list:
             assert getattr(T, attr) == getattr(depickled_T, attr)
 
+    def test_pickle_dynamic_typevar_memoization(self):
+        T = typing.TypeVar('T')
+        depickled_T1, depickled_T2 = pickle_depickle((T, T),
+                                                     protocol=self.protocol)
+        assert depickled_T1 is depickled_T2
+
     def test_pickle_importable_typevar(self):
         from .mypkg import T
         T1 = pickle_depickle(T, protocol=self.protocol)
