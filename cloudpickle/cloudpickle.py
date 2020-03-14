@@ -142,7 +142,7 @@ def _whichmodule(obj, name):
     return None
 
 
-if sys.version_info[:2] < (3, 7):
+if sys.version_info[:2] < (3, 7):  # pragma: no branch
     # Workaround bug in old Python versions: prior to Python 3.7, T.__module__
     # would always be set to "typing" even when the TypeVar T would be defined
     # in a different module.
