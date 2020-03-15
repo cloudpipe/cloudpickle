@@ -89,7 +89,7 @@ if PYPY:
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
 
-def _ensure_tracking(class_def):
+def _get_or_create_tracker_id(class_def):
     with _DYNAMIC_CLASS_TRACKER_LOCK:
         class_tracker_id = _DYNAMIC_CLASS_TRACKER_BY_CLASS.get(class_def)
         if class_tracker_id is None:
@@ -544,7 +544,7 @@ class CloudPickler(Pickler):
         self.save_reduce(
                 _make_skeleton_enum,
                 (obj.__bases__, obj.__name__, obj.__qualname__,
-                 members, obj.__module__, _ensure_tracking(obj), None),
+                 members, obj.__module__, _get_or_create_tracker_id(obj), None),
                 obj=obj
          )
 
@@ -646,7 +646,7 @@ class CloudPickler(Pickler):
             tp = type(obj)
             self.save_reduce(_make_skeleton_class,
                              (tp, obj.__name__, obj.__bases__, type_kwargs,
-                              _ensure_tracking(obj), None),
+                              _get_or_create_tracker_id(obj), None),
                              obj=obj)
 
         # Now save the rest of obj's __dict__. Any references to obj
@@ -1261,7 +1261,7 @@ def _decompose_typevar(obj):
     return (
         obj.__name__, obj.__bound__, obj.__constraints__,
         obj.__covariant__, obj.__contravariant__,
-        _ensure_tracking(obj),
+        _get_or_create_tracker_id(obj),
     )
 
 
