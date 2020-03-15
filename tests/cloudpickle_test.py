@@ -50,6 +50,7 @@ from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
+from .testutils import subprocess_worker
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -2121,6 +2122,12 @@ class CloudPickleTest(unittest.TestCase):
         for attr in attr_list:
             assert getattr(T, attr) == getattr(depickled_T, attr)
 
+    def test_pickle_dynamic_typevar_memoization(self):
+        T = typing.TypeVar('T')
+        depickled_T1, depickled_T2 = pickle_depickle((T, T),
+                                                     protocol=self.protocol)
+        assert depickled_T1 is depickled_T2
+
     def test_pickle_importable_typevar(self):
         from .mypkg import T
         T1 = pickle_depickle(T, protocol=self.protocol)
@@ -2129,6 +2136,61 @@ class CloudPickleTest(unittest.TestCase):
         # Standard Library TypeVar
         from typing import AnyStr
         assert AnyStr is pickle_depickle(AnyStr, protocol=self.protocol)
+
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "Pickling generics not supported below py37")
+    def test_generic_type(self):
+        T = typing.TypeVar('T')
+
+        class C(typing.Generic[T]):
+            pass
+
+        assert pickle_depickle(C, protocol=self.protocol) is C
+        assert pickle_depickle(C[int], protocol=self.protocol) is C[int]
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+
+            def check_generic(generic, origin, type_value):
+                assert generic.__origin__ is origin
+                assert len(generic.__args__) == 1
+                assert generic.__args__[0] is type_value
+
+                assert len(origin.__orig_bases__) == 1
+                ob = origin.__orig_bases__[0]
+                assert ob.__origin__ is typing.Generic
+                assert len(ob.__parameters__) == 1
+
+                return "ok"
+
+            assert check_generic(C[int], C, int) == "ok"
+            assert worker.run(check_generic, C[int], C, int) == "ok"
+
+    @unittest.skipIf(sys.version_info < (3, 7),
+                     "Pickling type hints not supported below py37")
+    def test_locally_defined_class_with_type_hints(self):
+        with subprocess_worker(protocol=self.protocol) as worker:
+            for type_ in _all_types_to_test():
+                # The type annotation syntax causes a SyntaxError on Python 3.5
+                code = textwrap.dedent("""\
+                class MyClass:
+                    attribute: type_
+
+                    def method(self, arg: type_) -> type_:
+                        return arg
+                """)
+                ns = {"type_": type_}
+                exec(code, ns)
+                MyClass = ns["MyClass"]
+
+                def check_annotations(obj, expected_type):
+                    assert obj.__annotations__["attribute"] is expected_type
+                    assert obj.method.__annotations__["arg"] is expected_type
+                    assert obj.method.__annotations__["return"] is expected_type
+                    return "ok"
+
+                obj = MyClass()
+                assert check_annotations(obj, type_) == "ok"
+                assert worker.run(check_annotations, obj, type_) == "ok"
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
@@ -2159,6 +2221,29 @@ def test_lookup_module_and_qualname_stdlib_typevar():
     module, name = module_and_name
     assert module is typing
     assert name == 'AnyStr'
+
+
+def _all_types_to_test():
+    T = typing.TypeVar('T')
+
+    class C(typing.Generic[T]):
+        pass
+
+    return [
+        C, C[int],
+        T, typing.Any, typing.NoReturn, typing.Optional,
+        typing.Generic, typing.Union, typing.ClassVar,
+        typing.Optional[int],
+        typing.Generic[T],
+        typing.Callable[[int], typing.Any],
+        typing.Callable[..., typing.Any],
+        typing.Callable[[], typing.Any],
+        typing.Tuple[int, ...],
+        typing.Tuple[int, C[int]],
+        typing.ClassVar[C[int]],
+        typing.List[int],
+        typing.Dict[int, str],
+    ]
 
 
 if __name__ == '__main__':
