@@ -27,7 +27,7 @@ from _pickle import Pickler
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _is_importable_by_name, _builtin_type,
-    Enum, _ensure_tracking,  _make_skeleton_class, _make_skeleton_enum,
+    Enum, _get_or_create_tracker_id,  _make_skeleton_class, _make_skeleton_enum,
     _extract_class_dict, dynamic_subimport, subimport, _typevar_reduce, _get_bases,
 )
 
@@ -77,13 +77,13 @@ def _class_getnewargs(obj):
         type_kwargs['__dict__'] = __dict__
 
     return (type(obj), obj.__name__, _get_bases(obj), type_kwargs,
-            _ensure_tracking(obj), None)
+            _get_or_create_tracker_id(obj), None)
 
 
 def _enum_getnewargs(obj):
     members = dict((e.name, e.value) for e in obj)
     return (obj.__bases__, obj.__name__, obj.__qualname__, members,
-            obj.__module__, _ensure_tracking(obj), None)
+            obj.__module__, _get_or_create_tracker_id(obj), None)
 
 
 # COLLECTION OF OBJECTS RECONSTRUCTORS
