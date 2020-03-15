@@ -2163,6 +2163,7 @@ class CloudPickleTest(unittest.TestCase):
                 def check_annotations(obj, expected_type):
                     assert obj.__annotations__["attribute"] is expected_type
                     assert obj.method.__annotations__["arg"] is expected_type
+                    assert obj.method.__annotations__["return"] is expected_type
                     return "ok"
 
                 obj = MyClass()
