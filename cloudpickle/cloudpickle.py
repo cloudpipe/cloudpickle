@@ -446,7 +446,7 @@ class CloudPickler(Pickler):
                 raise
 
     def save_typevar(self, obj):
-        self.save_reduce(*_typevar_reduce(obj))
+        self.save_reduce(*_typevar_reduce(obj), obj=obj)
 
     dispatch[typing.TypeVar] = save_typevar
 
