@@ -117,7 +117,18 @@ def _whichmodule(obj, name):
     - Errors arising during module introspection are ignored, as those errors
       are considered unwanted side effects.
     """
-    module_name = _get_module_attr(obj)
+    if sys.version_info[:2] < (3, 7) and isinstance(obj, typing.TypeVar):
+        # Workaround bug in old Python versions: prior to Python 3.7,
+        # T.__module__ would always be set to "typing" even when the TypeVar T
+        # would be defined in a different module.
+        #
+        # For such older Python versions, we ignore the __module__ attribute of
+        # TypeVar instances and instead exhaustively lookup those instances in
+        # all currently imported modules.
+        module_name = None
+    else:
+        module_name = getattr(obj, '__module__', None)
+
     if module_name is not None:
         return module_name
     # Protect the iteration by using a copy of sys.modules against dynamic
@@ -138,23 +149,6 @@ def _whichmodule(obj, name):
         except Exception:
             pass
     return None
-
-
-if sys.version_info[:2] < (3, 7):  # pragma: no branch
-    # Workaround bug in old Python versions: prior to Python 3.7, T.__module__
-    # would always be set to "typing" even when the TypeVar T would be defined
-    # in a different module.
-    #
-    # For such older Python versions, we ignore the __module__ attribute of
-    # TypeVar instances and instead exhaustively lookup those instances in all
-    # currently imported modules via the _whichmodule function.
-    def _get_module_attr(obj):
-        if isinstance(obj, typing.TypeVar):
-            return None
-        return getattr(obj, '__module__', None)
-else:
-    def _get_module_attr(obj):
-        return getattr(obj, '__module__', None)
 
 
 def _is_importable_by_name(obj, name=None):
