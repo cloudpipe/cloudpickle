@@ -52,6 +52,8 @@ from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
 
+from _cloudpickle_testpkg import relative_imports_factory
+
 
 _TEST_GLOBAL_VARIABLE = "default_value"
 
@@ -1968,18 +1970,7 @@ class CloudPickleTest(unittest.TestCase):
         # Make sure relative imports inside round-tripped functions is not
         # broken.This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
-
-        # Both functions living inside modules and packages are tested.
-        def f():
-            # module_function belongs to mypkg.mod1, which is a module
-            from .mypkg import module_function
-            return module_function()
-
-        def g():
-            # package_function belongs to mypkg, which is a package
-            from .mypkg import package_function
-            return package_function()
-
+        f, g = relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
             assert func() == "hello from a {}!".format(source)
@@ -2028,7 +2019,7 @@ class CloudPickleTest(unittest.TestCase):
     def test___reduce___returns_string(self):
         # Non regression test for objects with a __reduce__ method returning a
         # string, meaning "save by attribute using save_global"
-        from .mypkg import some_singleton
+        from _cloudpickle_testpkg import some_singleton
         assert some_singleton.__reduce__() == "some_singleton"
         depickled_singleton = pickle_depickle(
             some_singleton, protocol=self.protocol)
@@ -2100,7 +2091,7 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_T1 is depickled_T2
 
     def test_pickle_importable_typevar(self):
-        from .mypkg import T
+        from _cloudpickle_testpkg import T
         T1 = pickle_depickle(T, protocol=self.protocol)
         assert T1 is T
 
@@ -2230,12 +2221,12 @@ def test_lookup_module_and_qualname_dynamic_typevar():
 
 
 def test_lookup_module_and_qualname_importable_typevar():
-    from . import mypkg
-    T = mypkg.T
+    import _cloudpickle_testpkg
+    T = _cloudpickle_testpkg.T
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
     module, name = module_and_name
-    assert module is mypkg
+    assert module is _cloudpickle_testpkg
     assert name == 'T'
 
 
