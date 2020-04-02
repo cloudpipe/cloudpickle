@@ -26,9 +26,10 @@ from _pickle import Pickler
 
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
-    _find_imported_submodules, _get_cell_contents, _is_importable_by_name, _builtin_type,
-    Enum, _get_or_create_tracker_id,  _make_skeleton_class, _make_skeleton_enum,
-    _extract_class_dict, dynamic_subimport, subimport, _typevar_reduce, _get_bases,
+    _find_imported_submodules, _get_cell_contents, _is_importable,
+    _builtin_type, Enum, _get_or_create_tracker_id,  _make_skeleton_class,
+    _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
+    _typevar_reduce, _get_bases,
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -333,7 +334,7 @@ def _class_reduce(obj):
         return type, (NotImplemented,)
     elif obj in _BUILTIN_TYPE_NAMES:
         return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
-    elif not _is_importable_by_name(obj):
+    elif not _is_importable(obj):
         return _dynamic_class_reduce(obj)
     return NotImplemented
 
@@ -505,7 +506,7 @@ class CloudPickler(Pickler):
         As opposed to cloudpickle.py, There no special handling for builtin
         pypy functions because cloudpickle_fast is CPython-specific.
         """
-        if _is_importable_by_name(obj):
+        if _is_importable(obj):
             return NotImplemented
         else:
             return self._dynamic_function_reduce(obj)

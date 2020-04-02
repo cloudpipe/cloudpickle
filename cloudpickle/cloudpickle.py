@@ -163,9 +163,33 @@ def _whichmodule(obj, name):
     return None
 
 
-def _is_importable_by_name(obj, name=None):
-    """Determine if obj can be pickled as attribute of a file-backed module"""
-    return _lookup_module_and_qualname(obj, name=name) is not None
+if sys.version_info[:2] < (3, 7):  # pragma: no branch
+    # Workaround bug in old Python versions: prior to Python 3.7, T.__module__
+    # would always be set to "typing" even when the TypeVar T would be defined
+    # in a different module.
+    #
+    # For such older Python versions, we ignore the __module__ attribute of
+    # TypeVar instances and instead exhaustively lookup those instances in all
+    # currently imported modules via the _whichmodule function.
+    def _get_module_attr(obj):
+        if isinstance(obj, typing.TypeVar):
+            return None
+        return getattr(obj, '__module__', None)
+else:
+    def _get_module_attr(obj):
+        return getattr(obj, '__module__', None)
+
+
+def _is_importable(obj, name=None):
+    """Dispatcher utility to test the importability of various constructs."""
+    if isinstance(obj, types.FunctionType):
+        return _lookup_module_and_qualname(obj, name=name) is not None
+    elif issubclass(type(obj), type):
+        return _lookup_module_and_qualname(obj, name=name) is not None
+    else:
+        raise ValueError(
+            "cannot check importability for type {}.".format(type(obj))
+        )
 
 
 def _lookup_module_and_qualname(obj, name=None):
@@ -536,7 +560,7 @@ class CloudPickler(Pickler):
         Determines what kind of function obj is (e.g. lambda, defined at
         interactive prompt, etc) and handles the pickling appropriately.
         """
-        if _is_importable_by_name(obj, name=name):
+        if _is_importable(obj, name=name):
             return Pickler.save_global(self, obj, name=name)
         elif PYPY and isinstance(obj.__code__, builtin_code_type):
             return self.save_pypy_builtin_func(obj)
@@ -840,7 +864,7 @@ class CloudPickler(Pickler):
             self._save_parametrized_type_hint(obj)
         elif name is not None:
             Pickler.save_global(self, obj, name=name)
-        elif not _is_importable_by_name(obj, name=name):
+        elif not _is_importable(obj, name=name):
             self.save_dynamic_class(obj)
         else:
             Pickler.save_global(self, obj, name=name)
