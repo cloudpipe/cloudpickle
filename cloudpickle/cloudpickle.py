@@ -1331,6 +1331,19 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
+def _get_parent(module):
+    """(Try to) access the parent module (or package) of a submodule"""
+    parent_name, _, module_name = module.__name__.rpartition('.')
+    if parent_name:  # pragma: no cover
+        try:
+            return sys.modules[parent_name]
+        except KeyError:
+            msg = "parent {!r} not in sys.modules"
+            raise ImportError(msg.format(parent_name))
+    else:
+        return None
+
+
 def _is_dynamic(module):
     """
     Return True if the module is special module that cannot be imported by its
@@ -1343,24 +1356,13 @@ def _is_dynamic(module):
     if module.__spec__ is not None:
         return False
 
-    # In PyPy, Some built-in modules such as _codecs can have their
-    # __spec__ attribute set to None despite being imported.  For such
-    # modules, the ``_find_spec`` utility of the standard library is used.
-    parent_name = module.__name__.rpartition('.')[0]
-    if parent_name:  # pragma: no cover
-        # This code handles the case where an imported package (and not
-        # module) remains with __spec__ set to None. It is however untested
-        # as no package in the PyPy stdlib has __spec__ set to None after
-        # it is imported.
-        try:
-            parent = sys.modules[parent_name]
-        except KeyError:
-            msg = "parent {!r} not in sys.modules"
-            raise ImportError(msg.format(parent_name))
-        else:
-            pkgpath = parent.__path__
-    else:
-        pkgpath = None
+    # It *may be* that in PyPy, some built-in modules have their __spec__
+    # attribute set to None despite being imported.  For such modules, we try a
+    # little bit harder to see if they can be loaded by using importlib's
+    # ``_find_spec``.  This case is however untested as no package in the PyPy
+    # stdlib has __spec__ set to None after it is imported.
+    parent = _get_parent(module)
+    pkgpath = getattr(parent, '__path__', None)
     return _find_spec(module.__name__, pkgpath, module) is None
 
 
