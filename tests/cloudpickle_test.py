@@ -706,6 +706,15 @@ class CloudPickleTest(unittest.TestCase):
             import _codecs
             assert not _is_dynamic(_codecs)
 
+        # #354: Check that modules created dynamically during the import of
+        # their parent modules are flagged by cloudpickle as dynamic, but
+        # importable.  See the mod_with_dynamic_submodule documentation for
+        # more details of this use case.
+        import _cloudpickle_testpkg.mod.dynamic_submodule as m
+        assert _is_dynamic(m)
+        assert _is_importable(m)
+        assert pickle_depickle(m, protocol=self.protocol) is m
+
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
                          pickle_depickle(Ellipsis, protocol=self.protocol))

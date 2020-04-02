@@ -1372,6 +1372,17 @@ def _is_dynamic(module):
 def _module_is_importable(obj):
     if not _is_dynamic(obj):
         return True
+
+    # #354: the module is dynamic, but can still be importable if it is created
+    # and added to sys.modules during the initialization of its parent
+    # (provided that its parent is file-backed)
+    module_relative_name = obj.__name__.rpartition('.')[-1]
+    parent = _get_parent(obj)
+    if hasattr(parent, module_relative_name) and _is_importable(parent):
+        return True
+    return False
+
+
 def _make_typevar(name, bound, constraints, covariant, contravariant,
                   class_tracker_id):
     tv = typing.TypeVar(

@@ -1,4 +1,5 @@
 import typing
+from . import mod  # noqa
 
 
 def package_function():
