@@ -277,11 +277,11 @@ def _memoryview_reduce(obj):
 
 
 def _module_reduce(obj):
-    if _is_dynamic(obj):
+    if _is_importable(obj):
+        return subimport, (obj.__name__,)
+    else:
         obj.__dict__.pop('__builtins__', None)
         return dynamic_subimport, (obj.__name__, vars(obj))
-    else:
-        return subimport, (obj.__name__,)
 
 
 def _method_reduce(obj):

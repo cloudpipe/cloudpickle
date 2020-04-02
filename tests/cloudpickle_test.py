@@ -43,7 +43,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _is_dynamic
+from cloudpickle.cloudpickle import _is_dynamic, _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
@@ -680,7 +680,7 @@ class CloudPickleTest(unittest.TestCase):
         assert b'unwanted_function' not in b
         assert b'math' not in b
 
-    def test_is_dynamic_module(self):
+    def test_module_importability(self):
         import pickle  # decouple this test from global imports
         import os.path
         import distutils
@@ -691,10 +691,16 @@ class CloudPickleTest(unittest.TestCase):
         assert not _is_dynamic(distutils)  # package
         assert not _is_dynamic(distutils.ccompiler)  # module in package
 
+        assert _is_importable(pickle)
+        assert _is_importable(os.path)  # fake (aliased) module
+        assert _is_importable(distutils)  # package
+        assert _is_importable(distutils.ccompiler)  # module in package
+
         # user-created module without using the import machinery are also
         # dynamic
         dynamic_module = types.ModuleType('dynamic_module')
         assert _is_dynamic(dynamic_module)
+        assert not _is_importable(dynamic_module)
 
         if platform.python_implementation() == 'PyPy':
             import _codecs

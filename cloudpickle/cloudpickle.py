@@ -186,6 +186,8 @@ def _is_importable(obj, name=None):
         return _lookup_module_and_qualname(obj, name=name) is not None
     elif issubclass(type(obj), type):
         return _lookup_module_and_qualname(obj, name=name) is not None
+    elif isinstance(obj, types.ModuleType):
+        return _module_is_importable(obj)
     else:
         raise ValueError(
             "cannot check importability for type {}.".format(type(obj))
@@ -220,8 +222,9 @@ def _lookup_module_and_qualname(obj, name=None):
         # supported, as the standard pickle does not support it either.
         return None
 
-    # module has been added to sys.modules, but it can still be dynamic.
-    if _is_dynamic(module):
+    # module has been added to sys.modules, but it is not enough to be
+    # considered importable
+    if not _is_importable(module):
         return None
 
     try:
@@ -520,12 +523,12 @@ class CloudPickler(Pickler):
         """
         Save a module as an import
         """
-        if _is_dynamic(obj):
+        if _is_importable(obj):
+            self.save_reduce(subimport, (obj.__name__,), obj=obj)
+        else:
             obj.__dict__.pop('__builtins__', None)
             self.save_reduce(dynamic_subimport, (obj.__name__, vars(obj)),
                              obj=obj)
-        else:
-            self.save_reduce(subimport, (obj.__name__,), obj=obj)
 
     dispatch[types.ModuleType] = save_module
 
@@ -1366,6 +1369,9 @@ def _is_dynamic(module):
     return _find_spec(module.__name__, pkgpath, module) is None
 
 
+def _module_is_importable(obj):
+    if not _is_dynamic(obj):
+        return True
 def _make_typevar(name, bound, constraints, covariant, contravariant,
                   class_tracker_id):
     tv = typing.TypeVar(
