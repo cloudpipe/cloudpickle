@@ -66,6 +66,11 @@ from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
 
+try:
+    import typing_extensions as _typing_extensions
+except ImportError:
+    _typing_extensions = None
+
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
@@ -934,6 +939,35 @@ class CloudPickler(Pickler):
         """Plug in system. Register additional pickling functions if modules already loaded"""
         pass
 
+    if sys.version_info < (3, 7):
+        def _save_special_form(self, obj, base, arg_attr):
+            t = getattr(obj, arg_attr, None)
+            if t is None:
+                # Special forms (ClassVar, Final, Literal) don't store
+                # their `__name__` in an easy-to-get place.
+                name = typing._trim_name(typing._qualname(type(obj)))
+                self.save_global(obj, name=name)
+            else:
+                class_tracker_id = _get_or_create_tracker_id(obj)
+                reduce_args = (base, t, class_tracker_id)
+                self.save_reduce(_make_generic, reduce_args, obj=obj)
+
+        def save_classvar(self, obj):
+            self._save_special_form(obj, typing.ClassVar, '__type__')
+
+        dispatch[type(typing.ClassVar)] = save_classvar
+
+        if _typing_extensions is not None:
+            def save_literal(self, obj):
+                self._save_special_form(obj, _typing_extensions.Literal, '__values__')
+
+            dispatch[type(_typing_extensions.Literal)] = save_literal
+
+            def save_final(self, obj):
+                self._save_special_form(obj, _typing_extensions.Final, '__type__')
+
+            dispatch[type(_typing_extensions.Final)] = save_final
+
 
 # Tornado support
 
@@ -1290,48 +1324,8 @@ else:
     def _try_decompose_generic(obj):
         origin = getattr(obj, '__origin__', None)
         if origin is None:
-            return _try_decompose_special_generic(obj)
+            return None
         args = obj.__args__
         if origin is typing.Callable and args[0] is not Ellipsis:
             args = (list(args[:-1]), args[-1])
         return origin, args
-
-    Type_ClassVar = type(typing.ClassVar)
-
-    try:
-        import typing_extensions
-    except ImportError:
-        def _try_decompose_special_generic(obj):
-            if type(obj) is Type_ClassVar:
-                t = getattr(obj, '__type__', None)
-                if t is None:
-                    return None
-                return typing.ClassVar, t
-
-            return None
-    else:
-        Literal = typing_extensions.Literal
-        Type_Literal = type(typing_extensions.Literal)
-        Final = typing_extensions.Final
-        Type_Final = type(typing_extensions.Final)
-
-        def _try_decompose_special_generic(obj):
-            if type(obj) is Type_ClassVar:
-                t = getattr(obj, '__type__', None)
-                if t is None:
-                    return None
-                return typing.ClassVar, t
-
-            if type(obj) is Type_Literal:
-                v = getattr(obj, '__values__', None)
-                if v is None:
-                    return None
-                return Literal, v
-
-            if type(obj) is Type_Final:
-                t = getattr(obj, '__type__', None)
-                if t is None:
-                    return None
-                return Final, t
-
-            return None
