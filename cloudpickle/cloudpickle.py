@@ -61,6 +61,7 @@ import threading
 import typing
 from enum import Enum
 
+from typing import Generic, Union, Tuple, Callable, ClassVar
 from pickle import _Pickler as Pickler
 from pickle import _getattribute
 from io import BytesIO
@@ -68,8 +69,9 @@ from importlib._bootstrap import _find_spec
 
 try:
     import typing_extensions as _typing_extensions
+    from typing_extensions import Literal, Final
 except ImportError:
-    _typing_extensions = None
+    _typing_extensions = Literal = Final = None
 
 
 # cloudpickle is meant for inter process communication: we expect all
@@ -420,6 +422,18 @@ def _extract_class_dict(cls):
     for name in to_remove:
         clsdict.pop(name)
     return clsdict
+
+
+if sys.version_info[:2] < (3, 7):  # pramga: no branch
+    def _is_parametrized_type_hint(obj):
+        # This is very cheap but might generate false positives.
+        origin = getattr(obj, '__origin__', None)  # typing Constructs
+        values = getattr(obj, '__values__', None)  # typing_extensions.Literal
+        type_ = getattr(obj, '__type__', None)     # typing_extensions.Final
+        return origin is not None or values is not None or type_ is not None
+
+    def _create_parametrized_type_hint(origin, args):
+        return origin[args]
 
 
 class CloudPickler(Pickler):
@@ -793,11 +807,13 @@ class CloudPickler(Pickler):
             return self.save_reduce(
                 _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
 
-        decomposed_generic = _try_decompose_generic(obj)
-        if decomposed_generic is not None:
-            class_tracker_id = _get_or_create_tracker_id(obj)
-            reduce_args = (*decomposed_generic, class_tracker_id)
-            return self.save_reduce(_make_generic, reduce_args, obj=obj)
+        if sys.version_info[:2] < (3, 7) and _is_parametrized_type_hint(obj):  # noqa  # pragma: no branch
+            # Parametrized typing constructs in Python < 3.7 are not compatible
+            # with type checks and ``isinstance`` semantics. For this reason,
+            # it is easier to detect them using a duck-typing-based check
+            # (``_is_parametrized_type_hint``) than to populate the Pickler's
+            # dispatch with type-specific savers.
+            self._save_parametrized_type_hint(obj)
         elif name is not None:
             Pickler.save_global(self, obj, name=name)
         elif not _is_importable_by_name(obj, name=name):
@@ -939,34 +955,30 @@ class CloudPickler(Pickler):
         """Plug in system. Register additional pickling functions if modules already loaded"""
         pass
 
-    if sys.version_info < (3, 7):
-        def _save_special_form(self, obj, base, arg_attr):
-            t = getattr(obj, arg_attr, None)
-            if t is None:
-                # Special forms (ClassVar, Final, Literal) don't store
-                # their `__name__` in an easy-to-get place.
-                name = typing._trim_name(typing._qualname(type(obj)))
-                self.save_global(obj, name=name)
-            else:
-                class_tracker_id = _get_or_create_tracker_id(obj)
-                reduce_args = (base, t, class_tracker_id)
-                self.save_reduce(_make_generic, reduce_args, obj=obj)
-
-        def save_classvar(self, obj):
-            self._save_special_form(obj, typing.ClassVar, '__type__')
-
-        dispatch[type(typing.ClassVar)] = save_classvar
-
-        if _typing_extensions is not None:
-            def save_literal(self, obj):
-                self._save_special_form(obj, _typing_extensions.Literal, '__values__')
-
-            dispatch[type(_typing_extensions.Literal)] = save_literal
-
-            def save_final(self, obj):
-                self._save_special_form(obj, _typing_extensions.Final, '__type__')
-
-            dispatch[type(_typing_extensions.Final)] = save_final
+    if sys.version_info < (3, 7):  # pragma: no branch
+        def _save_parametrized_type_hint(self, obj):
+            # The distorted type check sematic for typing construct becomes:
+            # ``type(obj) is type(TypeHint)``, which means "obj is a
+            # parametrized TypeHint"
+            if type(obj) is type(Literal):
+                initargs = (Literal, obj.__values__)
+            elif type(obj) is type(Final):
+                initargs = (Final, obj.__type__)
+            elif type(obj) is type(ClassVar):
+                initargs = (ClassVar, obj.__type__)
+            elif type(obj) in [type(Union), type(Tuple), type(Generic)]:
+                initargs = (obj.__origin__, obj.__args__)
+            elif type(obj) is type(Callable):
+                args = obj.__args__
+                if args[0] is Ellipsis:
+                    initargs = (obj.__origin__, args)
+                else:
+                    initargs = (obj.__origin__, (list(args[:-1]), args[-1]))
+            else:  # pramga: no cover
+                raise pickle.PicklingError(
+                    "Cloudpickle Error: Unknown type {}".format(type(obj))
+                )
+            self.save_reduce(_create_parametrized_type_hint, initargs, obj=obj)
 
 
 # Tornado support
@@ -1311,21 +1323,3 @@ def _get_bases(typ):
         # For regular class objects
         bases_attr = '__bases__'
     return getattr(typ, bases_attr)
-
-
-def _make_generic(origin, args, class_tracker_id):
-    return _lookup_class_or_track(class_tracker_id, origin[args])
-
-
-if sys.version_info >= (3, 7):
-    def _try_decompose_generic(obj):
-        return None
-else:
-    def _try_decompose_generic(obj):
-        origin = getattr(obj, '__origin__', None)
-        if origin is None:
-            return None
-        args = obj.__args__
-        if origin is typing.Callable and args[0] is not Ellipsis:
-            args = (list(args[:-1]), args[-1])
-        return origin, args

@@ -2074,7 +2074,9 @@ class CloudPickleTest(unittest.TestCase):
             pass
 
         assert pickle_depickle(C, protocol=self.protocol) is C
-        assert pickle_depickle(C[int], protocol=self.protocol) is C[int]
+
+        # Identity is not part of the typing contract.
+        assert pickle_depickle(C[int], protocol=self.protocol) == C[int]
 
         with subprocess_worker(protocol=self.protocol) as worker:
 
