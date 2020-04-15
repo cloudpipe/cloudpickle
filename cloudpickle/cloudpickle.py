@@ -424,7 +424,7 @@ def _extract_class_dict(cls):
     return clsdict
 
 
-if sys.version_info[:2] < (3, 7):  # pramga: no branch
+if sys.version_info[:2] < (3, 7):  # pragma: no branch
     def _is_parametrized_type_hint(obj):
         # This is very cheap but might generate false positives.
         origin = getattr(obj, '__origin__', None)  # typing Constructs
@@ -974,7 +974,7 @@ class CloudPickler(Pickler):
                     initargs = (obj.__origin__, args)
                 else:
                     initargs = (obj.__origin__, (list(args[:-1]), args[-1]))
-            else:  # pramga: no cover
+            else:  # pragma: no cover
                 raise pickle.PicklingError(
                     "Cloudpickle Error: Unknown type {}".format(type(obj))
                 )
