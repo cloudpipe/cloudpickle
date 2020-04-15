@@ -67,7 +67,7 @@ from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
 
-try:
+try:  # pragma: no branch
     import typing_extensions as _typing_extensions
     from typing_extensions import Literal, Final
 except ImportError:
@@ -124,7 +124,7 @@ def _whichmodule(obj, name):
     - Errors arising during module introspection are ignored, as those errors
       are considered unwanted side effects.
     """
-    if sys.version_info[:2] < (3, 7) and isinstance(obj, typing.TypeVar):
+    if sys.version_info[:2] < (3, 7) and isinstance(obj, typing.TypeVar):  # pragma: no branch  # noqa
         # Workaround bug in old Python versions: prior to Python 3.7,
         # T.__module__ would always be set to "typing" even when the TypeVar T
         # would be defined in a different module.
@@ -960,9 +960,9 @@ class CloudPickler(Pickler):
             # The distorted type check sematic for typing construct becomes:
             # ``type(obj) is type(TypeHint)``, which means "obj is a
             # parametrized TypeHint"
-            if type(obj) is type(Literal):
+            if type(obj) is type(Literal):  # pragma: no branch
                 initargs = (Literal, obj.__values__)
-            elif type(obj) is type(Final):
+            elif type(obj) is type(Final):  # pragma: no branch
                 initargs = (Final, obj.__type__)
             elif type(obj) is type(ClassVar):
                 initargs = (ClassVar, obj.__type__)
