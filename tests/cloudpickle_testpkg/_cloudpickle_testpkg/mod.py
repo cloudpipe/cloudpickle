@@ -24,6 +24,15 @@ submodule_name = '_cloudpickle_testpkg.mod.dynamic_submodule'
 dynamic_submodule = types.ModuleType(submodule_name)
 sys.modules[submodule_name] = dynamic_submodule
 
+# What about a dynamic submodule inside a dynamic submodule inside an
+# importable module?
+subsubmodule_name = (
+    '_cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule'
+)
+dynamic_subsubmodule = types.ModuleType(subsubmodule_name)
+dynamic_submodule.dynamic_subsubmodule = dynamic_subsubmodule
+sys.modules[subsubmodule_name] = dynamic_subsubmodule
+
 
 def module_function():
     return "hello from a module!"

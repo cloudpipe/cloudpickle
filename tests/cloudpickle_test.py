@@ -715,6 +715,13 @@ class CloudPickleTest(unittest.TestCase):
         assert _is_importable(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
 
+        # Do the same for an importable dynamic submodule inside a dynamic
+        # module inside a file-backed module.
+        import _cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule as sm  # noqa
+        assert _is_dynamic(sm)
+        assert _is_importable(sm)
+        assert pickle_depickle(sm, protocol=self.protocol) is sm
+
         expected = "cannot check importability of object instances"
         with pytest.raises(TypeError, match=expected):
             _is_importable(object())
