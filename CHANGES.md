@@ -3,6 +3,10 @@
 
 **This version requires Python 3.5 or later**
 
+- cloudpickle can now all pickle all constructs from the ``typing`` module
+  and the ``typing_extensions`` library in Python 3.5+
+  ([PR #318](https://github.com/cloudpipe/cloudpickle/pull/318))
+
 - Stop pickling the annotations of a dynamic class for Python < 3.6
   (follow up on #276)
   ([issue #347](https://github.com/cloudpipe/cloudpickle/issues/347))
@@ -14,10 +18,6 @@
 - Add support for pickling dynamic classes subclassing `typing.Generic`
   instances on Python 3.7+
   ([PR #351](https://github.com/cloudpipe/cloudpickle/pull/351))
-
-- Add support for pickling dynamic classes subclassing `typing.Generic`
-  instances on Python 3.5+
-  ([PR #318](https://github.com/cloudpipe/cloudpickle/pull/318))
 
 1.3.0
 =====
