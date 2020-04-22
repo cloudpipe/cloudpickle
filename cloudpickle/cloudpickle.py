@@ -1335,7 +1335,7 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
-def _get_parent(module):
+def _get_parent_module_or_package(module):
     """(Try to) access the parent module (or package) of a submodule"""
     parent_name, _, module_name = module.__name__.rpartition('.')
     if parent_name:  # pragma: no cover
@@ -1365,7 +1365,7 @@ def _is_dynamic(module):
     # little bit harder to see if they can be loaded by using importlib's
     # ``_find_spec``.  This case is however untested as no package in the PyPy
     # stdlib has __spec__ set to None after it is imported.
-    parent = _get_parent(module)
+    parent = _get_parent_module_or_package(module)
     pkgpath = getattr(parent, '__path__', None)
     return _find_spec(module.__name__, pkgpath, module) is None
 
@@ -1378,7 +1378,7 @@ def _module_is_importable(obj):
     # and added to sys.modules during the initialization of its parent
     # (provided that its parent is file-backed)
     module_relative_name = obj.__name__.rpartition('.')[-1]
-    parent = _get_parent(obj)
+    parent = _get_parent_module_or_package(obj)
     if hasattr(parent, module_relative_name) and _is_importable(parent):
         return True
     return False
