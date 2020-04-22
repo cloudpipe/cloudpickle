@@ -716,7 +716,7 @@ class CloudPickleTest(unittest.TestCase):
         assert pickle_depickle(m, protocol=self.protocol) is m
 
         expected = "cannot check importability of object instances"
-        with pytest.raises(ValueError, match=expected):
+        with pytest.raises(TypeError, match=expected):
             _is_importable(object())
 
     def test_Ellipsis(self):

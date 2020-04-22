@@ -189,7 +189,7 @@ def _is_importable(obj, name=None):
     elif isinstance(obj, types.ModuleType):
         return _module_is_importable(obj)
     else:
-        raise ValueError(
+        raise TypeError(
             "cannot check importability of {} instances".format(
                 type(obj).__name__)
         )
