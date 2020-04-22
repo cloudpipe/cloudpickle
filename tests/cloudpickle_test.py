@@ -2105,9 +2105,11 @@ class CloudPickleTest(unittest.TestCase):
                 MyClass.__annotations__ = {'attribute': type_}
 
                 def check_annotations(obj, expected_type):
-                    assert obj.__annotations__["attribute"] is expected_type
-                    assert obj.method.__annotations__["arg"] is expected_type
-                    assert obj.method.__annotations__["return"] is expected_type
+                    assert obj.__annotations__["attribute"] == expected_type
+                    assert obj.method.__annotations__["arg"] == expected_type
+                    assert (
+                        obj.method.__annotations__["return"] == expected_type
+                    )
                     return "ok"
 
                 obj = MyClass()
@@ -2125,7 +2127,8 @@ class CloudPickleTest(unittest.TestCase):
         ]
 
         for obj in objs:
-            _ = pickle_depickle(obj, protocol=self.protocol)
+            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
+            assert depickled_obj == obj
 
     def test_class_annotations(self):
         class C:
