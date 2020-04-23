@@ -61,10 +61,17 @@ import threading
 import typing
 from enum import Enum
 
+from typing import Generic, Union, Tuple, Callable, ClassVar
 from pickle import _Pickler as Pickler
 from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
+
+try:  # pragma: no branch
+    import typing_extensions as _typing_extensions
+    from typing_extensions import Literal, Final
+except ImportError:
+    _typing_extensions = Literal = Final = None
 
 
 # cloudpickle is meant for inter process communication: we expect all
@@ -117,7 +124,18 @@ def _whichmodule(obj, name):
     - Errors arising during module introspection are ignored, as those errors
       are considered unwanted side effects.
     """
-    module_name = _get_module_attr(obj)
+    if sys.version_info[:2] < (3, 7) and isinstance(obj, typing.TypeVar):  # pragma: no branch  # noqa
+        # Workaround bug in old Python versions: prior to Python 3.7,
+        # T.__module__ would always be set to "typing" even when the TypeVar T
+        # would be defined in a different module.
+        #
+        # For such older Python versions, we ignore the __module__ attribute of
+        # TypeVar instances and instead exhaustively lookup those instances in
+        # all currently imported modules.
+        module_name = None
+    else:
+        module_name = getattr(obj, '__module__', None)
+
     if module_name is not None:
         return module_name
     # Protect the iteration by using a copy of sys.modules against dynamic
@@ -138,23 +156,6 @@ def _whichmodule(obj, name):
         except Exception:
             pass
     return None
-
-
-if sys.version_info[:2] < (3, 7):  # pragma: no branch
-    # Workaround bug in old Python versions: prior to Python 3.7, T.__module__
-    # would always be set to "typing" even when the TypeVar T would be defined
-    # in a different module.
-    #
-    # For such older Python versions, we ignore the __module__ attribute of
-    # TypeVar instances and instead exhaustively lookup those instances in all
-    # currently imported modules via the _whichmodule function.
-    def _get_module_attr(obj):
-        if isinstance(obj, typing.TypeVar):
-            return None
-        return getattr(obj, '__module__', None)
-else:
-    def _get_module_attr(obj):
-        return getattr(obj, '__module__', None)
 
 
 def _is_importable_by_name(obj, name=None):
@@ -423,6 +424,18 @@ def _extract_class_dict(cls):
     return clsdict
 
 
+if sys.version_info[:2] < (3, 7):  # pragma: no branch
+    def _is_parametrized_type_hint(obj):
+        # This is very cheap but might generate false positives.
+        origin = getattr(obj, '__origin__', None)  # typing Constructs
+        values = getattr(obj, '__values__', None)  # typing_extensions.Literal
+        type_ = getattr(obj, '__type__', None)     # typing_extensions.Final
+        return origin is not None or values is not None or type_ is not None
+
+    def _create_parametrized_type_hint(origin, args):
+        return origin[args]
+
+
 class CloudPickler(Pickler):
 
     dispatch = Pickler.dispatch.copy()
@@ -611,11 +624,6 @@ class CloudPickler(Pickler):
         if isinstance(__dict__, property):
             type_kwargs['__dict__'] = __dict__
 
-        if sys.version_info < (3, 7):
-            # Although annotations were added in Python 3.4, It is not possible
-            # to properly pickle them until Python 3.7. (See #193)
-            clsdict.pop('__annotations__', None)
-
         save = self.save
         write = self.write
 
@@ -715,9 +723,7 @@ class CloudPickler(Pickler):
             'doc': func.__doc__,
             '_cloudpickle_submodules': submodules
         }
-        if hasattr(func, '__annotations__') and sys.version_info >= (3, 7):
-            # Although annotations were added in Python3.4, It is not possible
-            # to properly pickle them until Python3.7. (See #193)
+        if hasattr(func, '__annotations__'):
             state['annotations'] = func.__annotations__
         if hasattr(func, '__qualname__'):
             state['qualname'] = func.__qualname__
@@ -800,6 +806,14 @@ class CloudPickler(Pickler):
         elif obj in _BUILTIN_TYPE_NAMES:
             return self.save_reduce(
                 _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
+
+        if sys.version_info[:2] < (3, 7) and _is_parametrized_type_hint(obj):  # noqa  # pragma: no branch
+            # Parametrized typing constructs in Python < 3.7 are not compatible
+            # with type checks and ``isinstance`` semantics. For this reason,
+            # it is easier to detect them using a duck-typing-based check
+            # (``_is_parametrized_type_hint``) than to populate the Pickler's
+            # dispatch with type-specific savers.
+            self._save_parametrized_type_hint(obj)
         elif name is not None:
             Pickler.save_global(self, obj, name=name)
         elif not _is_importable_by_name(obj, name=name):
@@ -940,6 +954,31 @@ class CloudPickler(Pickler):
     def inject_addons(self):
         """Plug in system. Register additional pickling functions if modules already loaded"""
         pass
+
+    if sys.version_info < (3, 7):  # pragma: no branch
+        def _save_parametrized_type_hint(self, obj):
+            # The distorted type check sematic for typing construct becomes:
+            # ``type(obj) is type(TypeHint)``, which means "obj is a
+            # parametrized TypeHint"
+            if type(obj) is type(Literal):  # pragma: no branch
+                initargs = (Literal, obj.__values__)
+            elif type(obj) is type(Final):  # pragma: no branch
+                initargs = (Final, obj.__type__)
+            elif type(obj) is type(ClassVar):
+                initargs = (ClassVar, obj.__type__)
+            elif type(obj) in [type(Union), type(Tuple), type(Generic)]:
+                initargs = (obj.__origin__, obj.__args__)
+            elif type(obj) is type(Callable):
+                args = obj.__args__
+                if args[0] is Ellipsis:
+                    initargs = (obj.__origin__, args)
+                else:
+                    initargs = (obj.__origin__, (list(args[:-1]), args[-1]))
+            else:  # pragma: no cover
+                raise pickle.PicklingError(
+                    "Cloudpickle Error: Unknown type {}".format(type(obj))
+                )
+            self.save_reduce(_create_parametrized_type_hint, initargs, obj=obj)
 
 
 # Tornado support

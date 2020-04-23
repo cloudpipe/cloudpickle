@@ -3,6 +3,10 @@
 
 **This version requires Python 3.5 or later**
 
+- cloudpickle can now all pickle all constructs from the ``typing`` module
+  and the ``typing_extensions`` library in Python 3.5+
+  ([PR #318](https://github.com/cloudpipe/cloudpickle/pull/318))
+
 - Stop pickling the annotations of a dynamic class for Python < 3.6
   (follow up on #276)
   ([issue #347](https://github.com/cloudpipe/cloudpickle/issues/347))

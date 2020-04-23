@@ -1787,9 +1787,6 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__doc__, f.__doc__)
 
-    @unittest.skipIf(sys.version_info < (3, 7),
-                     "Pickling type annotations isn't supported for py36 and "
-                     "below.")
     def test_wraps_preserves_function_annotations(self):
         def f(x):
             pass
@@ -1804,79 +1801,7 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(f2.__annotations__, f.__annotations__)
 
-    @unittest.skipIf(sys.version_info >= (3, 7),
-                     "pickling annotations is supported starting Python 3.7")
-    def test_function_annotations_silent_dropping(self):
-        # Because of limitations of typing module, cloudpickle does not pickle
-        # the type annotations of a dynamic function or class for Python < 3.7
-
-        class UnpicklableAnnotation:
-            # Mock Annotation metaclass that errors out loudly if we try to
-            # pickle one of its instances
-            def __reduce__(self):
-                raise Exception("not picklable")
-
-        unpickleable_annotation = UnpicklableAnnotation()
-
-        def f(a: unpickleable_annotation):
-            return a
-
-        with pytest.raises(Exception):
-            cloudpickle.dumps(f.__annotations__)
-
-        depickled_f = pickle_depickle(f, protocol=self.protocol)
-        assert depickled_f.__annotations__ == {}
-
-    @unittest.skipIf(sys.version_info >= (3, 7) or sys.version_info < (3, 6),
-                     "pickling annotations is supported starting Python 3.7")
-    def test_class_annotations_silent_dropping(self):
-        # Because of limitations of typing module, cloudpickle does not pickle
-        # the type annotations of a dynamic function or class for Python < 3.7
-
-        # Pickling and unpickling must be done in different processes when
-        # testing dynamic classes (see #313)
-
-        code = '''if 1:
-        import cloudpickle
-        import sys
-
-        class UnpicklableAnnotation:
-            # Mock Annotation metaclass that errors out loudly if we try to
-            # pickle one of its instances
-            def __reduce__(self):
-                raise Exception("not picklable")
-
-        unpickleable_annotation = UnpicklableAnnotation()
-
-        class A:
-            a: unpickleable_annotation
-
-        try:
-            cloudpickle.dumps(A.__annotations__)
-        except Exception:
-            pass
-        else:
-            raise AssertionError
-
-        sys.stdout.buffer.write(cloudpickle.dumps(A, protocol={protocol}))
-        '''
-        cmd = [sys.executable, '-c', code.format(protocol=self.protocol)]
-        proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        proc.wait()
-        out, err = proc.communicate()
-        assert proc.returncode == 0, err
-
-        depickled_a = pickle.loads(out)
-        assert not hasattr(depickled_a, "__annotations__")
-
-    @unittest.skipIf(sys.version_info < (3, 7),
-                     "Pickling type hints isn't supported for py36"
-                     " and below.")
     def test_type_hint(self):
-        # Try to pickle compound typing constructs. This would typically fail
-        # on Python < 3.7 (See #193)
         t = typing.Union[list, int]
         assert pickle_depickle(t) == t
 
@@ -2142,8 +2067,6 @@ class CloudPickleTest(unittest.TestCase):
         from typing import AnyStr
         assert AnyStr is pickle_depickle(AnyStr, protocol=self.protocol)
 
-    @unittest.skipIf(sys.version_info < (3, 7),
-                     "Pickling generics not supported below py37")
     def test_generic_type(self):
         T = typing.TypeVar('T')
 
@@ -2151,7 +2074,10 @@ class CloudPickleTest(unittest.TestCase):
             pass
 
         assert pickle_depickle(C, protocol=self.protocol) is C
-        assert pickle_depickle(C[int], protocol=self.protocol) is C[int]
+
+        # Identity is not part of the typing contract: only test for
+        # equality instead.
+        assert pickle_depickle(C[int], protocol=self.protocol) == C[int]
 
         with subprocess_worker(protocol=self.protocol) as worker:
 
@@ -2170,32 +2096,54 @@ class CloudPickleTest(unittest.TestCase):
             assert check_generic(C[int], C, int) == "ok"
             assert worker.run(check_generic, C[int], C, int) == "ok"
 
-    @unittest.skipIf(sys.version_info < (3, 7),
-                     "Pickling type hints not supported below py37")
     def test_locally_defined_class_with_type_hints(self):
         with subprocess_worker(protocol=self.protocol) as worker:
             for type_ in _all_types_to_test():
-                # The type annotation syntax causes a SyntaxError on Python 3.5
-                code = textwrap.dedent("""\
                 class MyClass:
-                    attribute: type_
-
                     def method(self, arg: type_) -> type_:
                         return arg
-                """)
-                ns = {"type_": type_}
-                exec(code, ns)
-                MyClass = ns["MyClass"]
+                MyClass.__annotations__ = {'attribute': type_}
 
                 def check_annotations(obj, expected_type):
-                    assert obj.__annotations__["attribute"] is expected_type
-                    assert obj.method.__annotations__["arg"] is expected_type
-                    assert obj.method.__annotations__["return"] is expected_type
+                    assert obj.__annotations__["attribute"] == expected_type
+                    assert obj.method.__annotations__["arg"] == expected_type
+                    assert (
+                        obj.method.__annotations__["return"] == expected_type
+                    )
                     return "ok"
 
                 obj = MyClass()
                 assert check_annotations(obj, type_) == "ok"
                 assert worker.run(check_annotations, obj, type_) == "ok"
+
+    def test_generic_extensions(self):
+        typing_extensions = pytest.importorskip('typing_extensions')
+
+        objs = [
+            typing_extensions.Literal,
+            typing_extensions.Final,
+            typing_extensions.Literal['a'],
+            typing_extensions.Final[int],
+        ]
+
+        for obj in objs:
+            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
+            assert depickled_obj == obj
+
+    def test_class_annotations(self):
+        class C:
+            pass
+        C.__annotations__ = {'a': int}
+
+        C1 = pickle_depickle(C, protocol=self.protocol)
+        assert C1.__annotations__ == C.__annotations__
+
+    def test_function_annotations(self):
+        def f(a: int) -> str:
+            pass
+
+        f1 = pickle_depickle(f, protocol=self.protocol)
+        assert f1.__annotations__ == f.__annotations__
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
