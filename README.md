@@ -63,7 +63,7 @@ Pickling a function interactively defined in a Python shell session
 >>> depickled_function
 <function __main__.my_function(data:int) -> int>
 >>> depickled_function(43)
- 85
+85
 ```
 
 Running the tests
