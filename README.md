@@ -54,22 +54,16 @@ Pickling a function interactively defined in a Python shell session
 (in the `__main__` module):
 
 ```python
-In [1]: import cloudpickle, pickle
+>>> CONSTANT = 42
+>>> def my_function(data: int) -> int:
+...     return data + CONSTANT
 
-In [2]: CONSTANT = 42
-
-In [3]: def my_function(data: int) -> int:
-   ...:     return data + CONSTANT
-
-In [4]: pickled_function = cloudpickle.dumps(my_function)
-
-In [5]: depickled_function = pickle.loads(pickled_function)
-
-In [6]: depickled_function
-Out[6]: <function __main__.my_function(data:int) -> int>
-
-In [7]: depickled_function(43)
-Out[7]: 85
+>>> pickled_function = cloudpickle.dumps(my_function)
+>>> depickled_function = pickle.loads(pickled_function)
+>>> depickled_function
+>>> <function __main__.my_function(data:int) -> int>
+>>> depickled_function(43)
+ 85
 ```
 
 Running the tests
