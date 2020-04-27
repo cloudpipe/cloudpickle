@@ -55,11 +55,14 @@ Pickling a function interactively defined in a Python shell session
 
 ```python
 >>> CONSTANT = 42
->>> def my_function(data):
-...    return data + CONSTANT
+>>> def my_function(data: int) -> int:
+...     return data + CONSTANT
 ...
 >>> pickled_function = cloudpickle.dumps(my_function)
->>> pickle.loads(pickled_function)(43)
+>>> depickled_function = pickle.loads(pickled_function)
+>>> depickled_function
+<function __main__.my_function(data:int) -> int>
+>>> depickled_function(43)
 85
 ```
 
@@ -82,26 +85,6 @@ Running the tests
 
       pip install -r dev-requirements.txt
       PYTHONPATH='.:tests' py.test
-
-
-Note about function Annotations
--------------------------------
-
-Note that because of design issues `Python`'s `typing` module, `cloudpickle`
-supports pickling type annotations of dynamic functions for `Python` 3.7 and
-later.  On `Python` 3.4, 3.5 and 3.6, those type annotations will be dropped
-silently during pickling (example below):
-
-```python
->>> import typing
->>> import cloudpickle
->>> def f(x: typing.Union[list, int]):
-...     return x
->>> f
-<function __main__.f(x:Union[list, int])>
->>> cloudpickle.loads(cloudpickle.dumps(f))  # drops f's annotations
-<function __main__.f(x)>
-```
 
 History
 -------
