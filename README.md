@@ -57,11 +57,11 @@ Pickling a function interactively defined in a Python shell session
 >>> CONSTANT = 42
 >>> def my_function(data: int) -> int:
 ...     return data + CONSTANT
-
+...
 >>> pickled_function = cloudpickle.dumps(my_function)
 >>> depickled_function = pickle.loads(pickled_function)
 >>> depickled_function
->>> <function __main__.my_function(data:int) -> int>
+<function __main__.my_function(data:int) -> int>
 >>> depickled_function(43)
  85
 ```
