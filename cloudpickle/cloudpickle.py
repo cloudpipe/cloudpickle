@@ -443,7 +443,7 @@ if sys.version_info[:2] < (3, 7):  # pragma: no branch
 
         # typing.Union/Tuple for old Python 3.5
         is_union = getattr(obj, '__union_params__', None) is not None
-        is_tuple = getattr(obj, '__tuple_params__', None)
+        is_tuple = getattr(obj, '__tuple_params__', None) is not None
         is_callable = (
             getattr(obj, '__result__', None) is not None and
             getattr(obj, '__args__', None) is not None
