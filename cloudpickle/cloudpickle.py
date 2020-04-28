@@ -991,8 +991,9 @@ class CloudPickler(Pickler):
             elif type(obj) is type(ClassVar):
                 initargs = (ClassVar, obj.__type__)
             elif type(obj) is type(Generic):
-                if sys.version_info < (3, 5, 2):  # pragma: no cover
-                    initargs = (obj.__origin__, obj.__parameters__)
+                parameters = obj.__parameters__
+                if len(obj.__parameters__) > 0:
+                    initargs = (obj.__origin__, parameters)
                 else:
                     initargs = (obj.__origin__, obj.__args__)
             elif type(obj) is type(Union):
