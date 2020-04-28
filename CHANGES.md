@@ -5,6 +5,11 @@
   introduced by the new support of cloudpickle for pickling typing constructs.
   ([issue #360](https://github.com/cloudpipe/cloudpickle/issues/360))
 
+- Restore compat with loading dynamic classes pickled with cloudpickle
+  version 1.2.1 that would reference the `types.ClassType` attribute.
+  ([PR #359](https://github.com/cloudpipe/cloudpickle/pull/359))
+
+
 1.4.0
 =====
 
