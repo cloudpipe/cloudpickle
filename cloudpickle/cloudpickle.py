@@ -61,7 +61,7 @@ import threading
 import typing
 from enum import Enum
 
-from typing import Generic, Union, Tuple, Callable, ClassVar
+from typing import Generic, Union, Tuple, Callable
 from pickle import _Pickler as Pickler
 from pickle import _getattribute
 from io import BytesIO
@@ -72,6 +72,11 @@ try:  # pragma: no branch
     from typing_extensions import Literal, Final
 except ImportError:
     _typing_extensions = Literal = Final = None
+
+if sys.version_info > (3, 5, 2):
+    from typing import ClassVar
+else:  # pragma: no cover
+    ClassVar = None
 
 
 # cloudpickle is meant for inter process communication: we expect all

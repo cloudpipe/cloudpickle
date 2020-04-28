@@ -2182,10 +2182,10 @@ def _all_types_to_test():
     class C(typing.Generic[T]):
         pass
 
-    return [
+    types_to_test = [
         C, C[int],
-        T, typing.Any, typing.NoReturn, typing.Optional,
-        typing.Generic, typing.Union, typing.ClassVar,
+        T, typing.Any, typing.Optional,
+        typing.Generic, typing.Union,
         typing.Optional[int],
         typing.Generic[T],
         typing.Callable[[int], typing.Any],
@@ -2193,10 +2193,15 @@ def _all_types_to_test():
         typing.Callable[[], typing.Any],
         typing.Tuple[int, ...],
         typing.Tuple[int, C[int]],
-        typing.ClassVar[C[int]],
         typing.List[int],
         typing.Dict[int, str],
     ]
+    if sys.version_info > (3, 5, 2):
+        types_to_test.append(typing.ClassVar)
+        types_to_test.append(typing.ClassVar[C[int]])
+    if sys.version_info > (3, 5, 3):
+        types_to_test.append(typing.NoReturn)
+    return types_to_test
 
 
 if __name__ == '__main__':
