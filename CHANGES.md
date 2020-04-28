@@ -1,5 +1,10 @@
-1.4.0 (in development)
+1.4.1 (in development)
 ======================
+
+
+
+1.4.0
+=====
 
 **This version requires Python 3.5 or later**
 
