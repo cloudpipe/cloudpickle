@@ -2083,12 +2083,18 @@ class CloudPickleTest(unittest.TestCase):
 
             def check_generic(generic, origin, type_value):
                 assert generic.__origin__ is origin
-                assert len(generic.__args__) == 1
-                assert generic.__args__[0] is type_value
 
-                assert len(origin.__orig_bases__) == 1
-                ob = origin.__orig_bases__[0]
-                assert ob.__origin__ is typing.Generic
+                if sys.version_info > (3, 5, 2):
+                    assert len(generic.__args__) == 1
+                    assert generic.__args__[0] is type_value
+                    assert len(origin.__orig_bases__) == 1
+                    ob = origin.__orig_bases__[0]
+                    assert ob.__origin__ is typing.Generic
+                else:  # Python 3.5.[0-1-2]
+                    assert len(generic.__parameters__) == 1
+                    assert generic.__parameters__[0] is type_value
+                    assert len(origin.__bases__) == 1
+                    ob = origin.__bases__[0]
                 assert len(ob.__parameters__) == 1
 
                 return "ok"
