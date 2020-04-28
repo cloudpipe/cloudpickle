@@ -997,7 +997,7 @@ class CloudPickler(Pickler):
                     initargs = (Union, obj.__args__)
             elif type(obj) is type(Tuple):
                 if sys.version_info < (3, 5, 2):  # pragma: no cover
-                    initargs = (Tuple, obj.__union_params__)
+                    initargs = (Tuple, obj.__tuple_params__)
                 else:
                     initargs = (Tuple, obj.__args__)
             elif type(obj) is type(Callable):
