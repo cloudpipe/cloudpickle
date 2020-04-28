@@ -1,7 +1,9 @@
 1.4.1 (in development)
 ======================
 
-
+- Fix incompatibilities between cloudpickle 1.4.0 and Python 3.5.0/1/2
+  introduced by the new support of cloudpickle for pickling typing constructs.
+  ([issue #360](https://github.com/cloudpipe/cloudpickle/issues/360))
 
 1.4.0
 =====
