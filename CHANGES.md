@@ -1,6 +1,9 @@
 1.4.1 (in development)
 ======================
 
+- Restore compat with loading dynamic classes pickled with cloudpickle
+  version 1.2.1 that would reference the `types.ClassType` attribute.
+  ([PR #359](https://github.com/cloudpipe/cloudpickle/pull/359))
 
 
 1.4.0
