@@ -1338,20 +1338,17 @@ def _is_dynamic(module):
     return _find_spec(module.__name__, pkgpath, module) is None
 
 
-def _make_typevar(name, bound, constraints, covariant, contravariant,
-                  class_tracker_id):
-    tv = typing.TypeVar(
+def _make_typevar(name, bound, constraints, covariant, contravariant):
+    return typing.TypeVar(
         name, *constraints, bound=bound,
         covariant=covariant, contravariant=contravariant
     )
-    return _lookup_class_or_track(class_tracker_id, tv)
 
 
 def _decompose_typevar(obj):
     return (
         obj.__name__, obj.__bound__, obj.__constraints__,
         obj.__covariant__, obj.__contravariant__,
-        _get_or_create_tracker_id(obj),
     )
 
 
