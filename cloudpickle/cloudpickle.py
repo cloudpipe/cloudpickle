@@ -73,7 +73,7 @@ try:  # pragma: no branch
 except ImportError:
     _typing_extensions = Literal = Final = None
 
-if sys.version_info > (3, 5, 2):
+if sys.version_info >= (3, 5, 3):
     from typing import ClassVar
 else:  # pragma: no cover
     ClassVar = None
@@ -996,17 +996,17 @@ class CloudPickler(Pickler):
                 else:
                     initargs = (obj.__origin__, obj.__args__)
             elif type(obj) is type(Union):
-                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                if sys.version_info < (3, 5, 3):  # pragma: no cover
                     initargs = (Union, obj.__union_params__)
                 else:
                     initargs = (Union, obj.__args__)
             elif type(obj) is type(Tuple):
-                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                if sys.version_info < (3, 5, 3):  # pragma: no cover
                     initargs = (Tuple, obj.__tuple_params__)
                 else:
                     initargs = (Tuple, obj.__args__)
             elif type(obj) is type(Callable):
-                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                if sys.version_info < (3, 5, 3):  # pragma: no cover
                     args = obj.__args__
                     result = obj.__result__
                     if args != Ellipsis:
