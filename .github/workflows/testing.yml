@@ -54,9 +54,12 @@ jobs:
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-    - name: Activate conda Python version
+    - name: Create conda virtual env
       shell: bash -l {0}
-      run: conda activate test
+      run: conda create -y -n testenv python=${{ matrix.python_version }}
+    - name: Activate virtualenv
+      shell: bash -l {0}
+      run: conda activate testenv
     - name: Test conda Python version
       shell: bash -l {0}
       run: python -V
