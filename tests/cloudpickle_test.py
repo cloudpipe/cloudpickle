@@ -2127,19 +2127,38 @@ class CloudPickleTest(unittest.TestCase):
                 assert check_annotations(obj, type_) == "ok"
                 assert worker.run(check_annotations, obj, type_) == "ok"
 
-    def test_generic_extensions(self):
+    def test_generic_extensions_literal(self):
         typing_extensions = pytest.importorskip('typing_extensions')
 
-        objs = [
-            typing_extensions.Literal,
-            typing_extensions.Final,
-            typing_extensions.Literal['a'],
-            typing_extensions.Final[int],
+        def check_literal_equal(obj1, obj2):
+            assert obj1.__values__ == obj2.__values__
+            assert type(obj1) == type(obj2) == typing_extensions._LiteralMeta
+        literal_objs = [
+            typing_extensions.Literal, typing_extensions.Literal['a']
         ]
-
-        for obj in objs:
+        for obj in literal_objs:
             depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            assert depickled_obj == obj
+            try:
+                # __eq__ does not work for Literal objects in early Python 3.5
+                assert depickled_obj == obj
+            except Exception:
+                check_literal_equal(obj, depickled_obj)
+
+    def test_generic_extensions_final(self):
+        typing_extensions = pytest.importorskip('typing_extensions')
+
+        def check_final_equal(obj1, obj2):
+            assert obj1.__type__ == obj2.__type__
+            assert type(obj1) == type(obj2) == typing_extensions._FinalMeta
+        final_objs = [typing_extensions.Final, typing_extensions.Final[int]]
+
+        for obj in final_objs:
+            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
+            try:
+                # __eq__ does not work for Final objects in early Python 3.5
+                assert depickled_obj == obj
+            except Exception:
+                check_final_equal(obj, depickled_obj)
 
     def test_class_annotations(self):
         class C:
