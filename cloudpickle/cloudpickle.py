@@ -1004,13 +1004,18 @@ class CloudPickler(Pickler):
                 if sys.version_info < (3, 5, 2):  # pragma: no cover
                     args = obj.__args__
                     result = obj.__result__
+                    if args != Ellipsis:
+                        if isinstance(args, tuple):
+                            args = list(args)
+                        else:
+                            args = [args]
                 else:
                     (*args, result) = obj.__args__
-
-                if args is Ellipsis:
-                    initargs = (Callable, (args, result))
-                else:
-                    initargs = (Callable, (list(args), result))
+                    if len(args) == 1 and args[0] is Ellipsis:
+                        args = Ellipsis
+                    else:
+                        args = list(args)
+                initargs = (Callable, (args, result))
             else:  # pragma: no cover
                 raise pickle.PicklingError(
                     "Cloudpickle Error: Unknown type {}".format(type(obj))
