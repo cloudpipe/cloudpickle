@@ -432,10 +432,24 @@ def _extract_class_dict(cls):
 if sys.version_info[:2] < (3, 7):  # pragma: no branch
     def _is_parametrized_type_hint(obj):
         # This is very cheap but might generate false positives.
-        origin = getattr(obj, '__origin__', None)  # typing Constructs
-        values = getattr(obj, '__values__', None)  # typing_extensions.Literal
-        type_ = getattr(obj, '__type__', None)     # typing_extensions.Final
-        return origin is not None or values is not None or type_ is not None
+        # genral typing Constructs
+        is_typing = getattr(obj, '__origin__', None) is not None
+
+        # typing_extensions.Literal
+        is_litteral = getattr(obj, '__values__', None) is not None
+
+        # typing_extensions.Final
+        is_final = getattr(obj, '__type__', None) is not None
+
+        # typing.Union/Tuple for old Python 3.5
+        is_union = getattr(obj, '__union_params__', None) is not None
+        is_tuple = getattr(obj, '__tuple_params__', None)
+        is_callable = (
+            getattr(obj, '__result__', None) is not None and
+            getattr(obj, '__args__', None) is not None
+        )
+        return any((is_typing, is_litteral, is_final, is_union, is_tuple,
+                    is_callable))
 
     def _create_parametrized_type_hint(origin, args):
         return origin[args]
@@ -971,14 +985,32 @@ class CloudPickler(Pickler):
                 initargs = (Final, obj.__type__)
             elif type(obj) is type(ClassVar):
                 initargs = (ClassVar, obj.__type__)
-            elif type(obj) in [type(Union), type(Tuple), type(Generic)]:
-                initargs = (obj.__origin__, obj.__args__)
-            elif type(obj) is type(Callable):
-                args = obj.__args__
-                if args[0] is Ellipsis:
-                    initargs = (obj.__origin__, args)
+            elif type(obj) is type(Generic):
+                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                    initargs = (obj.__origin__, obj.__parameters__)
                 else:
-                    initargs = (obj.__origin__, (list(args[:-1]), args[-1]))
+                    initargs = (obj.__origin__, obj.__args__)
+            elif type(obj) is type(Union):
+                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                    initargs = (Union, obj.__union_params__)
+                else:
+                    initargs = (Union, obj.__args__)
+            elif type(obj) is type(Tuple):
+                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                    initargs = (Tuple, obj.__union_params__)
+                else:
+                    initargs = (Tuple, obj.__args__)
+            elif type(obj) is type(Callable):
+                if sys.version_info < (3, 5, 2):  # pragma: no cover
+                    args = obj.__args__
+                    result = obj.__result__
+                else:
+                    (*args, result) = obj.__args__
+
+                if args is Ellipsis:
+                    initargs = (Callable, (args, result))
+                else:
+                    initargs = (Callable, (list(args), result))
             else:  # pragma: no cover
                 raise pickle.PicklingError(
                     "Cloudpickle Error: Unknown type {}".format(type(obj))
