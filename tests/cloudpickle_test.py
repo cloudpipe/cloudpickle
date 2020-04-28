@@ -2224,7 +2224,7 @@ def _all_types_to_test():
     if sys.version_info[:3] >= (3, 5, 3):
         types_to_test.append(typing.ClassVar)
         types_to_test.append(typing.ClassVar[C[int]])
-    if sys.version_info > (3, 5, 3):
+    if sys.version_info >= (3, 5, 4):
         types_to_test.append(typing.NoReturn)
     return types_to_test
 
