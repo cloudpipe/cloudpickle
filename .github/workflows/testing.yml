@@ -56,17 +56,12 @@ jobs:
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
         activate-environment: testenv
-    - name: Run conda info
-      shell: bash -l {0}
-      run: |
-        conda info
-        conda list
-    - name: Test conda Python version
-      shell: bash -l {0}
-      run: python -V
     - name: Install project and dependencies
       shell: bash
       run: |
+        conda init bash
+        source ~/.bashrc
+        conda activate testenv
         python -m pip install --upgrade pip
         python -m pip install -e .
         python -m pip install -r dev-requirements.txt
