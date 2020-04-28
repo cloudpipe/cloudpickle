@@ -993,6 +993,8 @@ class CloudPickler(Pickler):
             elif type(obj) is type(Generic):
                 parameters = obj.__parameters__
                 if len(obj.__parameters__) > 0:
+                    # in early Python 3.5, __parameters__ was sometimes
+                    # preferred to __args__
                     initargs = (obj.__origin__, parameters)
                 else:
                     initargs = (obj.__origin__, obj.__args__)

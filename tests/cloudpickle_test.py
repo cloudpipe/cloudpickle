@@ -2097,7 +2097,8 @@ class CloudPickleTest(unittest.TestCase):
 
                 return "ok"
 
-            # backward-compat for old Python3.5 versions
+            # backward-compat for old Python3.5 versions that sometimes relies
+            # on __parameters__
             use_args = getattr(C[int], '__args__', ()) != ()
             assert check_generic(C[int], C, int, use_args) == "ok"
             assert worker.run(check_generic, C[int], C, int, use_args) == "ok"
