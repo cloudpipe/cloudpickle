@@ -54,10 +54,12 @@ jobs:
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-        activate-environment: test
+    - name: Activate conda Python version
+      shell: bash -l {0}
+      run: conda activate test
     - name: Test conda Python version
       shell: bash -l {0}
-      run: which python
+      run: python -V
     - name: Install project and dependencies
       shell: bash
       run: |
