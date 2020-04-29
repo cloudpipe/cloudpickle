@@ -2139,10 +2139,10 @@ class CloudPickleTest(unittest.TestCase):
         ]
         for obj in literal_objs:
             depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            try:
-                # __eq__ does not work for Literal objects in early Python 3.5
+            if sys.version_info[:3] >= (3, 5, 3):
                 assert depickled_obj == obj
-            except Exception:
+            else:
+                # __eq__ does not work for Literal objects in early Python 3.5
                 check_literal_equal(obj, depickled_obj)
 
     def test_generic_extensions_final(self):
@@ -2155,10 +2155,10 @@ class CloudPickleTest(unittest.TestCase):
 
         for obj in final_objs:
             depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            try:
-                # __eq__ does not work for Final objects in early Python 3.5
+            if sys.version_info[:3] >= (3, 5, 3):
                 assert depickled_obj == obj
-            except Exception:
+            else:
+                # __eq__ does not work for Final objects in early Python 3.5
                 check_final_equal(obj, depickled_obj)
 
     def test_class_annotations(self):
