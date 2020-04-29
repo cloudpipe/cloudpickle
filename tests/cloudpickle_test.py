@@ -2047,6 +2047,9 @@ class CloudPickleTest(unittest.TestCase):
         for attr in attr_list:
             assert getattr(T, attr) == getattr(depickled_T, attr)
 
+    @pytest.mark.skipif(
+        sys.version_info[:3] == (3, 5, 3),
+        reason="TypeVar instances are not weakref-able in Python 3.5.3")
     def test_pickle_dynamic_typevar_tracking(self):
         T = typing.TypeVar("T")
         T2 = subprocess_pickle_echo(T, protocol=self.protocol)
