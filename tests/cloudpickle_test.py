@@ -2047,6 +2047,9 @@ class CloudPickleTest(unittest.TestCase):
         for attr in attr_list:
             assert getattr(T, attr) == getattr(depickled_T, attr)
 
+    @pytest.mark.skipif(
+        sys.version_info[:3] == (3, 5, 3),
+        reason="TypeVar instances are not weakref-able in Python 3.5.3")
     def test_pickle_dynamic_typevar_tracking(self):
         T = typing.TypeVar("T")
         T2 = subprocess_pickle_echo(T, protocol=self.protocol)
@@ -2081,20 +2084,32 @@ class CloudPickleTest(unittest.TestCase):
 
         with subprocess_worker(protocol=self.protocol) as worker:
 
-            def check_generic(generic, origin, type_value):
+            def check_generic(generic, origin, type_value, use_args):
                 assert generic.__origin__ is origin
-                assert len(generic.__args__) == 1
-                assert generic.__args__[0] is type_value
 
-                assert len(origin.__orig_bases__) == 1
-                ob = origin.__orig_bases__[0]
-                assert ob.__origin__ is typing.Generic
+                if sys.version_info >= (3, 5, 3):
+                    assert len(origin.__orig_bases__) == 1
+                    ob = origin.__orig_bases__[0]
+                    assert ob.__origin__ is typing.Generic
+                else:  # Python 3.5.[0-1-2], pragma: no cover
+                    assert len(origin.__bases__) == 1
+                    ob = origin.__bases__[0]
+
+                if use_args:
+                    assert len(generic.__args__) == 1
+                    assert generic.__args__[0] is type_value
+                else:
+                    assert len(generic.__parameters__) == 1
+                    assert generic.__parameters__[0] is type_value
                 assert len(ob.__parameters__) == 1
 
                 return "ok"
 
-            assert check_generic(C[int], C, int) == "ok"
-            assert worker.run(check_generic, C[int], C, int) == "ok"
+            # backward-compat for old Python 3.5 versions that sometimes relies
+            # on __parameters__
+            use_args = getattr(C[int], '__args__', ()) != ()
+            assert check_generic(C[int], C, int, use_args) == "ok"
+            assert worker.run(check_generic, C[int], C, int, use_args) == "ok"
 
     def test_locally_defined_class_with_type_hints(self):
         with subprocess_worker(protocol=self.protocol) as worker:
@@ -2116,19 +2131,38 @@ class CloudPickleTest(unittest.TestCase):
                 assert check_annotations(obj, type_) == "ok"
                 assert worker.run(check_annotations, obj, type_) == "ok"
 
-    def test_generic_extensions(self):
+    def test_generic_extensions_literal(self):
         typing_extensions = pytest.importorskip('typing_extensions')
 
-        objs = [
-            typing_extensions.Literal,
-            typing_extensions.Final,
-            typing_extensions.Literal['a'],
-            typing_extensions.Final[int],
+        def check_literal_equal(obj1, obj2):
+            assert obj1.__values__ == obj2.__values__
+            assert type(obj1) == type(obj2) == typing_extensions._LiteralMeta
+        literal_objs = [
+            typing_extensions.Literal, typing_extensions.Literal['a']
         ]
-
-        for obj in objs:
+        for obj in literal_objs:
             depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            assert depickled_obj == obj
+            if sys.version_info[:3] >= (3, 5, 3):
+                assert depickled_obj == obj
+            else:
+                # __eq__ does not work for Literal objects in early Python 3.5
+                check_literal_equal(obj, depickled_obj)
+
+    def test_generic_extensions_final(self):
+        typing_extensions = pytest.importorskip('typing_extensions')
+
+        def check_final_equal(obj1, obj2):
+            assert obj1.__type__ == obj2.__type__
+            assert type(obj1) == type(obj2) == typing_extensions._FinalMeta
+        final_objs = [typing_extensions.Final, typing_extensions.Final[int]]
+
+        for obj in final_objs:
+            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
+            if sys.version_info[:3] >= (3, 5, 3):
+                assert depickled_obj == obj
+            else:
+                # __eq__ does not work for Final objects in early Python 3.5
+                check_final_equal(obj, depickled_obj)
 
     def test_class_annotations(self):
         class C:
@@ -2182,10 +2216,10 @@ def _all_types_to_test():
     class C(typing.Generic[T]):
         pass
 
-    return [
+    types_to_test = [
         C, C[int],
-        T, typing.Any, typing.NoReturn, typing.Optional,
-        typing.Generic, typing.Union, typing.ClassVar,
+        T, typing.Any, typing.Optional,
+        typing.Generic, typing.Union,
         typing.Optional[int],
         typing.Generic[T],
         typing.Callable[[int], typing.Any],
@@ -2193,10 +2227,15 @@ def _all_types_to_test():
         typing.Callable[[], typing.Any],
         typing.Tuple[int, ...],
         typing.Tuple[int, C[int]],
-        typing.ClassVar[C[int]],
         typing.List[int],
         typing.Dict[int, str],
     ]
+    if sys.version_info[:3] >= (3, 5, 3):
+        types_to_test.append(typing.ClassVar)
+        types_to_test.append(typing.ClassVar[C[int]])
+    if sys.version_info >= (3, 5, 4):
+        types_to_test.append(typing.NoReturn)
+    return types_to_test
 
 
 if __name__ == '__main__':

@@ -61,7 +61,7 @@ import threading
 import typing
 from enum import Enum
 
-from typing import Generic, Union, Tuple, Callable, ClassVar
+from typing import Generic, Union, Tuple, Callable
 from pickle import _Pickler as Pickler
 from pickle import _getattribute
 from io import BytesIO
@@ -72,6 +72,11 @@ try:  # pragma: no branch
     from typing_extensions import Literal, Final
 except ImportError:
     _typing_extensions = Literal = Final = None
+
+if sys.version_info >= (3, 5, 3):
+    from typing import ClassVar
+else:  # pragma: no cover
+    ClassVar = None
 
 
 # cloudpickle is meant for inter process communication: we expect all
@@ -432,10 +437,24 @@ def _extract_class_dict(cls):
 if sys.version_info[:2] < (3, 7):  # pragma: no branch
     def _is_parametrized_type_hint(obj):
         # This is very cheap but might generate false positives.
-        origin = getattr(obj, '__origin__', None)  # typing Constructs
-        values = getattr(obj, '__values__', None)  # typing_extensions.Literal
-        type_ = getattr(obj, '__type__', None)     # typing_extensions.Final
-        return origin is not None or values is not None or type_ is not None
+        # general typing Constructs
+        is_typing = getattr(obj, '__origin__', None) is not None
+
+        # typing_extensions.Literal
+        is_litteral = getattr(obj, '__values__', None) is not None
+
+        # typing_extensions.Final
+        is_final = getattr(obj, '__type__', None) is not None
+
+        # typing.Union/Tuple for old Python 3.5
+        is_union = getattr(obj, '__union_params__', None) is not None
+        is_tuple = getattr(obj, '__tuple_params__', None) is not None
+        is_callable = (
+            getattr(obj, '__result__', None) is not None and
+            getattr(obj, '__args__', None) is not None
+        )
+        return any((is_typing, is_litteral, is_final, is_union, is_tuple,
+                    is_callable))
 
     def _create_parametrized_type_hint(origin, args):
         return origin[args]
@@ -971,14 +990,40 @@ class CloudPickler(Pickler):
                 initargs = (Final, obj.__type__)
             elif type(obj) is type(ClassVar):
                 initargs = (ClassVar, obj.__type__)
-            elif type(obj) in [type(Union), type(Tuple), type(Generic)]:
-                initargs = (obj.__origin__, obj.__args__)
-            elif type(obj) is type(Callable):
-                args = obj.__args__
-                if args[0] is Ellipsis:
-                    initargs = (obj.__origin__, args)
+            elif type(obj) is type(Generic):
+                parameters = obj.__parameters__
+                if len(obj.__parameters__) > 0:
+                    # in early Python 3.5, __parameters__ was sometimes
+                    # preferred to __args__
+                    initargs = (obj.__origin__, parameters)
                 else:
-                    initargs = (obj.__origin__, (list(args[:-1]), args[-1]))
+                    initargs = (obj.__origin__, obj.__args__)
+            elif type(obj) is type(Union):
+                if sys.version_info < (3, 5, 3):  # pragma: no cover
+                    initargs = (Union, obj.__union_params__)
+                else:
+                    initargs = (Union, obj.__args__)
+            elif type(obj) is type(Tuple):
+                if sys.version_info < (3, 5, 3):  # pragma: no cover
+                    initargs = (Tuple, obj.__tuple_params__)
+                else:
+                    initargs = (Tuple, obj.__args__)
+            elif type(obj) is type(Callable):
+                if sys.version_info < (3, 5, 3):  # pragma: no cover
+                    args = obj.__args__
+                    result = obj.__result__
+                    if args != Ellipsis:
+                        if isinstance(args, tuple):
+                            args = list(args)
+                        else:
+                            args = [args]
+                else:
+                    (*args, result) = obj.__args__
+                    if len(args) == 1 and args[0] is Ellipsis:
+                        args = Ellipsis
+                    else:
+                        args = list(args)
+                initargs = (Callable, (args, result))
             else:  # pragma: no cover
                 raise pickle.PicklingError(
                     "Cloudpickle Error: Unknown type {}".format(type(obj))
@@ -1301,14 +1346,23 @@ def _make_typevar(name, bound, constraints, covariant, contravariant,
         name, *constraints, bound=bound,
         covariant=covariant, contravariant=contravariant
     )
-    return _lookup_class_or_track(class_tracker_id, tv)
+    if class_tracker_id is not None:
+        return _lookup_class_or_track(class_tracker_id, tv)
+    else:  # pragma: nocover
+        # Only for Python 3.5.3 compat.
+        return tv
 
 
 def _decompose_typevar(obj):
+    try:
+        class_tracker_id = _get_or_create_tracker_id(obj)
+    except TypeError:  # pragma: nocover
+        # TypeVar instances are not weakref-able in Python 3.5.3
+        class_tracker_id = None
     return (
         obj.__name__, obj.__bound__, obj.__constraints__,
         obj.__covariant__, obj.__contravariant__,
-        _get_or_create_tracker_id(obj),
+        class_tracker_id,
     )
 
 

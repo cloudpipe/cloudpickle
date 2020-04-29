@@ -1,6 +1,10 @@
 1.4.1 (in development)
 ======================
 
+- Fix incompatibilities between cloudpickle 1.4.0 and Python 3.5.0/1/2
+  introduced by the new support of cloudpickle for pickling typing constructs.
+  ([issue #360](https://github.com/cloudpipe/cloudpickle/issues/360))
+
 - Restore compat with loading dynamic classes pickled with cloudpickle
   version 1.2.1 that would reference the `types.ClassType` attribute.
   ([PR #359](https://github.com/cloudpipe/cloudpickle/pull/359))
