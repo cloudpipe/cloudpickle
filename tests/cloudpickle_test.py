@@ -2088,7 +2088,7 @@ class CloudPickleTest(unittest.TestCase):
                     assert len(origin.__orig_bases__) == 1
                     ob = origin.__orig_bases__[0]
                     assert ob.__origin__ is typing.Generic
-                else:  # Python 3.5.[0-1-2]
+                else:  # Python 3.5.[0-1-2], pragma: no cover
                     assert len(origin.__bases__) == 1
                     ob = origin.__bases__[0]
 
@@ -2102,7 +2102,7 @@ class CloudPickleTest(unittest.TestCase):
 
                 return "ok"
 
-            # backward-compat for old Python3.5 versions that sometimes relies
+            # backward-compat for old Python 3.5 versions that sometimes relies
             # on __parameters__
             use_args = getattr(C[int], '__args__', ()) != ()
             assert check_generic(C[int], C, int, use_args) == "ok"
