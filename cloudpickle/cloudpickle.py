@@ -437,7 +437,7 @@ def _extract_class_dict(cls):
 if sys.version_info[:2] < (3, 7):  # pragma: no branch
     def _is_parametrized_type_hint(obj):
         # This is very cheap but might generate false positives.
-        # genral typing Constructs
+        # general typing Constructs
         is_typing = getattr(obj, '__origin__', None) is not None
 
         # typing_extensions.Literal
