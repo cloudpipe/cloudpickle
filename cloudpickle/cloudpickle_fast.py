@@ -415,7 +415,8 @@ class CloudPickler(Pickler):
     dispatch[memoryview] = _memoryview_reduce
     dispatch[property] = _property_reduce
     dispatch[staticmethod] = _classmethod_reduce
-    dispatch[types.CellType] = _cell_reduce
+    if hasattr(types, "CellType"):
+        dispatch[types.CellType] = _cell_reduce
     dispatch[types.CodeType] = _code_reduce
     dispatch[types.GetSetDescriptorType] = _getset_descriptor_reduce
     dispatch[types.ModuleType] = _module_reduce
