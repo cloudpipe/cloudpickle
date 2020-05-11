@@ -62,6 +62,7 @@ import typing
 from enum import Enum
 
 from typing import Generic, Union, Tuple, Callable
+from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
 
@@ -79,7 +80,6 @@ else:  # pragma: no cover
 
 # Aliases using the compat module
 Pickler = pickle._Pickler
-_getattribute = pickle._getattribute
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
