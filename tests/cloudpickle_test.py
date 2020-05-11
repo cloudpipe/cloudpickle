@@ -9,7 +9,6 @@ import itertools
 import logging
 import math
 from operator import itemgetter, attrgetter
-import pickle
 import platform
 import random
 import shutil
@@ -43,6 +42,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
+from cloudpickle.compat import pickle
 from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
