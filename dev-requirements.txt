@@ -3,6 +3,8 @@ flake8
 pytest
 pytest-cov
 psutil
+# To test on older Python versions
+pickle5; python_version <= '3.7'
 # To be able to test tornado coroutines
 tornado
 # To be able to test numpy specific things
