@@ -15,14 +15,12 @@ import copyreg
 import io
 import itertools
 import logging
-import _pickle
-import pickle
+from cloudpickle.compat import pickle
+from cloudpickle.compat import _pickle
 import sys
 import types
 import weakref
 import typing
-
-from _pickle import Pickler
 
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
@@ -31,6 +29,7 @@ from .cloudpickle import (
     _extract_class_dict, dynamic_subimport, subimport, _typevar_reduce, _get_bases,
 )
 
+Pickler = _pickle.Pickler
 load, loads = _pickle.load, _pickle.loads
 
 

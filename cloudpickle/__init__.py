@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-import pickle
+from cloudpickle.compat import pickle
 
 
 from cloudpickle.cloudpickle import *
