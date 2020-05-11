@@ -537,9 +537,11 @@ class CloudPickler(Pickler):
         # avoid infinite recursion.
         if func.__closure__ is None:
             closure = None
-        else:
+        elif hasattr(types, "CellType"):
             closure = tuple(
                 types.CellType() for _ in range(len(code.co_freevars)))
+        else:
+            closure = list(map(_get_cell_contents, func.__closure__))
 
         return code, base_globals, None, None, closure
 
