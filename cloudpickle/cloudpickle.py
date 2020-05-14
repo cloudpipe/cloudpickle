@@ -1211,16 +1211,12 @@ class _empty_cell_value(object):
 
 
 def _make_empty_cell():
-    if sys.version_info >= (3, 8):
-        from types import CellType
-        return CellType
-    else:
-        if False:
-            # trick the compiler into creating an empty cell in our lambda
-            cell = None
-            raise AssertionError('this route should not be executed')
+    if False:
+        # trick the compiler into creating an empty cell in our lambda
+        cell = None
+        raise AssertionError('this route should not be executed')
 
-        return (lambda: cell).__closure__[0]
+    return (lambda: cell).__closure__[0]
 
 
 def _make_cell(value=_empty_cell_value):

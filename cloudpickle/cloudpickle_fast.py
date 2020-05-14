@@ -29,7 +29,7 @@ from .cloudpickle import (
     _find_imported_submodules, _get_cell_contents, _is_importable_by_name, _builtin_type,
     Enum, _get_or_create_tracker_id,  _make_skeleton_class, _make_skeleton_enum,
     _extract_class_dict, dynamic_subimport, subimport, _typevar_reduce, _get_bases,
-    FunctionSaverMixin
+    FunctionSaverMixin, _class_reduce
 )
 
 load, loads = _pickle.load, _pickle.loads
