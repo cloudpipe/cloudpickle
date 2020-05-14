@@ -29,6 +29,7 @@ from .cloudpickle import (
     _find_imported_submodules, _get_cell_contents, _is_importable_by_name, _builtin_type,
     Enum, _get_or_create_tracker_id,  _make_skeleton_class, _make_skeleton_enum,
     _extract_class_dict, dynamic_subimport, subimport, _typevar_reduce, _get_bases,
+    FunctionSaverMixin
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -67,25 +68,6 @@ def dumps(obj, protocol=None, buffer_callback=None):
 # COLLECTION OF OBJECTS __getnewargs__-LIKE METHODS
 # -------------------------------------------------
 
-def _class_getnewargs(obj):
-    type_kwargs = {}
-    if "__slots__" in obj.__dict__:
-        type_kwargs["__slots__"] = obj.__slots__
-
-    __dict__ = obj.__dict__.get('__dict__', None)
-    if isinstance(__dict__, property):
-        type_kwargs['__dict__'] = __dict__
-
-    return (type(obj), obj.__name__, _get_bases(obj), type_kwargs,
-            _get_or_create_tracker_id(obj), None)
-
-
-def _enum_getnewargs(obj):
-    members = dict((e.name, e.value) for e in obj)
-    return (obj.__bases__, obj.__name__, obj.__qualname__, members,
-            obj.__module__, _get_or_create_tracker_id(obj), None)
-
-
 # COLLECTION OF OBJECTS RECONSTRUCTORS
 # ------------------------------------
 def _file_reconstructor(retval):
@@ -94,89 +76,6 @@ def _file_reconstructor(retval):
 
 # COLLECTION OF OBJECTS STATE GETTERS
 # -----------------------------------
-def _function_getstate(func):
-    # - Put func's dynamic attributes (stored in func.__dict__) in state. These
-    #   attributes will be restored at unpickling time using
-    #   f.__dict__.update(state)
-    # - Put func's members into slotstate. Such attributes will be restored at
-    #   unpickling time by iterating over slotstate and calling setattr(func,
-    #   slotname, slotvalue)
-    slotstate = {
-        "__name__": func.__name__,
-        "__qualname__": func.__qualname__,
-        "__annotations__": func.__annotations__,
-        "__kwdefaults__": func.__kwdefaults__,
-        "__defaults__": func.__defaults__,
-        "__module__": func.__module__,
-        "__doc__": func.__doc__,
-        "__closure__": func.__closure__,
-    }
-
-    f_globals_ref = _extract_code_globals(func.__code__)
-    f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
-                 func.__globals__}
-
-    closure_values = (
-        list(map(_get_cell_contents, func.__closure__))
-        if func.__closure__ is not None else ()
-    )
-
-    # Extract currently-imported submodules used by func. Storing these modules
-    # in a smoke _cloudpickle_subimports attribute of the object's state will
-    # trigger the side effect of importing these modules at unpickling time
-    # (which is necessary for func to work correctly once depickled)
-    slotstate["_cloudpickle_submodules"] = _find_imported_submodules(
-        func.__code__, itertools.chain(f_globals.values(), closure_values))
-    slotstate["__globals__"] = f_globals
-
-    state = func.__dict__
-    return state, slotstate
-
-
-def _class_getstate(obj):
-    clsdict = _extract_class_dict(obj)
-    clsdict.pop('__weakref__', None)
-
-    if issubclass(type(obj), abc.ABCMeta):
-        # If obj is an instance of an ABCMeta subclass, dont pickle the
-        # cache/negative caches populated during isinstance/issubclass
-        # checks, but pickle the list of registered subclasses of obj.
-        clsdict.pop('_abc_impl', None)
-        (registry, _, _, _) = abc._get_dump(obj)
-        clsdict["_abc_impl"] = [subclass_weakref()
-                                for subclass_weakref in registry]
-
-    if "__slots__" in clsdict:
-        # pickle string length optimization: member descriptors of obj are
-        # created automatically from obj's __slots__ attribute, no need to
-        # save them in obj's state
-        if isinstance(obj.__slots__, str):
-            clsdict.pop(obj.__slots__)
-        else:
-            for k in obj.__slots__:
-                clsdict.pop(k, None)
-
-    clsdict.pop('__dict__', None)  # unpicklable property object
-
-    return (clsdict, {})
-
-
-def _enum_getstate(obj):
-    clsdict, slotstate = _class_getstate(obj)
-
-    members = dict((e.name, e.value) for e in obj)
-    # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
-    # Those attributes are already handled by the metaclass.
-    for attrname in ["_generate_next_value_", "_member_names_",
-                     "_member_map_", "_member_type_",
-                     "_value2member_map_"]:
-        clsdict.pop(attrname, None)
-    for member in members:
-        clsdict.pop(member)
-        # Special handling of Enum subclasses
-    return clsdict, slotstate
-
-
 # COLLECTIONS OF OBJECTS REDUCERS
 # -------------------------------
 # A reducer is a function taking a single argument (obj), and that returns a
@@ -303,97 +202,13 @@ def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
 
-def _dynamic_class_reduce(obj):
-    """
-    Save a class that can't be stored as module global.
-
-    This method is used to serialize classes that are defined inside
-    functions, or that otherwise can't be serialized as attribute lookups
-    from global modules.
-    """
-    if Enum is not None and issubclass(obj, Enum):
-        return (
-            _make_skeleton_enum, _enum_getnewargs(obj), _enum_getstate(obj),
-            None, None, _class_setstate
-        )
-    else:
-        return (
-            _make_skeleton_class, _class_getnewargs(obj), _class_getstate(obj),
-            None, None, _class_setstate
-        )
-
-
-def _class_reduce(obj):
-    """Select the reducer depending on the dynamic nature of the class obj"""
-    if obj is type(None):  # noqa
-        return type, (None,)
-    elif obj is type(Ellipsis):
-        return type, (Ellipsis,)
-    elif obj is type(NotImplemented):
-        return type, (NotImplemented,)
-    elif obj in _BUILTIN_TYPE_NAMES:
-        return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
-    elif not _is_importable_by_name(obj):
-        return _dynamic_class_reduce(obj)
-    return NotImplemented
-
-
 # COLLECTIONS OF OBJECTS STATE SETTERS
 # ------------------------------------
 # state setters are called at unpickling time, once the object is created and
 # it has to be updated to how it was at unpickling time.
 
 
-def _function_setstate(obj, state):
-    """Update the state of a dynaamic function.
-
-    As __closure__ and __globals__ are readonly attributes of a function, we
-    cannot rely on the native setstate routine of pickle.load_build, that calls
-    setattr on items of the slotstate. Instead, we have to modify them inplace.
-    """
-    state, slotstate = state
-    obj.__dict__.update(state)
-
-    obj_globals = slotstate.pop("__globals__")
-    obj_closure = slotstate.pop("__closure__")
-    # _cloudpickle_subimports is a set of submodules that must be loaded for
-    # the pickled function to work correctly at unpickling time. Now that these
-    # submodules are depickled (hence imported), they can be removed from the
-    # object's state (the object state only served as a reference holder to
-    # these submodules)
-    slotstate.pop("_cloudpickle_submodules")
-
-    obj.__globals__.update(obj_globals)
-    obj.__globals__["__builtins__"] = __builtins__
-
-    if obj_closure is not None:
-        for i, cell in enumerate(obj_closure):
-            try:
-                value = cell.cell_contents
-            except ValueError:  # cell is empty
-                continue
-            obj.__closure__[i].cell_contents = value
-
-    for k, v in slotstate.items():
-        setattr(obj, k, v)
-
-
-def _class_setstate(obj, state):
-    state, slotstate = state
-    registry = None
-    for attrname, attr in state.items():
-        if attrname == "_abc_impl":
-            registry = attr
-        else:
-            setattr(obj, attrname, attr)
-    if registry is not None:
-        for subclass in registry:
-            obj.register(subclass)
-
-    return obj
-
-
-class CloudPickler(Pickler):
+class CloudPickler(FunctionSaverMixin, Pickler):
     """Fast C Pickler extension with additional reducing routines.
 
     CloudPickler's extensions exist into into:
@@ -483,65 +298,6 @@ class CloudPickler(Pickler):
         else:
             # fallback to save_global, including the Pickler's distpatch_table
             return NotImplemented
-
-    # function reducers are defined as instance methods of CloudPickler
-    # objects, as they rely on a CloudPickler attribute (globals_ref)
-    def _dynamic_function_reduce(self, func):
-        """Reduce a function that is not pickleable via attribute lookup."""
-        newargs = self._function_getnewargs(func)
-        state = _function_getstate(func)
-        return (types.FunctionType, newargs, state, None, None,
-                _function_setstate)
-
-    def _function_reduce(self, obj):
-        """Reducer for function objects.
-
-        If obj is a top-level attribute of a file-backed module, this
-        reducer returns NotImplemented, making the CloudPickler fallback to
-        traditional _pickle.Pickler routines to save obj. Otherwise, it reduces
-        obj using a custom cloudpickle reducer designed specifically to handle
-        dynamic functions.
-
-        As opposed to cloudpickle.py, There no special handling for builtin
-        pypy functions because cloudpickle_fast is CPython-specific.
-        """
-        if _is_importable_by_name(obj):
-            return NotImplemented
-        else:
-            return self._dynamic_function_reduce(obj)
-
-    def _function_getnewargs(self, func):
-        code = func.__code__
-
-        # base_globals represents the future global namespace of func at
-        # unpickling time. Looking it up and storing it in
-        # CloudpiPickler.globals_ref allow functions sharing the same globals
-        # at pickling time to also share them once unpickled, at one condition:
-        # since globals_ref is an attribute of a CloudPickler instance, and
-        # that a new CloudPickler is created each time pickle.dump or
-        # pickle.dumps is called, functions also need to be saved within the
-        # same invocation of cloudpickle.dump/cloudpickle.dumps (for example:
-        # cloudpickle.dumps([f1, f2])). There is no such limitation when using
-        # CloudPickler.dump, as long as the multiple invocations are bound to
-        # the same CloudPickler.
-        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
-
-        if base_globals == {}:
-            # Add module attributes used to resolve relative imports
-            # instructions inside func.
-            for k in ["__package__", "__name__", "__path__", "__file__"]:
-                if k in func.__globals__:
-                    base_globals[k] = func.__globals__[k]
-
-        # Do not bind the free variables before the function is created to
-        # avoid infinite recursion.
-        if func.__closure__ is None:
-            closure = None
-        else:
-            closure = tuple(
-                types.CellType() for _ in range(len(code.co_freevars)))
-
-        return code, base_globals, None, None, closure
 
     def dump(self, obj):
         try:

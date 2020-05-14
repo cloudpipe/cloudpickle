@@ -78,6 +78,17 @@ if sys.version_info >= (3, 5, 3):
 else:  # pragma: no cover
     ClassVar = None
 
+if sys.version_info >= (3, 8):
+    from types import CellType
+else:
+    def f():
+        a = 1
+
+        def g():
+            return a
+        return g
+    CellType = type(f().__closure__[0])
+
 
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
@@ -99,6 +110,265 @@ if PYPY:
     builtin_code_type = type(float.__new__.__code__)
 
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
+
+
+def _function_setstate(obj, state):
+    """Update the state of a dynaamic function.
+
+    As __closure__ and __globals__ are readonly attributes of a function, we
+    cannot rely on the native setstate routine of pickle.load_build, that calls
+    setattr on items of the slotstate. Instead, we have to modify them inplace.
+    """
+    state, slotstate = state
+    obj.__dict__.update(state)
+
+    obj_globals = slotstate.pop("__globals__")
+    obj_closure = slotstate.pop("__closure__")
+    # _cloudpickle_subimports is a set of submodules that must be loaded for
+    # the pickled function to work correctly at unpickling time. Now that these
+    # submodules are depickled (hence imported), they can be removed from the
+    # object's state (the object state only served as a reference holder to
+    # these submodules)
+    slotstate.pop("_cloudpickle_submodules")
+
+    obj.__globals__.update(obj_globals)
+    obj.__globals__["__builtins__"] = __builtins__
+
+    if obj_closure is not None:
+        for i, cell in enumerate(obj_closure):
+            try:
+                value = cell.cell_contents
+            except ValueError:  # cell is empty
+                continue
+            cell_set(obj.__closure__[i], value)
+
+    for k, v in slotstate.items():
+        setattr(obj, k, v)
+
+
+def _function_getstate(func):
+    # - Put func's dynamic attributes (stored in func.__dict__) in state. These
+    #   attributes will be restored at unpickling time using
+    #   f.__dict__.update(state)
+    # - Put func's members into slotstate. Such attributes will be restored at
+    #   unpickling time by iterating over slotstate and calling setattr(func,
+    #   slotname, slotvalue)
+    slotstate = {
+        "__name__": func.__name__,
+        "__qualname__": func.__qualname__,
+        "__annotations__": func.__annotations__,
+        "__kwdefaults__": func.__kwdefaults__,
+        "__defaults__": func.__defaults__,
+        "__module__": func.__module__,
+        "__doc__": func.__doc__,
+        "__closure__": func.__closure__,
+    }
+
+    f_globals_ref = _extract_code_globals(func.__code__)
+    f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
+                 func.__globals__}
+
+    closure_values = (
+        list(map(_get_cell_contents, func.__closure__))
+        if func.__closure__ is not None else ()
+    )
+
+    # Extract currently-imported submodules used by func. Storing these modules
+    # in a smoke _cloudpickle_subimports attribute of the object's state will
+    # trigger the side effect of importing these modules at unpickling time
+    # (which is necessary for func to work correctly once depickled)
+    slotstate["_cloudpickle_submodules"] = _find_imported_submodules(
+        func.__code__, itertools.chain(f_globals.values(), closure_values))
+    slotstate["__globals__"] = f_globals
+
+    state = func.__dict__
+    return state, slotstate
+
+
+class FunctionSaverMixin:
+    # function reducers are defined as instance methods of CloudPickler
+    # objects, as they rely on a CloudPickler attribute (globals_ref)
+    def _dynamic_function_reduce(self, func):
+        """Reduce a function that is not pickleable via attribute lookup."""
+        newargs = self._function_getnewargs(func)
+        state = _function_getstate(func)
+        return (types.FunctionType, newargs, state, None, None,
+                _function_setstate)
+
+    def _function_reduce(self, obj):
+        """Reducer for function objects.
+
+        If obj is a top-level attribute of a file-backed module, this
+        reducer returns NotImplemented, making the CloudPickler fallback to
+        traditional _pickle.Pickler routines to save obj. Otherwise, it reduces
+        obj using a custom cloudpickle reducer designed specifically to handle
+        dynamic functions.
+
+        As opposed to cloudpickle.py, There no special handling for builtin
+        pypy functions because cloudpickle_fast is CPython-specific.
+        """
+        if _is_importable_by_name(obj):
+            return NotImplemented
+        else:
+            return self._dynamic_function_reduce(obj)
+
+    def _function_getnewargs(self, func):
+        code = func.__code__
+
+        # base_globals represents the future global namespace of func at
+        # unpickling time. Looking it up and storing it in
+        # CloudpiPickler.globals_ref allow functions sharing the same globals
+        # at pickling time to also share them once unpickled, at one condition:
+        # since globals_ref is an attribute of a CloudPickler instance, and
+        # that a new CloudPickler is created each time pickle.dump or
+        # pickle.dumps is called, functions also need to be saved within the
+        # same invocation of cloudpickle.dump/cloudpickle.dumps (for example:
+        # cloudpickle.dumps([f1, f2])). There is no such limitation when using
+        # CloudPickler.dump, as long as the multiple invocations are bound to
+        # the same CloudPickler.
+        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
+
+        if base_globals == {}:
+            # Add module attributes used to resolve relative imports
+            # instructions inside func.
+            for k in ["__package__", "__name__", "__path__", "__file__"]:
+                if k in func.__globals__:
+                    base_globals[k] = func.__globals__[k]
+
+        # Do not bind the free variables before the function is created to
+        # avoid infinite recursion.
+        if func.__closure__ is None:
+            closure = None
+        else:
+            closure = tuple(
+                _make_empty_cell() for _ in range(len(code.co_freevars)))
+
+        return code, base_globals, None, None, closure
+
+
+def _class_getnewargs(obj):
+    type_kwargs = {}
+    if "__slots__" in obj.__dict__:
+        type_kwargs["__slots__"] = obj.__slots__
+
+    __dict__ = obj.__dict__.get('__dict__', None)
+    if isinstance(__dict__, property):
+        type_kwargs['__dict__'] = __dict__
+
+    return (type(obj), obj.__name__, _get_bases(obj), type_kwargs,
+            _get_or_create_tracker_id(obj), None)
+
+
+def _enum_getnewargs(obj):
+    members = dict((e.name, e.value) for e in obj)
+    return (obj.__bases__, obj.__name__, obj.__qualname__, members,
+            obj.__module__, _get_or_create_tracker_id(obj), None)
+
+
+def _class_reduce(obj):
+    """Select the reducer depending on the dynamic nature of the class obj"""
+    if obj is type(None):  # noqa
+        return type, (None,)
+    elif obj is type(Ellipsis):
+        return type, (Ellipsis,)
+    elif obj is type(NotImplemented):
+        return type, (NotImplemented,)
+    elif obj in _BUILTIN_TYPE_NAMES:
+        return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
+    elif not _is_importable_by_name(obj):
+        return _dynamic_class_reduce(obj)
+    return NotImplemented
+
+
+def _dynamic_class_reduce(obj):
+    """
+    Save a class that can't be stored as module global.
+
+    This method is used to serialize classes that are defined inside
+    functions, or that otherwise can't be serialized as attribute lookups
+    from global modules.
+    """
+    if Enum is not None and issubclass(obj, Enum):
+        return (
+            _make_skeleton_enum, _enum_getnewargs(obj), _enum_getstate(obj),
+            None, None, _class_setstate
+        )
+    else:
+        return (
+            _make_skeleton_class, _class_getnewargs(obj), _class_getstate(obj),
+            None, None, _class_setstate
+        )
+
+
+def _class_getstate(obj):
+    clsdict = _extract_class_dict(obj)
+    clsdict.pop('__weakref__', None)
+
+    if issubclass(type(obj), abc.ABCMeta):
+        # If obj is an instance of an ABCMeta subclass, dont pickle the
+        # cache/negative caches populated during isinstance/issubclass
+        # checks, but pickle the list of registered subclasses of obj.
+        clsdict.pop('_abc_cache', None)
+        clsdict.pop('_abc_negative_cache', None)
+        clsdict.pop('_abc_negative_cache_version', None)
+        registry = clsdict.pop('_abc_registry', None)
+        if registry is None:
+            # in Python3.7+, the abc caches and registered subclasses of a
+            # class are bundled into the single _abc_impl attribute
+            clsdict.pop('_abc_impl', None)
+            (registry, _, _, _) = abc._get_dump(obj)
+
+            clsdict["_abc_impl"] = [subclass_weakref()
+                                    for subclass_weakref in registry]
+        else:
+            # In the above if clause, registry is a set of weakrefs -- in
+            # this case, registry is a WeakSet
+            clsdict["_abc_impl"] = [type_ for type_ in registry]
+
+    if "__slots__" in clsdict:
+        # pickle string length optimization: member descriptors of obj are
+        # created automatically from obj's __slots__ attribute, no need to
+        # save them in obj's state
+        if isinstance(obj.__slots__, str):
+            clsdict.pop(obj.__slots__)
+        else:
+            for k in obj.__slots__:
+                clsdict.pop(k, None)
+
+    clsdict.pop('__dict__', None)  # unpicklable property object
+
+    return (clsdict, {})
+
+
+def _enum_getstate(obj):
+    clsdict, slotstate = _class_getstate(obj)
+
+    members = dict((e.name, e.value) for e in obj)
+    # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
+    # Those attributes are already handled by the metaclass.
+    for attrname in ["_generate_next_value_", "_member_names_",
+                     "_member_map_", "_member_type_",
+                     "_value2member_map_"]:
+        clsdict.pop(attrname, None)
+    for member in members:
+        clsdict.pop(member)
+        # Special handling of Enum subclasses
+    return clsdict, slotstate
+
+
+def _class_setstate(obj, state):
+    state, slotstate = state
+    registry = None
+    for attrname, attr in state.items():
+        if attrname == "_abc_impl":
+            registry = attr
+        else:
+            setattr(obj, attrname, attr)
+    if registry is not None:
+        for subclass in registry:
+            obj.register(subclass)
+
+    return obj
 
 
 def _get_or_create_tracker_id(class_def):
@@ -460,9 +730,10 @@ if sys.version_info[:2] < (3, 7):  # pragma: no branch
         return origin[args]
 
 
-class CloudPickler(Pickler):
+class CloudPickler(FunctionSaverMixin, Pickler):
 
     dispatch = Pickler.dispatch.copy()
+    dispatch_table = dict()
 
     def __init__(self, file, protocol=None):
         if protocol is None:
@@ -481,6 +752,17 @@ class CloudPickler(Pickler):
                 raise pickle.PicklingError(msg)
             else:
                 raise
+
+    def _cell_reduce(obj):
+        """Cell (containing values of a function's free variables) reducer"""
+        try:
+            obj.cell_contents
+        except ValueError:  # cell is empty
+            return _make_empty_cell, ()
+        else:
+            return _make_cell, (obj.cell_contents, )
+
+    dispatch_table[CellType] = _cell_reduce
 
     def save_typevar(self, obj):
         self.save_reduce(*_typevar_reduce(obj), obj=obj)
@@ -541,7 +823,30 @@ class CloudPickler(Pickler):
         elif PYPY and isinstance(obj.__code__, builtin_code_type):
             return self.save_pypy_builtin_func(obj)
         else:
-            return self.save_function_tuple(obj)
+            return self._save_reduce_pickle5(
+                *self._dynamic_function_reduce(obj), obj=obj
+            )
+
+    def _save_reduce_pickle5(self, func, args, state=None, listitems=None,
+                             dictitems=None, state_setter=None, obj=None):
+        save = self.save
+        write = self.write
+        self.save_reduce(
+            func, args, state=None, listitems=listitems, dictitems=dictitems,
+            obj=obj
+        )
+        # backport of the Python 3.8 state_setter pickle operations
+        save(state_setter)
+        save(obj)  # simple BINGET opcode as obj is already memoized.
+        save(state)
+        write(pickle.TUPLE2)
+        # Trigger a state_setter(obj, state) function call.
+        write(pickle.REDUCE)
+        # The purpose of state_setter is to carry-out an
+        # inplace modification of obj. We do not care about what the
+        # method might return, so its output is eventually removed from
+        # the stack.
+        write(pickle.POP)
 
     dispatch[types.FunctionType] = save_function
 
@@ -568,246 +873,6 @@ class CloudPickler(Pickler):
                                    obj.__defaults__, obj.__closure__),
               obj.__dict__)
         self.save_reduce(*rv, obj=obj)
-
-    def _save_dynamic_enum(self, obj, clsdict):
-        """Special handling for dynamic Enum subclasses
-
-        Use a dedicated Enum constructor (inspired by EnumMeta.__call__) as the
-        EnumMeta metaclass has complex initialization that makes the Enum
-        subclasses hold references to their own instances.
-        """
-        members = dict((e.name, e.value) for e in obj)
-
-        self.save_reduce(
-                _make_skeleton_enum,
-                (obj.__bases__, obj.__name__, obj.__qualname__,
-                 members, obj.__module__, _get_or_create_tracker_id(obj), None),
-                obj=obj
-         )
-
-        # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
-        # Those attributes are already handled by the metaclass.
-        for attrname in ["_generate_next_value_", "_member_names_",
-                         "_member_map_", "_member_type_",
-                         "_value2member_map_"]:
-            clsdict.pop(attrname, None)
-        for member in members:
-            clsdict.pop(member)
-
-    def save_dynamic_class(self, obj):
-        """Save a class that can't be stored as module global.
-
-        This method is used to serialize classes that are defined inside
-        functions, or that otherwise can't be serialized as attribute lookups
-        from global modules.
-        """
-        clsdict = _extract_class_dict(obj)
-        clsdict.pop('__weakref__', None)
-
-        if issubclass(type(obj), abc.ABCMeta):
-            # If obj is an instance of an ABCMeta subclass, dont pickle the
-            # cache/negative caches populated during isinstance/issubclass
-            # checks, but pickle the list of registered subclasses of obj.
-            clsdict.pop('_abc_cache', None)
-            clsdict.pop('_abc_negative_cache', None)
-            clsdict.pop('_abc_negative_cache_version', None)
-            registry = clsdict.pop('_abc_registry', None)
-            if registry is None:
-                # in Python3.7+, the abc caches and registered subclasses of a
-                # class are bundled into the single _abc_impl attribute
-                clsdict.pop('_abc_impl', None)
-                (registry, _, _, _) = abc._get_dump(obj)
-
-                clsdict["_abc_impl"] = [subclass_weakref()
-                                        for subclass_weakref in registry]
-            else:
-                # In the above if clause, registry is a set of weakrefs -- in
-                # this case, registry is a WeakSet
-                clsdict["_abc_impl"] = [type_ for type_ in registry]
-
-        # On PyPy, __doc__ is a readonly attribute, so we need to include it in
-        # the initial skeleton class.  This is safe because we know that the
-        # doc can't participate in a cycle with the original class.
-        type_kwargs = {'__doc__': clsdict.pop('__doc__', None)}
-
-        if "__slots__" in clsdict:
-            type_kwargs['__slots__'] = obj.__slots__
-            # pickle string length optimization: member descriptors of obj are
-            # created automatically from obj's __slots__ attribute, no need to
-            # save them in obj's state
-            if isinstance(obj.__slots__, str):
-                clsdict.pop(obj.__slots__)
-            else:
-                for k in obj.__slots__:
-                    clsdict.pop(k, None)
-
-        # If type overrides __dict__ as a property, include it in the type
-        # kwargs. In Python 2, we can't set this attribute after construction.
-        # XXX: can this ever happen in Python 3? If so add a test.
-        __dict__ = clsdict.pop('__dict__', None)
-        if isinstance(__dict__, property):
-            type_kwargs['__dict__'] = __dict__
-
-        save = self.save
-        write = self.write
-
-        # We write pickle instructions explicitly here to handle the
-        # possibility that the type object participates in a cycle with its own
-        # __dict__. We first write an empty "skeleton" version of the class and
-        # memoize it before writing the class' __dict__ itself. We then write
-        # instructions to "rehydrate" the skeleton class by restoring the
-        # attributes from the __dict__.
-        #
-        # A type can appear in a cycle with its __dict__ if an instance of the
-        # type appears in the type's __dict__ (which happens for the stdlib
-        # Enum class), or if the type defines methods that close over the name
-        # of the type, (which is common for Python 2-style super() calls).
-
-        # Push the rehydration function.
-        save(_rehydrate_skeleton_class)
-
-        # Mark the start of the args tuple for the rehydration function.
-        write(pickle.MARK)
-
-        # Create and memoize an skeleton class with obj's name and bases.
-        if Enum is not None and issubclass(obj, Enum):
-            # Special handling of Enum subclasses
-            self._save_dynamic_enum(obj, clsdict)
-        else:
-            # "Regular" class definition:
-            tp = type(obj)
-            self.save_reduce(_make_skeleton_class,
-                             (tp, obj.__name__, _get_bases(obj), type_kwargs,
-                              _get_or_create_tracker_id(obj), None),
-                             obj=obj)
-
-        # Now save the rest of obj's __dict__. Any references to obj
-        # encountered while saving will point to the skeleton class.
-        save(clsdict)
-
-        # Write a tuple of (skeleton_class, clsdict).
-        write(pickle.TUPLE)
-
-        # Call _rehydrate_skeleton_class(skeleton_class, clsdict)
-        write(pickle.REDUCE)
-
-    def save_function_tuple(self, func):
-        """  Pickles an actual func object.
-
-        A func comprises: code, globals, defaults, closure, and dict.  We
-        extract and save these, injecting reducing functions at certain points
-        to recreate the func object.  Keep in mind that some of these pieces
-        can contain a ref to the func itself.  Thus, a naive save on these
-        pieces could trigger an infinite loop of save's.  To get around that,
-        we first create a skeleton func object using just the code (this is
-        safe, since this won't contain a ref to the func), and memoize it as
-        soon as it's created.  The other stuff can then be filled in later.
-        """
-        if is_tornado_coroutine(func):
-            self.save_reduce(_rebuild_tornado_coroutine, (func.__wrapped__,),
-                             obj=func)
-            return
-
-        save = self.save
-        write = self.write
-
-        code, f_globals, defaults, closure_values, dct, base_globals = self.extract_func_data(func)
-
-        save(_fill_function)  # skeleton function updater
-        write(pickle.MARK)    # beginning of tuple that _fill_function expects
-
-        # Extract currently-imported submodules used by func. Storing these
-        # modules in a smoke _cloudpickle_subimports attribute of the object's
-        # state will trigger the side effect of importing these modules at
-        # unpickling time (which is necessary for func to work correctly once
-        # depickled)
-        submodules = _find_imported_submodules(
-            code,
-            itertools.chain(f_globals.values(), closure_values or ()),
-        )
-
-        # create a skeleton function object and memoize it
-        save(_make_skel_func)
-        save((
-            code,
-            len(closure_values) if closure_values is not None else -1,
-            base_globals,
-        ))
-        write(pickle.REDUCE)
-        self.memoize(func)
-
-        # save the rest of the func data needed by _fill_function
-        state = {
-            'globals': f_globals,
-            'defaults': defaults,
-            'dict': dct,
-            'closure_values': closure_values,
-            'module': func.__module__,
-            'name': func.__name__,
-            'doc': func.__doc__,
-            '_cloudpickle_submodules': submodules
-        }
-        if hasattr(func, '__annotations__'):
-            state['annotations'] = func.__annotations__
-        if hasattr(func, '__qualname__'):
-            state['qualname'] = func.__qualname__
-        if hasattr(func, '__kwdefaults__'):
-            state['kwdefaults'] = func.__kwdefaults__
-        save(state)
-        write(pickle.TUPLE)
-        write(pickle.REDUCE)  # applies _fill_function on the tuple
-
-    def extract_func_data(self, func):
-        """
-        Turn the function into a tuple of data necessary to recreate it:
-            code, globals, defaults, closure_values, dict
-        """
-        code = func.__code__
-
-        # extract all global ref's
-        func_global_refs = _extract_code_globals(code)
-
-        # process all variables referenced by global environment
-        f_globals = {}
-        for var in func_global_refs:
-            if var in func.__globals__:
-                f_globals[var] = func.__globals__[var]
-
-        # defaults requires no processing
-        defaults = func.__defaults__
-
-        # process closure
-        closure = (
-            list(map(_get_cell_contents, func.__closure__))
-            if func.__closure__ is not None
-            else None
-        )
-
-        # save the dict
-        dct = func.__dict__
-
-        # base_globals represents the future global namespace of func at
-        # unpickling time. Looking it up and storing it in globals_ref allow
-        # functions sharing the same globals at pickling time to also
-        # share them once unpickled, at one condition: since globals_ref is
-        # an attribute of a Cloudpickler instance, and that a new CloudPickler is
-        # created each time pickle.dump or pickle.dumps is called, functions
-        # also need to be saved within the same invokation of
-        # cloudpickle.dump/cloudpickle.dumps (for example: cloudpickle.dumps([f1, f2])). There
-        # is no such limitation when using Cloudpickler.dump, as long as the
-        # multiple invokations are bound to the same Cloudpickler.
-        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
-
-        if base_globals == {}:
-            # Add module attributes used to resolve relative imports
-            # instructions inside func.
-            for k in ["__package__", "__name__", "__path__", "__file__"]:
-                # Some built-in functions/methods such as object.__new__  have
-                # their __globals__ set to None in PyPy
-                if func.__globals__ is not None and k in func.__globals__:
-                    base_globals[k] = func.__globals__[k]
-
-        return (code, f_globals, defaults, closure, dct, base_globals)
 
     def save_getset_descriptor(self, obj):
         return self.save_reduce(getattr, (obj.__objclass__, obj.__name__))
@@ -841,7 +906,7 @@ class CloudPickler(Pickler):
         elif name is not None:
             Pickler.save_global(self, obj, name=name)
         elif not _is_importable_by_name(obj, name=name):
-            self.save_dynamic_class(obj)
+            self._save_reduce_pickle5(*_dynamic_class_reduce(obj), obj=obj)
         else:
             Pickler.save_global(self, obj, name=name)
 
@@ -1145,78 +1210,24 @@ class _empty_cell_value(object):
         return cls.__name__
 
 
-def _fill_function(*args):
-    """Fills in the rest of function data into the skeleton function object
-
-    The skeleton itself is create by _make_skel_func().
-    """
-    if len(args) == 2:
-        func = args[0]
-        state = args[1]
-    elif len(args) == 5:
-        # Backwards compat for cloudpickle v0.4.0, after which the `module`
-        # argument was introduced
-        func = args[0]
-        keys = ['globals', 'defaults', 'dict', 'closure_values']
-        state = dict(zip(keys, args[1:]))
-    elif len(args) == 6:
-        # Backwards compat for cloudpickle v0.4.1, after which the function
-        # state was passed as a dict to the _fill_function it-self.
-        func = args[0]
-        keys = ['globals', 'defaults', 'dict', 'module', 'closure_values']
-        state = dict(zip(keys, args[1:]))
-    else:
-        raise ValueError('Unexpected _fill_value arguments: %r' % (args,))
-
-    # - At pickling time, any dynamic global variable used by func is
-    #   serialized by value (in state['globals']).
-    # - At unpickling time, func's __globals__ attribute is initialized by
-    #   first retrieving an empty isolated namespace that will be shared
-    #   with other functions pickled from the same original module
-    #   by the same CloudPickler instance and then updated with the
-    #   content of state['globals'] to populate the shared isolated
-    #   namespace with all the global variables that are specifically
-    #   referenced for this function.
-    func.__globals__.update(state['globals'])
-
-    func.__defaults__ = state['defaults']
-    func.__dict__ = state['dict']
-    if 'annotations' in state:
-        func.__annotations__ = state['annotations']
-    if 'doc' in state:
-        func.__doc__  = state['doc']
-    if 'name' in state:
-        func.__name__ = state['name']
-    if 'module' in state:
-        func.__module__ = state['module']
-    if 'qualname' in state:
-        func.__qualname__ = state['qualname']
-    if 'kwdefaults' in state:
-        func.__kwdefaults__ = state['kwdefaults']
-    # _cloudpickle_subimports is a set of submodules that must be loaded for
-    # the pickled function to work correctly at unpickling time. Now that these
-    # submodules are depickled (hence imported), they can be removed from the
-    # object's state (the object state only served as a reference holder to
-    # these submodules)
-    if '_cloudpickle_submodules' in state:
-        state.pop('_cloudpickle_submodules')
-
-    cells = func.__closure__
-    if cells is not None:
-        for cell, value in zip(cells, state['closure_values']):
-            if value is not _empty_cell_value:
-                cell_set(cell, value)
-
-    return func
-
-
 def _make_empty_cell():
-    if False:
-        # trick the compiler into creating an empty cell in our lambda
-        cell = None
-        raise AssertionError('this route should not be executed')
+    if sys.version_info >= (3, 8):
+        from types import CellType
+        return CellType
+    else:
+        if False:
+            # trick the compiler into creating an empty cell in our lambda
+            cell = None
+            raise AssertionError('this route should not be executed')
 
-    return (lambda: cell).__closure__[0]
+        return (lambda: cell).__closure__[0]
+
+
+def _make_cell(value=_empty_cell_value):
+    cell = _make_empty_cell()
+    if value != _empty_cell_value:
+        cell_set(cell, value)
+    return cell
 
 
 def _make_skel_func(code, cell_count, base_globals=None):
@@ -1257,24 +1268,6 @@ def _make_skeleton_class(type_constructor, name, bases, type_kwargs,
         lambda ns: ns.update(type_kwargs)
     )
     return _lookup_class_or_track(class_tracker_id, skeleton_class)
-
-
-def _rehydrate_skeleton_class(skeleton_class, class_dict):
-    """Put attributes from `class_dict` back on `skeleton_class`.
-
-    See CloudPickler.save_dynamic_class for more info.
-    """
-    registry = None
-    for attrname, attr in class_dict.items():
-        if attrname == "_abc_impl":
-            registry = attr
-        else:
-            setattr(skeleton_class, attrname, attr)
-    if registry is not None:
-        for subclass in registry:
-            skeleton_class.register(subclass)
-
-    return skeleton_class
 
 
 def _make_skeleton_enum(bases, name, qualname, members, module,
