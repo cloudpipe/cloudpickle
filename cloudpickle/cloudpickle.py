@@ -42,29 +42,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
-import abc
 import builtins
 import dis
-import io
-import itertools
-import logging
 import opcode
-import operator
 import pickle
 import platform
-import struct
 import sys
 import types
 import weakref
 import uuid
 import threading
 import typing
-from enum import Enum
 
 from typing import Generic, Union, Tuple, Callable
-from pickle import _Pickler as Pickler
 from pickle import _getattribute
-from io import BytesIO
 from importlib._bootstrap import _find_spec
 
 try:  # pragma: no branch
@@ -543,40 +534,6 @@ def is_tornado_coroutine(func):
 def _rebuild_tornado_coroutine(func):
     from tornado import gen
     return gen.coroutine(func)
-
-
-# Shorthands for legacy support
-
-def dump(obj, file, protocol=None):
-    """Serialize obj as bytes streamed into file
-
-    protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
-    pickle.HIGHEST_PROTOCOL. This setting favors maximum communication speed
-    between processes running the same Python version.
-
-    Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
-    compatibility with older versions of Python.
-    """
-    CloudPickler(file, protocol=protocol).dump(obj)
-
-
-def dumps(obj, protocol=None):
-    """Serialize obj as a string of bytes allocated in memory
-
-    protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
-    pickle.HIGHEST_PROTOCOL. This setting favors maximum communication speed
-    between processes running the same Python version.
-
-    Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
-    compatibility with older versions of Python.
-    """
-    file = BytesIO()
-    try:
-        cp = CloudPickler(file, protocol=protocol)
-        cp.dump(obj)
-        return file.getvalue()
-    finally:
-        file.close()
 
 
 # including pickles unloading functions in this namespace

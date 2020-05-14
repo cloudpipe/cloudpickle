@@ -23,6 +23,8 @@ import types
 import weakref
 import typing
 
+from enum import Enum
+
 if sys.version_info >= (3, 8):
     from _pickle import Pickler
 else:
@@ -32,7 +34,7 @@ else:
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _is_importable_by_name,
-    _builtin_type, Enum, _get_or_create_tracker_id,  _make_skeleton_class,
+    _builtin_type, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
     _is_parametrized_type_hint, PYPY, cell_set,
