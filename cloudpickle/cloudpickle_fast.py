@@ -54,7 +54,7 @@ def dump(obj, file, protocol=None, buffer_callback=None):
     Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
     compatibility with older versions of Python.
     """
-    if sys.version_info >= (3, 8):
+    if pickle.HIGHEST_PROTOCOL >= 5:
         CloudPickler(
             file, protocol=protocol, buffer_callback=buffer_callback).dump(obj)
     else:
@@ -72,7 +72,7 @@ def dumps(obj, protocol=None, buffer_callback=None):
     compatibility with older versions of Python.
     """
     with io.BytesIO() as file:
-        if sys.version_info >= (3, 8):
+        if pickle.HIGHEST_PROTOCOL >= 5:
             cp = CloudPickler(
                 file, protocol=protocol, buffer_callback=buffer_callback
             )
@@ -528,7 +528,7 @@ class CloudPickler(FunctionSaverMixin, Pickler):
     def __init__(self, file, protocol=None, buffer_callback=None):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
-        if sys.version_info >= (3, 8):
+        if pickle.HIGHEST_PROTOCOL >= 5:
             Pickler.__init__(
                 self, file, protocol=protocol, buffer_callback=buffer_callback
             )
@@ -601,7 +601,12 @@ class CloudPickler(FunctionSaverMixin, Pickler):
                 raise pickle.PicklingError(msg)
             else:
                 raise
-    if sys.version_info < (3, 8):
+
+    if pickle.HIGHEST_PROTOCOL < 5:
+        # backport of Python 3.8+ new save_reduce function.  although the
+        # Python 3.8's save_reduce is not explicitly part of pickle 5 its
+        # availablity coincidates with the availablity of pickle protocol 5 in
+        # both the stdlib pickle and pickle5.
         dispatch = Pickler.dispatch.copy()
 
         def save_pypy_builtin_func(self, obj):
