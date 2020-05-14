@@ -15,7 +15,6 @@ import copyreg
 import io
 import itertools
 import logging
-import _pickle
 import pickle
 import sys
 import struct
@@ -24,12 +23,6 @@ import weakref
 import typing
 
 from enum import Enum
-
-if sys.version_info >= (3, 8):
-    from _pickle import Pickler
-else:
-    from pickle import _Pickler as Pickler
-
 
 from .cloudpickle import (
     _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
@@ -42,7 +35,12 @@ from .cloudpickle import (
     builtin_code_type
 )
 
-load, loads = _pickle.load, _pickle.loads
+if sys.version_info < (3, 8) or PYPY:
+    from pickle import _Pickler as Pickler
+else:
+    from _pickle import Pickler
+
+load, loads = pickle.load, pickle.loads
 
 
 # Shorthands similar to pickle.dump/pickle.dumps
@@ -605,6 +603,28 @@ class CloudPickler(FunctionSaverMixin, Pickler):
                 raise
     if sys.version_info < (3, 8):
         dispatch = Pickler.dispatch.copy()
+
+        def save_pypy_builtin_func(self, obj):
+            """Save pypy equivalent of builtin functions.
+            PyPy does not have the concept of builtin-functions. Instead,
+            builtin-functions are simple function instances, but with a
+            builtin-code attribute.
+            Most of the time, builtin functions should be pickled by attribute.
+            But PyPy has flaky support for __qualname__, so some builtin
+            functions such as float.__new__ will be classified as dynamic. For
+            this reason only, we created this special routine. Because
+            builtin-functions are not expected to have closure or globals,
+            there is no additional hack (compared the one already implemented
+            in pickle) to protect ourselves from reference cycles. A simple
+            (reconstructor, newargs, obj.__dict__) tuple is save_reduced.  Note
+            also that PyPy improved their support for __qualname__ in v3.6, so
+            this routing should be removed when cloudpickle supports only PyPy
+            3.6 and later.
+            """
+            rv = (types.FunctionType, (obj.__code__, {}, obj.__name__,
+                                       obj.__defaults__, obj.__closure__),
+                  obj.__dict__)
+            self.save_reduce(*rv, obj=obj)
 
         def save_function(self, obj, name=None):
             """ Registered with the dispatch to handle all function types.
