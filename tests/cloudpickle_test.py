@@ -1229,7 +1229,7 @@ class CloudPickleTest(unittest.TestCase):
         # serializable.
         from cloudpickle import CloudPickler
         from cloudpickle import cloudpickle_fast as cp_fast
-        CloudPickler._dispatch[type(py.builtin)] = cp_fast._module_reduce
+        CloudPickler.dispatch_table[type(py.builtin)] = cp_fast._module_reduce
 
         g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
 
