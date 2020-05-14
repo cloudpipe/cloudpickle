@@ -296,7 +296,7 @@ def _root_logger_reduce(obj):
 
 
 def _property_reduce(obj):
-    return property, (obj.fget, obj.fset, obj.fdel, obj.__doc__)
+    return type(obj), (obj.fget, obj.fset, obj.fdel, obj.__doc__)
 
 
 def _weakset_reduce(obj):
@@ -424,6 +424,10 @@ class CloudPickler(Pickler):
     dispatch[types.MappingProxyType] = _mappingproxy_reduce
     dispatch[weakref.WeakSet] = _weakset_reduce
     dispatch[typing.TypeVar] = _typevar_reduce
+    dispatch[abc.abstractmethod] = _classmethod_reduce
+    dispatch[abc.abstractclassmethod] = _classmethod_reduce
+    dispatch[abc.abstractstaticmethod] = _classmethod_reduce
+    dispatch[abc.abstractproperty] = _property_reduce
 
     def __init__(self, file, protocol=None, buffer_callback=None):
         if protocol is None:

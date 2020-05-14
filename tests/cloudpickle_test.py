@@ -1278,8 +1278,6 @@ class CloudPickleTest(unittest.TestCase):
             def read_write_value(self, value):
                 self._read_write_value = value
 
-
-
         my_object = MyObject()
 
         assert my_object.read_only_value == 1
@@ -1303,6 +1301,59 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_obj.read_write_value == 3
         type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
 
+    def test_abstracts(self):
+        class Base(abc.ABC):
+            _value = 'initial_value'
+
+            @abc.abstractmethod
+            def my_method(self):
+                pass
+
+            @abc.abstractclassmethod
+            def my_classmethod(cls):
+                pass
+
+            @abc.abstractstaticmethod
+            def my_staticmethod():
+                pass
+
+            @abc.abstractproperty
+            def my_property(self):
+                pass
+
+        class Derived(Base):
+            def my_method(self):
+                return 'my_method'
+
+            @classmethod
+            def my_classmethod(cls):
+                return 'my_classmethod'
+
+            @staticmethod
+            def my_staticmethod():
+                return 'my_staticmethod'
+
+            @property
+            def my_property(self):
+                return self._value
+
+            @my_property.setter
+            def my_property(self, new_value):
+                self._value = new_value
+
+        my_object = Derived()
+
+        assert my_object.my_property == 'initial_value'
+        my_object.my_property = 'new_value'
+        assert my_object.my_property == 'new_value'
+        assert Derived._value == 'initial_value'
+        assert Base._value == 'initial_value'
+
+        depickled_obj = pickle_depickle(my_object)
+
+        assert depickled_obj.my_property == 'new_value'
+        assert type(depickled_obj) is Derived
+        assert isinstance(depickled_obj, Base)
 
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
