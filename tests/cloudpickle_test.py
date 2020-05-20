@@ -1070,40 +1070,78 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_abc(self):
 
-        @abc.abstractmethod
-        def foo(self):
-            raise NotImplementedError('foo')
+        class AbstractClass(abc.ABC):
+            @abc.abstractmethod
+            def some_method(self):
+                """A method"""
 
-        # Invoke the metaclass directly rather than using class syntax for
-        # python 2/3 compat.
-        AbstractClass = abc.ABCMeta('AbstractClass', (object,), {'foo': foo})
+            @classmethod
+            @abc.abstractmethod
+            def some_classmethod(cls):
+                """A classmethod"""
+
+            @staticmethod
+            @abc.abstractmethod
+            def some_staticmethod():
+                """A staticmethod"""
 
         class ConcreteClass(AbstractClass):
-            def foo(self):
+            def some_method(self):
                 return 'it works!'
 
-        # This class is local so we can safely register tuple in it to verify
-        # the unpickled class also register tuple.
+            @classmethod
+            def some_classmethod(cls):
+                assert cls == ConcreteClass
+                return 'it works!'
+
+            @staticmethod
+            def some_staticmethod():
+                return 'it works!'
+
+        # This abstract class is locally defined so we can safely register
+        # tuple in it to verify the unpickled class also register tuple.
         AbstractClass.register(tuple)
 
+        concrete_instance = ConcreteClass()
         depickled_base = pickle_depickle(AbstractClass, protocol=self.protocol)
         depickled_class = pickle_depickle(ConcreteClass,
                                           protocol=self.protocol)
-        depickled_instance = pickle_depickle(ConcreteClass())
+        depickled_instance = pickle_depickle(concrete_instance)
 
         assert issubclass(tuple, AbstractClass)
         assert issubclass(tuple, depickled_base)
 
-        self.assertEqual(depickled_class().foo(), 'it works!')
-        self.assertEqual(depickled_instance.foo(), 'it works!')
+        self.assertEqual(depickled_class().some_method(), 'it works!')
+        self.assertEqual(depickled_instance.some_method(), 'it works!')
 
+        self.assertEqual(depickled_class.some_classmethod(), 'it works!')
+        self.assertEqual(depickled_instance.some_classmethod(), 'it works!')
+
+        self.assertEqual(depickled_class().some_staticmethod(), 'it works!')
+        self.assertEqual(depickled_instance.some_staticmethod(), 'it works!')
         self.assertRaises(TypeError, depickled_base)
 
         class DepickledBaseSubclass(depickled_base):
-            def foo(self):
+            def some_method(self):
                 return 'it works for realz!'
 
-        self.assertEqual(DepickledBaseSubclass().foo(), 'it works for realz!')
+            @classmethod
+            def some_classmethod(cls):
+                assert cls == DepickledBaseSubclass
+                return 'it works for realz!'
+
+            @staticmethod
+            def some_staticmethod():
+                return 'it works for realz!'
+
+        self.assertEqual(DepickledBaseSubclass().some_method(),
+                         'it works for realz!')
+
+        class IncompleteBaseSubclass(depickled_base):
+            def some_method(self):
+                return 'this class lacks some concrete methods'
+
+        self.assertRaises(TypeError, IncompleteBaseSubclass)
 
     def test_weakset_identity_preservation(self):
         # Test that weaksets don't lose all their inhabitants if they're
