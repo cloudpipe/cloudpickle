@@ -715,6 +715,29 @@ class CloudPickleTest(unittest.TestCase):
         assert _is_importable(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
 
+        # Check for similar behavior for a module that cannot be imported by
+        # attribute lookup.
+        from _cloudpickle_testpkg.mod import dynamic_submodule_two as m2
+        # Note: import _cloudpickle_testpkg.mod.dynamic_submodule_two as m2
+        # works only for Python 3.7+
+        assert _is_dynamic(m2)
+        assert _is_importable(m2)
+        assert pickle_depickle(m2, protocol=self.protocol) is m2
+
+        # Submodule_three is a dynamic module only importable via module lookup
+        with pytest.raises(ImportError):
+            import _cloudpickle_testpkg.mod.submodule_three  # noqa
+        from _cloudpickle_testpkg.mod import submodule_three as m3
+        assert _is_dynamic(m3)
+        assert not _is_importable(m3)
+
+        # This module cannot be pickled using attribute lookup (as it does not
+        # have a `__module__` attribute like classes and functions.
+        assert not hasattr(m3, '__module__')
+        depickled_m3 = pickle_depickle(m3, protocol=self.protocol)
+        assert depickled_m3 is not m3
+        assert m3.f(1) == depickled_m3.f(1)
+
         # Do the same for an importable dynamic submodule inside a dynamic
         # module inside a file-backed module.
         import _cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule as sm  # noqa
