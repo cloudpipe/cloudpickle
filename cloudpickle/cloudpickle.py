@@ -45,7 +45,6 @@ from __future__ import print_function
 import builtins
 import dis
 import opcode
-import pickle
 import platform
 import sys
 import types
@@ -54,6 +53,7 @@ import uuid
 import threading
 import typing
 
+from .compat import pickle
 from typing import Generic, Union, Tuple, Callable
 from pickle import _getattribute
 from importlib._bootstrap import _find_spec
