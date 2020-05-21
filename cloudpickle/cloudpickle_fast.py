@@ -15,7 +15,6 @@ import copyreg
 import io
 import itertools
 import logging
-import pickle
 import sys
 import struct
 import types
@@ -25,6 +24,7 @@ import typing
 from enum import Enum
 from collections import ChainMap
 
+from .compat import pickle, Pickler
 from .cloudpickle import (
     _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _is_importable,
@@ -37,8 +37,8 @@ from .cloudpickle import (
 
 )
 
-if sys.version_info >= (3, 8) and not PYPY:
-    from _pickle import Pickler
+
+if pickle.HIGHEST_PROTOCOL >= 5 and not PYPY:
     # Shorthands similar to pickle.dump/pickle.dumps
 
     def dump(obj, file, protocol=None, buffer_callback=None):
@@ -73,8 +73,6 @@ if sys.version_info >= (3, 8) and not PYPY:
             return file.getvalue()
 
 else:
-    from pickle import _Pickler as Pickler
-
     # Shorthands similar to pickle.dump/pickle.dumps
     def dump(obj, file, protocol=None):
         """Serialize obj as bytes streamed into file
