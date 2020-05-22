@@ -425,6 +425,8 @@ def _extract_class_dict(cls):
             inherited_dict.update(base.__dict__)
     to_remove = []
     for name, value in clsdict.items():
+        if name.startswith("_abc"):
+            continue
         try:
             base_value = inherited_dict[name]
             if value is base_value:
