@@ -181,13 +181,13 @@ def _class_getstate(obj):
         # cache/negative caches populated during isinstance/issubclass
         # checks, but pickle the list of registered subclasses of obj.
         clsdict.pop('_abc_cache', None)
+        clsdict.pop('_abc_impl', None)
         clsdict.pop('_abc_negative_cache', None)
         clsdict.pop('_abc_negative_cache_version', None)
         registry = clsdict.pop('_abc_registry', None)
         if registry is None:
             # in Python3.7+, the abc caches and registered subclasses of a
             # class are bundled into the single _abc_impl attribute
-            clsdict.pop('_abc_impl', None)
             (registry, _, _, _) = abc._get_dump(obj)
 
             clsdict["_abc_impl"] = [subclass_weakref()
