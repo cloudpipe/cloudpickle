@@ -197,6 +197,8 @@ def _lookup_module_and_qualname(obj, name=None):
     if module_name == "__main__":
         return None
 
+    # Note: if module_name is in sys.modules, the corresponding module is
+    # assumed importable at unpickling time. See #357
     module = sys.modules.get(module_name, None)
     if module is None:
         # The main reason why obj's module would not be imported is that this
@@ -204,11 +206,6 @@ def _lookup_module_and_qualname(obj, name=None):
         # types.ModuleType. The other possibility is that module was removed
         # from sys.modules after obj was created/imported. But this case is not
         # supported, as the standard pickle does not support it either.
-        return None
-
-    # module has been added to sys.modules, but it is not enough to be
-    # considered importable
-    if not _is_importable(module):
         return None
 
     try:
