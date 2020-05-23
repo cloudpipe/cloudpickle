@@ -1315,19 +1315,6 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
-def _get_parent_module_or_package(module):
-    """(Try to) access the parent module (or package) of a submodule"""
-    parent_name, _, module_name = module.__name__.rpartition('.')
-    if parent_name:
-        try:
-            return sys.modules[parent_name]
-        except KeyError:
-            msg = "parent {!r} not in sys.modules"
-            raise ImportError(msg.format(parent_name))
-    else:
-        return None
-
-
 def _make_typevar(name, bound, constraints, covariant, contravariant,
                   class_tracker_id):
     tv = typing.TypeVar(
