@@ -163,23 +163,6 @@ def _whichmodule(obj, name):
     return None
 
 
-if sys.version_info[:2] < (3, 7):  # pragma: no branch
-    # Workaround bug in old Python versions: prior to Python 3.7, T.__module__
-    # would always be set to "typing" even when the TypeVar T would be defined
-    # in a different module.
-    #
-    # For such older Python versions, we ignore the __module__ attribute of
-    # TypeVar instances and instead exhaustively lookup those instances in all
-    # currently imported modules via the _whichmodule function.
-    def _get_module_attr(obj):
-        if isinstance(obj, typing.TypeVar):
-            return None
-        return getattr(obj, '__module__', None)
-else:
-    def _get_module_attr(obj):
-        return getattr(obj, '__module__', None)
-
-
 def _is_importable(obj, name=None):
     """Dispatcher utility to test the importability of various constructs."""
     if isinstance(obj, types.FunctionType):
