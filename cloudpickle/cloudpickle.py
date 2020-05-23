@@ -170,7 +170,7 @@ def _is_importable(obj, name=None):
     elif issubclass(type(obj), type):
         return _lookup_module_and_qualname(obj, name=name) is not None
     elif isinstance(obj, types.ModuleType):
-        return _module_is_importable(obj)
+        return obj.__name__ in sys.modules
     else:
         raise TypeError(
             "cannot check importability of {} instances".format(
@@ -1329,32 +1329,6 @@ def _get_parent_module_or_package(module):
             raise ImportError(msg.format(parent_name))
     else:
         return None
-
-
-def _is_dynamic(module):
-    """
-    Return True if the module is special module that cannot be imported by its
-    name.
-    """
-    # Quick check: module that have __file__ attribute are not dynamic modules.
-    if hasattr(module, '__file__'):
-        return False
-
-    if module.__spec__ is not None:
-        return False
-
-    # It *may be* that in PyPy, some built-in modules have their __spec__
-    # attribute set to None despite being imported.  For such modules, we try a
-    # little bit harder to see if they can be loaded by using importlib's
-    # ``_find_spec``.  This case is however untested as no package in the PyPy
-    # stdlib has __spec__ set to None after it is imported.
-    parent = _get_parent_module_or_package(module)
-    pkgpath = getattr(parent, '__path__', None)
-    return _find_spec(module.__name__, pkgpath, module) is None
-
-
-def _module_is_importable(obj):
-    return obj.__name__ in sys.modules
 
 
 def _make_typevar(name, bound, constraints, covariant, contravariant,

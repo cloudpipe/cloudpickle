@@ -43,7 +43,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _is_dynamic, _is_importable
+from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
@@ -686,32 +686,23 @@ class CloudPickleTest(unittest.TestCase):
         import distutils
         import distutils.ccompiler
 
-        assert not _is_dynamic(pickle)
-        assert not _is_dynamic(os.path)  # fake (aliased) module
-        assert not _is_dynamic(distutils)  # package
-        assert not _is_dynamic(distutils.ccompiler)  # module in package
-
         assert _is_importable(pickle)
         assert _is_importable(os.path)  # fake (aliased) module
         assert _is_importable(distutils)  # package
         assert _is_importable(distutils.ccompiler)  # module in package
 
-        # user-created module without using the import machinery are also
-        # dynamic
         dynamic_module = types.ModuleType('dynamic_module')
-        assert _is_dynamic(dynamic_module)
         assert not _is_importable(dynamic_module)
 
         if platform.python_implementation() == 'PyPy':
             import _codecs
-            assert not _is_dynamic(_codecs)
+            assert _is_importable(_codecs)
 
         # #354: Check that modules created dynamically during the import of
         # their parent modules are flagged by cloudpickle as dynamic, but
         # importable.  See the mod_with_dynamic_submodule documentation for
         # more details of this use case.
         import _cloudpickle_testpkg.mod.dynamic_submodule as m
-        assert _is_dynamic(m)
         assert _is_importable(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
 
@@ -720,7 +711,6 @@ class CloudPickleTest(unittest.TestCase):
         from _cloudpickle_testpkg.mod import dynamic_submodule_two as m2
         # Note: import _cloudpickle_testpkg.mod.dynamic_submodule_two as m2
         # works only for Python 3.7+
-        assert _is_dynamic(m2)
         assert _is_importable(m2)
         assert pickle_depickle(m2, protocol=self.protocol) is m2
 
@@ -728,7 +718,6 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(ImportError):
             import _cloudpickle_testpkg.mod.submodule_three  # noqa
         from _cloudpickle_testpkg.mod import submodule_three as m3
-        assert _is_dynamic(m3)
         assert not _is_importable(m3)
 
         # This module cannot be pickled using attribute lookup (as it does not
@@ -741,7 +730,6 @@ class CloudPickleTest(unittest.TestCase):
         # Do the same for an importable dynamic submodule inside a dynamic
         # module inside a file-backed module.
         import _cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule as sm  # noqa
-        assert _is_dynamic(sm)
         assert _is_importable(sm)
         assert pickle_depickle(sm, protocol=self.protocol) is sm
 
@@ -1232,11 +1220,14 @@ class CloudPickleTest(unittest.TestCase):
         func.__module__ = None
 
         class NonModuleObject(object):
+            def __ini__(self):
+                self.some_attr = None
+
             def __getattr__(self, name):
-                # We whitelist func so that a _whichmodule(func, None) call returns
-                # the NonModuleObject instance if a type check on the entries
-                # of sys.modules is not carried out, but manipulating this
-                # instance thinking it really is a module later on in the
+                # We whitelist func so that a _whichmodule(func, None) call
+                # returns the NonModuleObject instance if a type check on the
+                # entries of sys.modules is not carried out, but manipulating
+                # this instance thinking it really is a module later on in the
                 # pickling process of func errors out
                 if name == 'func':
                     return func
@@ -1251,7 +1242,7 @@ class CloudPickleTest(unittest.TestCase):
         # Any manipulation of non_module_object relying on attribute access
         # will raise an Exception
         with pytest.raises(AttributeError):
-            _is_dynamic(non_module_object)
+            _ = non_module_object.some_attr
 
         try:
             sys.modules['NonModuleObject'] = non_module_object
