@@ -23,6 +23,7 @@ import weakref
 import os
 import enum
 import typing
+import warnings
 from functools import wraps
 
 import pytest
@@ -54,6 +55,20 @@ from .testutils import subprocess_worker
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
+
+
+def test_future_warning_pickler():
+    # FutureWarning should be raised when accessing Pickler
+    with warnings.catch_warnings(record=True) as warning:
+        warnings.simplefilter("always")
+        pickler = cloudpickle.Pickler
+        assert len(warning) == 1
+        assert issubclass(warning[-1].category, FutureWarning)
+        assert "Pickler will point to Cloudpickler in two releases." \
+            in str(warning[-1].message)
+
+    # cloudpickle.Pickler should still be pointing to pickle._Pickler
+    assert pickler == pickle._Pickler
 
 
 class RaiserOnPickle(object):

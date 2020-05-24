@@ -62,7 +62,7 @@ import typing
 from enum import Enum
 
 from typing import Generic, Union, Tuple, Callable
-from pickle import _Pickler as Pickler
+from pickle import _Pickler
 from pickle import _getattribute
 from io import BytesIO
 from importlib._bootstrap import _find_spec
@@ -460,21 +460,21 @@ if sys.version_info[:2] < (3, 7):  # pragma: no branch
         return origin[args]
 
 
-class CloudPickler(Pickler):
+class CloudPickler(_Pickler):
 
-    dispatch = Pickler.dispatch.copy()
+    dispatch = _Pickler.dispatch.copy()
 
     def __init__(self, file, protocol=None):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
-        Pickler.__init__(self, file, protocol=protocol)
+        _Pickler.__init__(self, file, protocol=protocol)
         # map ids to dictionary. used to ensure that functions can share global env
         self.globals_ref = {}
 
     def dump(self, obj):
         self.inject_addons()
         try:
-            return Pickler.dump(self, obj)
+            return _Pickler.dump(self, obj)
         except RuntimeError as e:
             if 'recursion' in e.args[0]:
                 msg = """Could not pickle object as excessively deep recursion required."""
@@ -537,7 +537,7 @@ class CloudPickler(Pickler):
         interactive prompt, etc) and handles the pickling appropriately.
         """
         if _is_importable_by_name(obj, name=name):
-            return Pickler.save_global(self, obj, name=name)
+            return _Pickler.save_global(self, obj, name=name)
         elif PYPY and isinstance(obj.__code__, builtin_code_type):
             return self.save_pypy_builtin_func(obj)
         else:
@@ -839,11 +839,11 @@ class CloudPickler(Pickler):
             # dispatch with type-specific savers.
             self._save_parametrized_type_hint(obj)
         elif name is not None:
-            Pickler.save_global(self, obj, name=name)
+            _Pickler.save_global(self, obj, name=name)
         elif not _is_importable_by_name(obj, name=name):
             self.save_dynamic_class(obj)
         else:
-            Pickler.save_global(self, obj, name=name)
+            _Pickler.save_global(self, obj, name=name)
 
     dispatch[type] = save_global
 
