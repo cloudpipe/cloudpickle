@@ -4,7 +4,7 @@ pytest
 pytest-cov
 psutil
 # To test on older Python versions
-pickle5 >=0.0.10 ; python_version <= '3.7'
+pickle5 >=0.0.10 ; python_version <= '3.7' and python_implementation == 'CPython'
 # To be able to test tornado coroutines
 tornado
 # To be able to test numpy specific things
