@@ -170,6 +170,11 @@ def _is_importable(obj, name=None):
     elif issubclass(type(obj), type):
         return _lookup_module_and_qualname(obj, name=name) is not None
     elif isinstance(obj, types.ModuleType):
+        # We assume that sys.modules is primarily used as a cache mechanism for
+        # the Python import machinery. Checking if a module has been added in
+        # is sys.modules therefore a cheap and simple heuristic to tell us whether
+        # we can assume  that a given module could be imported by name in
+        # another Python process.
         return obj.__name__ in sys.modules
     else:
         raise TypeError(

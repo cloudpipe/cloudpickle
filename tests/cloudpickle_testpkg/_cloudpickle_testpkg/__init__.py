@@ -20,12 +20,13 @@ def relative_imports_factory():
     tested.
     """
     def f():
-        # module_function belongs to mypkg.mod, which is a module
+        # module_function belongs to _cloudpickle_testpkg.mod, which is a
+        # module
         from .mod import module_function
         return module_function()
 
     def g():
-        # package_function belongs to mypkg, which is a package
+        # package_function belongs to _cloudpickle_testpkg, which is a package
         from . import package_function
         return package_function()
 

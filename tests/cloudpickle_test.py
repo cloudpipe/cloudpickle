@@ -699,9 +699,9 @@ class CloudPickleTest(unittest.TestCase):
             assert _is_importable(_codecs)
 
         # #354: Check that modules created dynamically during the import of
-        # their parent modules are flagged by cloudpickle as dynamic, but
-        # importable.  See the mod_with_dynamic_submodule documentation for
-        # more details of this use case.
+        # their parent modules are considered importable by cloudpickle.
+        # See the mod_with_dynamic_submodule documentation for more
+        # details of this use case.
         import _cloudpickle_testpkg.mod.dynamic_submodule as m
         assert _is_importable(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
@@ -2008,7 +2008,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_relative_import_inside_function(self):
         # Make sure relative imports inside round-tripped functions is not
-        # broken.This was a bug in cloudpickle versions <= 0.5.3 and was
+        # broken. This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
         f, g = relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
