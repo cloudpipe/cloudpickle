@@ -43,7 +43,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.cloudpickle import _is_dynamic
+from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
@@ -51,6 +51,8 @@ from cloudpickle.cloudpickle import _lookup_module_and_qualname
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
+
+from _cloudpickle_testpkg import relative_imports_factory
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -678,25 +680,62 @@ class CloudPickleTest(unittest.TestCase):
         assert b'unwanted_function' not in b
         assert b'math' not in b
 
-    def test_is_dynamic_module(self):
+    def test_module_importability(self):
         import pickle  # decouple this test from global imports
         import os.path
         import distutils
         import distutils.ccompiler
 
-        assert not _is_dynamic(pickle)
-        assert not _is_dynamic(os.path)  # fake (aliased) module
-        assert not _is_dynamic(distutils)  # package
-        assert not _is_dynamic(distutils.ccompiler)  # module in package
+        assert _is_importable(pickle)
+        assert _is_importable(os.path)  # fake (aliased) module
+        assert _is_importable(distutils)  # package
+        assert _is_importable(distutils.ccompiler)  # module in package
 
-        # user-created module without using the import machinery are also
-        # dynamic
         dynamic_module = types.ModuleType('dynamic_module')
-        assert _is_dynamic(dynamic_module)
+        assert not _is_importable(dynamic_module)
 
         if platform.python_implementation() == 'PyPy':
             import _codecs
-            assert not _is_dynamic(_codecs)
+            assert _is_importable(_codecs)
+
+        # #354: Check that modules created dynamically during the import of
+        # their parent modules are considered importable by cloudpickle.
+        # See the mod_with_dynamic_submodule documentation for more
+        # details of this use case.
+        import _cloudpickle_testpkg.mod.dynamic_submodule as m
+        assert _is_importable(m)
+        assert pickle_depickle(m, protocol=self.protocol) is m
+
+        # Check for similar behavior for a module that cannot be imported by
+        # attribute lookup.
+        from _cloudpickle_testpkg.mod import dynamic_submodule_two as m2
+        # Note: import _cloudpickle_testpkg.mod.dynamic_submodule_two as m2
+        # works only for Python 3.7+
+        assert _is_importable(m2)
+        assert pickle_depickle(m2, protocol=self.protocol) is m2
+
+        # Submodule_three is a dynamic module only importable via module lookup
+        with pytest.raises(ImportError):
+            import _cloudpickle_testpkg.mod.submodule_three  # noqa
+        from _cloudpickle_testpkg.mod import submodule_three as m3
+        assert not _is_importable(m3)
+
+        # This module cannot be pickled using attribute lookup (as it does not
+        # have a `__module__` attribute like classes and functions.
+        assert not hasattr(m3, '__module__')
+        depickled_m3 = pickle_depickle(m3, protocol=self.protocol)
+        assert depickled_m3 is not m3
+        assert m3.f(1) == depickled_m3.f(1)
+
+        # Do the same for an importable dynamic submodule inside a dynamic
+        # module inside a file-backed module.
+        import _cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule as sm  # noqa
+        assert _is_importable(sm)
+        assert pickle_depickle(sm, protocol=self.protocol) is sm
+
+        expected = "cannot check importability of object instances"
+        with pytest.raises(TypeError, match=expected):
+            _is_importable(object())
 
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
@@ -1181,11 +1220,14 @@ class CloudPickleTest(unittest.TestCase):
         func.__module__ = None
 
         class NonModuleObject(object):
+            def __ini__(self):
+                self.some_attr = None
+
             def __getattr__(self, name):
-                # We whitelist func so that a _whichmodule(func, None) call returns
-                # the NonModuleObject instance if a type check on the entries
-                # of sys.modules is not carried out, but manipulating this
-                # instance thinking it really is a module later on in the
+                # We whitelist func so that a _whichmodule(func, None) call
+                # returns the NonModuleObject instance if a type check on the
+                # entries of sys.modules is not carried out, but manipulating
+                # this instance thinking it really is a module later on in the
                 # pickling process of func errors out
                 if name == 'func':
                     return func
@@ -1200,7 +1242,7 @@ class CloudPickleTest(unittest.TestCase):
         # Any manipulation of non_module_object relying on attribute access
         # will raise an Exception
         with pytest.raises(AttributeError):
-            _is_dynamic(non_module_object)
+            _ = non_module_object.some_attr
 
         try:
             sys.modules['NonModuleObject'] = non_module_object
@@ -1966,20 +2008,9 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_relative_import_inside_function(self):
         # Make sure relative imports inside round-tripped functions is not
-        # broken.This was a bug in cloudpickle versions <= 0.5.3 and was
+        # broken. This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
-
-        # Both functions living inside modules and packages are tested.
-        def f():
-            # module_function belongs to mypkg.mod1, which is a module
-            from .mypkg import module_function
-            return module_function()
-
-        def g():
-            # package_function belongs to mypkg, which is a package
-            from .mypkg import package_function
-            return package_function()
-
+        f, g = relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
             assert func() == "hello from a {}!".format(source)
@@ -2028,7 +2059,7 @@ class CloudPickleTest(unittest.TestCase):
     def test___reduce___returns_string(self):
         # Non regression test for objects with a __reduce__ method returning a
         # string, meaning "save by attribute using save_global"
-        from .mypkg import some_singleton
+        from _cloudpickle_testpkg import some_singleton
         assert some_singleton.__reduce__() == "some_singleton"
         depickled_singleton = pickle_depickle(
             some_singleton, protocol=self.protocol)
@@ -2100,7 +2131,7 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_T1 is depickled_T2
 
     def test_pickle_importable_typevar(self):
-        from .mypkg import T
+        from _cloudpickle_testpkg import T
         T1 = pickle_depickle(T, protocol=self.protocol)
         assert T1 is T
 
@@ -2230,12 +2261,12 @@ def test_lookup_module_and_qualname_dynamic_typevar():
 
 
 def test_lookup_module_and_qualname_importable_typevar():
-    from . import mypkg
-    T = mypkg.T
+    import _cloudpickle_testpkg
+    T = _cloudpickle_testpkg.T
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
     module, name = module_and_name
-    assert module is mypkg
+    assert module is _cloudpickle_testpkg
     assert name == 'T'
 
 

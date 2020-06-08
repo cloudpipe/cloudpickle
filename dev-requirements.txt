@@ -11,3 +11,5 @@ numpy; python_version <= '3.8'
 # Code coverage uploader for Travis:
 codecov
 coverage
+# Utility package used when running the cloudpickle test suite
+./tests/cloudpickle_testpkg
