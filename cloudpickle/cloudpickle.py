@@ -606,7 +606,7 @@ def _make_empty_cell():
 
 def _make_cell(value=_empty_cell_value):
     cell = _make_empty_cell()
-    if value != _empty_cell_value:
+    if value is not _empty_cell_value:
         cell_set(cell, value)
     return cell
 
