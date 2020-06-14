@@ -165,9 +165,24 @@ def _whichmodule(obj, name):
     return None
 
 
-def _is_importable_by_name(obj, name=None):
-    """Determine if obj can be pickled as attribute of a file-backed module"""
-    return _lookup_module_and_qualname(obj, name=name) is not None
+def _is_importable(obj, name=None):
+    """Dispatcher utility to test the importability of various constructs."""
+    if isinstance(obj, types.FunctionType):
+        return _lookup_module_and_qualname(obj, name=name) is not None
+    elif issubclass(type(obj), type):
+        return _lookup_module_and_qualname(obj, name=name) is not None
+    elif isinstance(obj, types.ModuleType):
+        # We assume that sys.modules is primarily used as a cache mechanism for
+        # the Python import machinery. Checking if a module has been added in
+        # is sys.modules therefore a cheap and simple heuristic to tell us whether
+        # we can assume  that a given module could be imported by name in
+        # another Python process.
+        return obj.__name__ in sys.modules
+    else:
+        raise TypeError(
+            "cannot check importability of {} instances".format(
+                type(obj).__name__)
+        )
 
 
 def _lookup_module_and_qualname(obj, name=None):
@@ -189,6 +204,8 @@ def _lookup_module_and_qualname(obj, name=None):
     if module_name == "__main__":
         return None
 
+    # Note: if module_name is in sys.modules, the corresponding module is
+    # assumed importable at unpickling time. See #357
     module = sys.modules.get(module_name, None)
     if module is None:
         # The main reason why obj's module would not be imported is that this
@@ -196,10 +213,6 @@ def _lookup_module_and_qualname(obj, name=None):
         # types.ModuleType. The other possibility is that module was removed
         # from sys.modules after obj was created/imported. But this case is not
         # supported, as the standard pickle does not support it either.
-        return None
-
-    # module has been added to sys.modules, but it can still be dynamic.
-    if _is_dynamic(module):
         return None
 
     try:
@@ -515,6 +528,7 @@ def parametrized_type_hint_getinitargs(obj):
         )
     return initargs
 
+
 # Tornado support
 
 def is_tornado_coroutine(func):
@@ -679,39 +693,6 @@ def _make_skeleton_enum(bases, name, qualname, members, module,
     enum_class.__qualname__ = qualname
 
     return _lookup_class_or_track(class_tracker_id, enum_class)
-
-
-def _is_dynamic(module):
-    """
-    Return True if the module is special module that cannot be imported by its
-    name.
-    """
-    # Quick check: module that have __file__ attribute are not dynamic modules.
-    if hasattr(module, '__file__'):
-        return False
-
-    if module.__spec__ is not None:
-        return False
-
-    # In PyPy, Some built-in modules such as _codecs can have their
-    # __spec__ attribute set to None despite being imported.  For such
-    # modules, the ``_find_spec`` utility of the standard library is used.
-    parent_name = module.__name__.rpartition('.')[0]
-    if parent_name:  # pragma: no cover
-        # This code handles the case where an imported package (and not
-        # module) remains with __spec__ set to None. It is however untested
-        # as no package in the PyPy stdlib has __spec__ set to None after
-        # it is imported.
-        try:
-            parent = sys.modules[parent_name]
-        except KeyError:
-            msg = "parent {!r} not in sys.modules"
-            raise ImportError(msg.format(parent_name))
-        else:
-            pkgpath = parent.__path__
-    else:
-        pkgpath = None
-    return _find_spec(module.__name__, pkgpath, module) is None
 
 
 def _make_typevar(name, bound, constraints, covariant, contravariant,

@@ -25,14 +25,15 @@ from enum import Enum
 
 from .compat import pickle, Pickler
 from .cloudpickle import (
-    _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
-    _find_imported_submodules, _get_cell_contents, _is_importable_by_name,
+    _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
+    _find_imported_submodules, _get_cell_contents, _is_importable,
     _builtin_type, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
     _is_parametrized_type_hint, PYPY, cell_set,
     parametrized_type_hint_getinitargs, _create_parametrized_type_hint,
     builtin_code_type
+
 )
 
 
@@ -336,11 +337,11 @@ def _memoryview_reduce(obj):
 
 
 def _module_reduce(obj):
-    if _is_dynamic(obj):
+    if _is_importable(obj):
+        return subimport, (obj.__name__,)
+    else:
         obj.__dict__.pop('__builtins__', None)
         return dynamic_subimport, (obj.__name__, vars(obj))
-    else:
-        return subimport, (obj.__name__,)
 
 
 def _method_reduce(obj):
@@ -393,7 +394,7 @@ def _class_reduce(obj):
         return type, (NotImplemented,)
     elif obj in _BUILTIN_TYPE_NAMES:
         return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
-    elif not _is_importable_by_name(obj):
+    elif not _is_importable(obj):
         return _dynamic_class_reduce(obj)
     return NotImplemented
 
@@ -496,7 +497,7 @@ class CloudPickler(Pickler):
         As opposed to cloudpickle.py, There no special handling for builtin
         pypy functions because cloudpickle_fast is CPython-specific.
         """
-        if _is_importable_by_name(obj):
+        if _is_importable(obj):
             return NotImplemented
         else:
             return self._dynamic_function_reduce(obj)
@@ -689,7 +690,7 @@ class CloudPickler(Pickler):
                 )
             elif name is not None:
                 Pickler.save_global(self, obj, name=name)
-            elif not _is_importable_by_name(obj, name=name):
+            elif not _is_importable(obj, name=name):
                 self._save_reduce_pickle5(*_dynamic_class_reduce(obj), obj=obj)
             else:
                 Pickler.save_global(self, obj, name=name)
@@ -701,7 +702,7 @@ class CloudPickler(Pickler):
             Determines what kind of function obj is (e.g. lambda, defined at
             interactive prompt, etc) and handles the pickling appropriately.
             """
-            if _is_importable_by_name(obj, name=name):
+            if _is_importable(obj, name=name):
                 return Pickler.save_global(self, obj, name=name)
             elif PYPY and isinstance(obj.__code__, builtin_code_type):
                 return self.save_pypy_builtin_func(obj)

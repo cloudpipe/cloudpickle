@@ -68,6 +68,14 @@ jobs:
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
+    - name: Generate old pickles (backward compat)
+      shell: bash
+      run: |
+        git_head=$(git rev-parse HEAD)
+        cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
+        git checkout v1.4.1
+        python tests/_generate_old_pickles.py
+        git checkout $(git_head)
     - name: Look for syntax errors/undefined names
       shell: bash
       run: |
@@ -106,6 +114,14 @@ jobs:
         python -m pip install -r dev-requirements.txt
         python -m pip install -e .
         python ci/install_coverage_subprocess_pth.py
+    - name: Generate old pickles (backward compat)
+      shell: bash
+      run: |
+        git_head=$(git rev-parse HEAD)
+        cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
+        git checkout v1.4.1
+        python tests/_generate_old_pickles.py
+        git checkout $(git_head)
     - name: Test with pytest
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
