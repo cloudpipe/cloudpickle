@@ -20,7 +20,7 @@ PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles"
 
 
 def dump_obj(obj, filename):
-    with open(PICKLE_DIRECTORY / filename, "wb") as f:
+    with open(str(PICKLE_DIRECTORY / filename), "wb") as f:
         cloudpickle.dump(obj, f)
 
 

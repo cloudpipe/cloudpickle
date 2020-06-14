@@ -15,7 +15,7 @@ from .generate_old_pickles import PICKLE_DIRECTORY
 
 
 def load_obj(filename):
-    with open(PICKLE_DIRECTORY / filename, "rb") as f:
+    with open(str(PICKLE_DIRECTORY / filename), "rb") as f:
         obj = pickle.load(f)
     return obj
 
