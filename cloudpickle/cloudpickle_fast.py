@@ -25,8 +25,8 @@ import typing
 from enum import Enum
 
 from .cloudpickle import (
-    _is_dynamic, _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
-    _find_imported_submodules, _get_cell_contents, _is_importable_by_name,
+    _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
+    _find_imported_submodules, _get_cell_contents, _is_importable,
     _builtin_type, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
@@ -687,7 +687,7 @@ class CloudPickler(Pickler):
                 )
             elif name is not None:
                 Pickler.save_global(self, obj, name=name)
-            elif not _is_importable_by_name(obj, name=name):
+            elif not _is_importable(obj, name=name):
                 self._save_reduce_pickle5(*_dynamic_class_reduce(obj), obj=obj)
             else:
                 Pickler.save_global(self, obj, name=name)
@@ -699,7 +699,7 @@ class CloudPickler(Pickler):
             Determines what kind of function obj is (e.g. lambda, defined at
             interactive prompt, etc) and handles the pickling appropriately.
             """
-            if _is_importable_by_name(obj, name=name):
+            if _is_importable(obj, name=name):
                 return Pickler.save_global(self, obj, name=name)
             elif PYPY and isinstance(obj.__code__, builtin_code_type):
                 return self.save_pypy_builtin_func(obj)
