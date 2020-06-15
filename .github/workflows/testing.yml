@@ -121,7 +121,7 @@ jobs:
         cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
         git checkout v1.4.1
         python tests/_generate_old_pickles.py
-        git checkout $(git_head)
+        git checkout ${git_head}
     - name: Test with pytest
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
