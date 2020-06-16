@@ -491,7 +491,7 @@ class CloudPickler(Pickler):
         except RuntimeError as e:
             if 'recursion' in e.args[0]:
                 msg = """Could not pickle object as excessively deep recursion required."""
-                raise pickle.PicklingError(msg)
+                raise pickle.PicklingError(msg) from e
             else:
                 raise
 
@@ -947,8 +947,8 @@ class CloudPickler(Pickler):
             obj.seek(0)
             contents = obj.read()
             obj.seek(curloc)
-        except IOError:
-            raise pickle.PicklingError("Cannot pickle file %s as it cannot be read" % name)
+        except IOError as e:
+            raise pickle.PicklingError("Cannot pickle file %s as it cannot be read" % name) from e
         retval.write(contents)
         retval.seek(curloc)
 
