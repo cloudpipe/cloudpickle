@@ -70,6 +70,9 @@ if __name__ == "__main__":
     # supported since cloudpickle 1.4
     T = TypeVar("T")
 
+    # debug what's happening in the CI
+    print(T.__module__)
+
     class MyClass(Generic[T]):
         def __init__(self, attribute: T):
             self.attribute = attribute
