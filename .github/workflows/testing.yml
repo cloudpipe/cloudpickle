@@ -75,7 +75,7 @@ jobs:
         cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
         git checkout v1.4.1
         python tests/_generate_old_pickles.py
-        git checkout $(git_head)
+        git checkout ${git_head}
     - name: Look for syntax errors/undefined names
       shell: bash
       run: |
