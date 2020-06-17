@@ -2244,6 +2244,24 @@ class CloudPickleTest(unittest.TestCase):
         f1 = pickle_depickle(f, protocol=self.protocol)
         assert f1.__annotations__ == f.__annotations__
 
+    def test_always_use_up_to_date_copyreg(self):
+        # test that updates of copyreg.dispatch_table are taken in account by
+        # cloudpickle
+        import copyreg
+        try:
+            class MyClass:
+                pass
+
+            def reduce_myclass(x):
+                return MyClass, (), {'custom_reduce': True}
+
+            copyreg.dispatch_table[MyClass] = reduce_myclass
+            my_obj = MyClass()
+            depickled_myobj = pickle_depickle(my_obj, protocol=self.protocol)
+            assert hasattr(depickled_myobj, 'custom_reduce')
+        finally:
+            copyreg.dispatch_table.pop(MyClass)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
