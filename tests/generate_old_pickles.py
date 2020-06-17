@@ -71,7 +71,7 @@ if __name__ == "__main__":
     T = TypeVar("T")
 
     # debug what's happening in the CI
-    print(T.__module__)
+    raise ValueError(T.__module__)
 
     class MyClass(Generic[T]):
         def __init__(self, attribute: T):
