@@ -9,6 +9,7 @@ active cloudpickle branch to make sure that cloudpickle is able to depickle old
 cloudpickle files.
 """
 from pathlib import Path
+import sys
 
 from enum import IntEnum
 from types import ModuleType
@@ -71,7 +72,8 @@ if __name__ == "__main__":
     T = TypeVar("T")
 
     # debug what's happening in the CI
-    raise ValueError(T.__module__)
+    if sys.version_info[:2] == (3, 6):
+        raise ValueError(T.__module__)
 
     class MyClass(Generic[T]):
         def __init__(self, attribute: T):
