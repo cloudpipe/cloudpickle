@@ -21,7 +21,7 @@ def load_obj(filename, check_deprecation_warning='auto'):
     if check_deprecation_warning == 'auto':
         # pickles files generated with cloudpickle_fast.py on old versions of
         # coudpickle with Python < 3.8 use non-deprecated reconstructors.
-        check_deprecation_warning == sys.version_info < (3, 8)
+        check_deprecation_warning = (sys.version_info < (3, 8))
     try:
         f = open(str(PICKLE_DIRECTORY / filename), "rb")
         if check_deprecation_warning:
