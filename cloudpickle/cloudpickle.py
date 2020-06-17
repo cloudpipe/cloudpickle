@@ -494,6 +494,7 @@ def parametrized_type_hint_getinitargs(obj):
             # in early Python 3.5, __parameters__ was sometimes
             # preferred to __args__
             initargs = (obj.__origin__, parameters)
+
         else:
             initargs = (obj.__origin__, obj.__args__)
     elif type(obj) is type(Union):
