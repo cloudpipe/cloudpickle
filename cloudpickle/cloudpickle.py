@@ -53,6 +53,7 @@ import weakref
 import uuid
 import threading
 import typing
+import warnings
 
 from typing import Generic, Union, Tuple, Callable
 from pickle import _getattribute
@@ -695,6 +696,12 @@ def _make_skel_func(code, cell_count, base_globals=None):
         code and the correct number of cells in func_closure.  All other
         func attributes (e.g. func_globals) are empty.
     """
+    # This function is deprecated and should be removed in cloudpickle 1.7
+    warnings.warn(
+        "A pickle file created using an old (<=1.4.1) version of cloudpicke "
+        "is currently being loaded. This is not supported by cloudpickle and "
+        "will break in cloudpickle 1.7", category=UserWarning
+    )
     # This is backward-compatibility code: for cloudpickle versions between
     # 0.5.4 and 0.7, base_globals could be a string or None. base_globals
     # should now always be a dictionary.
