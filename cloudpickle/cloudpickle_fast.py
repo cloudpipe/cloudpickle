@@ -253,10 +253,10 @@ def _file_reduce(obj):
         obj.seek(0)
         contents = obj.read()
         obj.seek(curloc)
-    except IOError:
+    except IOError as e:
         raise pickle.PicklingError(
             "Cannot pickle file %s as it cannot be read" % name
-        )
+        ) from e
     retval.write(contents)
     retval.seek(curloc)
 
@@ -553,6 +553,6 @@ class CloudPickler(Pickler):
                     "Could not pickle object as excessively deep recursion "
                     "required."
                 )
-                raise pickle.PicklingError(msg)
+                raise pickle.PicklingError(msg) from e
             else:
                 raise
