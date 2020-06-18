@@ -73,7 +73,8 @@ if __name__ == "__main__":
 
     # debug what's happening in the CI
     if sys.version_info[:2] == (3, 6):
-        raise ValueError(T.__module__)
+        from cloudpickle.cloudpickle import _lookup_module_and_qualname
+        raise ValueError(_lookup_module_and_qualname(T, T.__name__))
 
     class MyClass(Generic[T]):
         def __init__(self, attribute: T):
