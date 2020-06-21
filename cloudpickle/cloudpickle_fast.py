@@ -10,6 +10,7 @@ Note that the C Pickler sublassing API is CPython-specific. Therefore, some
 guards present in cloudpickle.py that were written to handle PyPy specificities
 are not present in cloudpickle_fast.py
 """
+import _collections_abc
 import abc
 import copyreg
 import io
@@ -30,6 +31,7 @@ from .cloudpickle import (
     _builtin_type, Enum, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases,
+    _make_dict_keys, _make_dict_values, _make_dict_items,
 )
 
 load, loads = _pickle.load, _pickle.loads
@@ -339,6 +341,18 @@ def _class_reduce(obj):
     return NotImplemented
 
 
+def _dict_keys_reduce(obj):
+    return _make_dict_keys, (list(obj),)
+
+
+def _dict_values_reduce(obj):
+    return _make_dict_values, (list(obj),)
+
+
+def _dict_items_reduce(obj):
+    return _make_dict_items, (list(obj),)
+
+
 # COLLECTIONS OF OBJECTS STATE SETTERS
 # ------------------------------------
 # state setters are called at unpickling time, once the object is created and
@@ -425,6 +439,9 @@ class CloudPickler(Pickler):
     dispatch[types.MappingProxyType] = _mappingproxy_reduce
     dispatch[weakref.WeakSet] = _weakset_reduce
     dispatch[typing.TypeVar] = _typevar_reduce
+    dispatch[_collections_abc.dict_keys] = _dict_keys_reduce
+    dispatch[_collections_abc.dict_values] = _dict_values_reduce
+    dispatch[_collections_abc.dict_items] = _dict_items_reduce
 
     def __init__(self, file, protocol=None, buffer_callback=None):
         if protocol is None:
