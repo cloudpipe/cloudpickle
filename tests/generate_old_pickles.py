@@ -37,7 +37,7 @@ def nested_function_generator():
 
 
 if __name__ == "__main__":
-    PICKLE_DIRECTORY.mkdir()
+    PICKLE_DIRECTORY.mkdir(parents=True)
 
     # simple dynamic function
     def simple_func(x: int, y=1):
