@@ -71,7 +71,7 @@ jobs:
     - name: Look for syntax errors/undefined names
       shell: bash
       run: |
-        python -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
+        python -m  flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
           --show-source --statistics
     - name: Test with pytest
       shell: bash
