@@ -213,7 +213,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_dict_values(self):
         values = {"a": 1, "b": 2}.values()
-        self.assertEqual(list(pickle_depickle(values)), list(values))
+        self.assertEqual(sorted(pickle_depickle(values)), sorted(values))
 
     def test_dict_items(self):
         items = {"a": 1, "b": 2}.items()
