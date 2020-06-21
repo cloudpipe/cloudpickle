@@ -8,15 +8,18 @@ cloudpickle. When testing, the generated pickle files are depickled using the
 active cloudpickle branch to make sure that cloudpickle is able to depickle old
 cloudpickle files.
 """
-from pathlib import Path
+import sys
 
+from pathlib import Path
 from enum import IntEnum
 from types import ModuleType
 from typing import TypeVar, Generic
 
 import cloudpickle
 
-PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles"
+PYTHON_VERSION = "{}.{}".format(sys.version_info.major, sys.version_info.minor)
+
+PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles" / PYTHON_VERSION
 
 
 def dump_obj(obj, filename):
