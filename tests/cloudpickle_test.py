@@ -211,6 +211,14 @@ class CloudPickleTest(unittest.TestCase):
         keys = {"a": 1, "b": 2}.keys()
         self.assertEqual(pickle_depickle(keys), keys)
 
+    def test_dict_values(self):
+        values = {"a": 1, "b": 2}.values()
+        self.assertEqual(list(pickle_depickle(values)), list(values))
+
+    def test_dict_items(self):
+        items = {"a": 1, "b": 2}.items()
+        self.assertEqual(pickle_depickle(items), items)
+
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),

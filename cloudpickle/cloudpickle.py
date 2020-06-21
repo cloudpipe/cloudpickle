@@ -987,6 +987,16 @@ class CloudPickler(Pickler):
 
     dispatch[_collections_abc.dict_keys] = save_dict_keys
 
+    def save_dict_values(self, obj):
+        self.save_reduce(_make_dict_values, (list(obj), ))
+
+    dispatch[_collections_abc.dict_values] = save_dict_values
+
+    def save_dict_items(self, obj):
+        self.save_reduce(_make_dict_items, (list(obj), ))
+
+    dispatch[_collections_abc.dict_items] = save_dict_items
+
     if hasattr(types, "MappingProxyType"):  # pragma: no branch
         def save_mappingproxy(self, obj):
             self.save_reduce(types.MappingProxyType, (dict(obj),), obj=obj)
@@ -1372,3 +1382,11 @@ def _get_bases(typ):
 
 def _make_dict_keys(obj):
     return dict.fromkeys(obj).keys()
+
+
+def _make_dict_values(obj):
+    return {_.__hash__: _ for _ in obj}.values()
+
+
+def _make_dict_items(obj):
+    return dict(obj).items()
