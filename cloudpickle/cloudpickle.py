@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 
+import _collections_abc
 import abc
 import builtins
 import dis
@@ -981,6 +982,11 @@ class CloudPickler(Pickler):
 
     dispatch[logging.RootLogger] = save_root_logger
 
+    def save_dict_keys(self, obj):
+        self.save_reduce(_make_dict_keys, (list(obj),))
+
+    dispatch[_collections_abc.dict_keys] = save_dict_keys
+
     if hasattr(types, "MappingProxyType"):  # pragma: no branch
         def save_mappingproxy(self, obj):
             self.save_reduce(types.MappingProxyType, (dict(obj),), obj=obj)
@@ -1362,3 +1368,7 @@ def _get_bases(typ):
         # For regular class objects
         bases_attr = '__bases__'
     return getattr(typ, bases_attr)
+
+
+def _make_dict_keys(obj):
+    return dict.fromkeys(obj).keys()
