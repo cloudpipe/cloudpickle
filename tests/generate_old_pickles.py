@@ -17,9 +17,11 @@ from typing import TypeVar, Generic
 
 import cloudpickle
 
-PYTHON_VERSION = "{}.{}".format(sys.version_info.major, sys.version_info.minor)
+PYTHON_INFO = "{}_{}{}".format(
+    sys.implementation.name, sys.version_info.major, sys.version_info.minor
+)
 
-PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles" / PYTHON_VERSION
+PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles" / PYTHON_INFO
 
 
 def dump_obj(obj, filename):
