@@ -10,13 +10,28 @@ few canonical use cases. Cloudpicke backward-compatitibility support remains a
 best-effort initiative.
 """
 import pickle
+import sys
+
+import pytest
 
 from .generate_old_pickles import PICKLE_DIRECTORY
 
 
-def load_obj(filename):
-    with open(str(PICKLE_DIRECTORY / filename), "rb") as f:
-        obj = pickle.load(f)
+def load_obj(filename, check_deprecation_warning='auto'):
+    if check_deprecation_warning == 'auto':
+        # pickles files generated with cloudpickle_fast.py on old versions of
+        # coudpickle with Python < 3.8 use non-deprecated reconstructors.
+        check_deprecation_warning = (sys.version_info < (3, 8))
+    try:
+        f = open(str(PICKLE_DIRECTORY / filename), "rb")
+        if check_deprecation_warning:
+            msg = "A pickle file created using an old"
+            with pytest.warns(UserWarning, match=msg):
+                obj = pickle.load(f)
+        else:
+            obj = pickle.load(f)
+    finally:
+        f.close()
     return obj
 
 
@@ -46,13 +61,13 @@ def test_dynamic_module():
 
 
 def test_simple_enum():
-    enum = load_obj("simple_enum.pkl")
+    enum = load_obj("simple_enum.pkl", check_deprecation_warning=False)
     assert hasattr(enum, "RED")
     assert enum.RED == 1
     assert enum.BLUE == 2
 
     # test enum tracking feature
-    new_enum = load_obj("simple_enum.pkl")
+    new_enum = load_obj("simple_enum.pkl", check_deprecation_warning=False)
     assert new_enum is enum
 
 

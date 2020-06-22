@@ -8,15 +8,20 @@ cloudpickle. When testing, the generated pickle files are depickled using the
 active cloudpickle branch to make sure that cloudpickle is able to depickle old
 cloudpickle files.
 """
-from pathlib import Path
+import sys
 
+from pathlib import Path
 from enum import IntEnum
 from types import ModuleType
 from typing import TypeVar, Generic
 
 import cloudpickle
 
-PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles"
+PYTHON_INFO = "{}_{}{}".format(
+    sys.implementation.name, sys.version_info.major, sys.version_info.minor
+)
+
+PICKLE_DIRECTORY = Path(__file__).parent / "old_pickles" / PYTHON_INFO
 
 
 def dump_obj(obj, filename):
@@ -34,7 +39,7 @@ def nested_function_generator():
 
 
 if __name__ == "__main__":
-    PICKLE_DIRECTORY.mkdir()
+    PICKLE_DIRECTORY.mkdir(parents=True)
 
     # simple dynamic function
     def simple_func(x: int, y=1):

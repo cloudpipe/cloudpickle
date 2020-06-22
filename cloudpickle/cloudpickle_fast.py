@@ -22,6 +22,7 @@ import weakref
 import typing
 
 from enum import Enum
+from collections import ChainMap
 
 from .compat import pickle, Pickler
 from .cloudpickle import (
@@ -455,26 +456,25 @@ def _class_setstate(obj, state):
 
 
 class CloudPickler(Pickler):
-    # Take into account potential custom reducers registered by external
-    # modules
-    dispatch_table = copyreg.dispatch_table.copy()
-    # register the additional set of objects (compared to the standard library
-    # pickle) that cloupickle can serialize.
-    dispatch_table[classmethod] = _classmethod_reduce
-    dispatch_table[io.TextIOWrapper] = _file_reduce
-    dispatch_table[logging.Logger] = _logger_reduce
-    dispatch_table[logging.RootLogger] = _root_logger_reduce
-    dispatch_table[memoryview] = _memoryview_reduce
-    dispatch_table[property] = _property_reduce
-    dispatch_table[staticmethod] = _classmethod_reduce
-    dispatch_table[CellType] = _cell_reduce
-    dispatch_table[types.CodeType] = _code_reduce
-    dispatch_table[types.GetSetDescriptorType] = _getset_descriptor_reduce
-    dispatch_table[types.ModuleType] = _module_reduce
-    dispatch_table[types.MethodType] = _method_reduce
-    dispatch_table[types.MappingProxyType] = _mappingproxy_reduce
-    dispatch_table[weakref.WeakSet] = _weakset_reduce
-    dispatch_table[typing.TypeVar] = _typevar_reduce
+    # set of reducers defined and used by cloudpickle (private)
+    _dispatch_table = {}
+    _dispatch_table[classmethod] = _classmethod_reduce
+    _dispatch_table[io.TextIOWrapper] = _file_reduce
+    _dispatch_table[logging.Logger] = _logger_reduce
+    _dispatch_table[logging.RootLogger] = _root_logger_reduce
+    _dispatch_table[memoryview] = _memoryview_reduce
+    _dispatch_table[property] = _property_reduce
+    _dispatch_table[staticmethod] = _classmethod_reduce
+    _dispatch_table[CellType] = _cell_reduce
+    _dispatch_table[types.CodeType] = _code_reduce
+    _dispatch_table[types.GetSetDescriptorType] = _getset_descriptor_reduce
+    _dispatch_table[types.ModuleType] = _module_reduce
+    _dispatch_table[types.MethodType] = _method_reduce
+    _dispatch_table[types.MappingProxyType] = _mappingproxy_reduce
+    _dispatch_table[weakref.WeakSet] = _weakset_reduce
+    _dispatch_table[typing.TypeVar] = _typevar_reduce
+
+    dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
 
     # function reducers are defined as instance methods of CloudPickler
     # objects, as they rely on a CloudPickler attribute (globals_ref)
