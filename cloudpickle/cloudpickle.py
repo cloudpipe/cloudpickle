@@ -1385,7 +1385,7 @@ def _make_dict_keys(obj):
 
 
 def _make_dict_values(obj):
-    return {_.__hash__: _ for _ in obj}.values()
+    return {i: _ for i, _ in enumerate(obj)}.values()
 
 
 def _make_dict_items(obj):
