@@ -33,7 +33,7 @@ try:
     # tests should be skipped if these modules are not available
     import numpy as np
     import scipy.special as spp
-except ImportError:
+except (ImportError, RuntimeError):
     np = None
     spp = None
 
