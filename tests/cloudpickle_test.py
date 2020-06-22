@@ -1,5 +1,6 @@
 from __future__ import division
 
+import _collections_abc
 import abc
 import collections
 import base64
@@ -209,15 +210,21 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_dict_keys(self):
         keys = {"a": 1, "b": 2}.keys()
-        self.assertEqual(pickle_depickle(keys), keys)
+        results = pickle_depickle(keys)
+        self.assertEqual(results, keys)
+        assert isinstance(results, _collections_abc.dict_keys)
 
     def test_dict_values(self):
         values = {"a": 1, "b": 2}.values()
-        self.assertEqual(sorted(pickle_depickle(values)), sorted(values))
+        results = pickle_depickle(values)
+        self.assertEqual(sorted(results), sorted(values))
+        assert isinstance(results, _collections_abc.dict_values)
 
     def test_dict_items(self):
         items = {"a": 1, "b": 2}.items()
-        self.assertEqual(pickle_depickle(items), items)
+        results = pickle_depickle(items)
+        self.assertEqual(results, items)
+        assert isinstance(results, _collections_abc.dict_items)
 
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
