@@ -983,17 +983,23 @@ class CloudPickler(Pickler):
     dispatch[logging.RootLogger] = save_root_logger
 
     def save_dict_keys(self, obj):
+        # Safer not to ship the full dict as sending the rest might
+        # be unintended and could potentially cause leaking of
+        # sensitive information
         self.save_reduce(_make_dict_keys, (list(obj),))
 
     dispatch[_collections_abc.dict_keys] = save_dict_keys
 
     def save_dict_values(self, obj):
-        self.save_reduce(_make_dict_values, (list(obj), ))
+        # Safer not to ship the full dict as sending the rest might
+        # be unintended and could potentially cause leaking of
+        # sensitive information
+        self.save_reduce(_make_dict_values, (list(obj),))
 
     dispatch[_collections_abc.dict_values] = save_dict_values
 
     def save_dict_items(self, obj):
-        self.save_reduce(_make_dict_items, (list(obj), ))
+        self.save_reduce(_make_dict_items, (dict(obj),))
 
     dispatch[_collections_abc.dict_items] = save_dict_items
 
@@ -1389,4 +1395,4 @@ def _make_dict_values(obj):
 
 
 def _make_dict_items(obj):
-    return dict(obj).items()
+    return obj.items()
