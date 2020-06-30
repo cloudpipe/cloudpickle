@@ -1308,12 +1308,8 @@ class CloudPickleTest(unittest.TestCase):
         # some setup is required to allow pytest apimodules to be correctly
         # serializable.
         from cloudpickle import CloudPickler
-        if sys.version_info[:2] >= (3, 8):
-            from cloudpickle import cloudpickle_fast as cp_fast
-            CloudPickler.dispatch[
-                type(py.builtin)] = cp_fast._module_reduce
-        else:
-            CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
+        from cloudpickle import cloudpickle_fast as cp_fast
+        CloudPickler.dispatch_table[type(py.builtin)] = cp_fast._module_reduce
 
         g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
 
@@ -2247,6 +2243,24 @@ class CloudPickleTest(unittest.TestCase):
 
         f1 = pickle_depickle(f, protocol=self.protocol)
         assert f1.__annotations__ == f.__annotations__
+
+    def test_always_use_up_to_date_copyreg(self):
+        # test that updates of copyreg.dispatch_table are taken in account by
+        # cloudpickle
+        import copyreg
+        try:
+            class MyClass:
+                pass
+
+            def reduce_myclass(x):
+                return MyClass, (), {'custom_reduce': True}
+
+            copyreg.dispatch_table[MyClass] = reduce_myclass
+            my_obj = MyClass()
+            depickled_myobj = pickle_depickle(my_obj, protocol=self.protocol)
+            assert hasattr(depickled_myobj, 'custom_reduce')
+        finally:
+            copyreg.dispatch_table.pop(MyClass)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):

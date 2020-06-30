@@ -44,6 +44,10 @@ jobs:
             python_version: 3.6
           - os: macos-latest
             python_version: 3.7
+          - os: macos-latest
+            # numpy triggers: RuntimeError: Polyfit sanity test emitted a
+            # warning
+            python_version: "pypy3"
 
     runs-on: ${{ matrix.os }}
 
@@ -61,7 +65,7 @@ jobs:
         python -m pip install -r dev-requirements.txt
         python ci/install_coverage_subprocess_pth.py
         export
-    - name: Install optional typing_extensions in Python 3.6
+    - name: Install supported dependencies (only test in Python 3.6)
       shell: bash
       run: python -m pip install typing-extensions
       if: matrix.python_version == '3.6'
@@ -106,6 +110,14 @@ jobs:
         python -m pip install -r dev-requirements.txt
         python -m pip install -e .
         python ci/install_coverage_subprocess_pth.py
+    - name: Generate old pickles (backward compat)
+      shell: bash
+      run: |
+        git_head=$(git rev-parse HEAD)
+        cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
+        git checkout v1.4.1
+        python tests/_generate_old_pickles.py
+        git checkout ${git_head}
     - name: Test with pytest
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
@@ -210,16 +222,19 @@ jobs:
     - name: Install project and dependencies
       run: |
         python -m pip install --upgrade -r dev-requirements.txt
-        python -m pip install setproctitle psutil ray==0.6.4
+        python -m pip install setproctitle psutil ray==0.8.6
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
+        git clone https://github.com/ray-project/ray.git ../ray
+        cp -R ../ray/python/ray/tests $PROJECT_DIR/tests
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
+        cp cloudpickle/cloudpickle_fast.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
     - name: Test the downstream project
       run: |
         PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
         COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_simple_serialization
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_complex_serialization
+        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_simple_serialization
+        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_complex_serialization
         pytest -vl $PROJECT_DIR/tests/test_basic.py::test_ray_recursive_objects
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_serialization_final_fallback
-        pytest -vl $PROJECT_DIR/tests/test_recursion.py
+        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_serialization_final_fallback
+        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_nested_functions

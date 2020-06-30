@@ -1,11 +1,7 @@
 from __future__ import absolute_import
 
-import sys
-import pickle
 
-
-from cloudpickle.cloudpickle import *
-if sys.version_info[:2] >= (3, 8):
-    from cloudpickle.cloudpickle_fast import CloudPickler, dumps, dump
+from cloudpickle.cloudpickle import *  # noqa
+from cloudpickle.cloudpickle_fast import CloudPickler, dumps, dump  # noqa
 
 __version__ = '1.5.0dev0'
