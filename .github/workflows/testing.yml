@@ -226,7 +226,7 @@ jobs:
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
-        cp cloudpickle/cloudpickle_fast.py.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
+        cp cloudpickle/cloudpickle_fast.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
         cp cloudpickle/__init__.py $PROJECT_DIR/cloudpickle/__init__.py
     - name: Test the downstream project
       run: |
