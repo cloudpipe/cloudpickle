@@ -549,6 +549,9 @@ class CloudPickler(Pickler):
                 raise
 
     if pickle.HIGHEST_PROTOCOL >= 5:
+        # left for backward compat
+        dispatch = dispatch_table
+
         # Implementation of the reducer_override callback, in order to
         # efficiently serialize dynamic functions and classes by subclassing
         # the C-implemented Pickler.
