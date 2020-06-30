@@ -233,6 +233,8 @@ jobs:
       run: |
         PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
         COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_complex_serialization
+        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_simple_serialization
+        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_complex_serialization
         pytest -vl $PROJECT_DIR/tests/test_basic.py::test_ray_recursive_objects
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_serialization_final_fallback
+        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_serialization_final_fallback
+        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_nested_functions
