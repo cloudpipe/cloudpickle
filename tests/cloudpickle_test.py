@@ -681,7 +681,7 @@ class CloudPickleTest(unittest.TestCase):
         assert b'math' not in b
 
     def test_module_importability(self):
-        from cloudpickle.compat import pickle  # decouple this test from global imports
+        from cloudpickle.compat import pickle
         import os.path
         import distutils
         import distutils.ccompiler

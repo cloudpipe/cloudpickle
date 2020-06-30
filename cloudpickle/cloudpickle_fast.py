@@ -549,6 +549,17 @@ class CloudPickler(Pickler):
                 raise
 
     if pickle.HIGHEST_PROTOCOL >= 5:
+        # `Cloudpickle.dispatch` is only left for backward compatibility - note
+        # that when using protocol 5, `CloudPickler.dispatch` is not an
+        # extension of `Pickler.dispatch` dictionary, because CloudPickler
+        # subclasses the C-implemented Pickler, which does not expose a
+        # `dispatch` attribute.  Earlier version of the protocol 5 CloudPickler
+        # used `CloudPickler.dispatch` as a class-level attribute storing all
+        # reducers implemented by cloudpickle, but the attribute name was not a
+        # great choice given the meaning of `Cloudpickler.dispatch` when
+        # `CloudPickler` extends the pure-python pickler.
+        dispatch = dispatch_table
+
         # Implementation of the reducer_override callback, in order to
         # efficiently serialize dynamic functions and classes by subclassing
         # the C-implemented Pickler.
