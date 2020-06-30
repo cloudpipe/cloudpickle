@@ -22,16 +22,16 @@ def load_obj(filename, check_deprecation_warning='auto'):
         # pickles files generated with cloudpickle_fast.py on old versions of
         # coudpickle with Python < 3.8 use non-deprecated reconstructors.
         check_deprecation_warning = (sys.version_info < (3, 8))
-    try:
-        f = open(str(PICKLE_DIRECTORY / filename), "rb")
+    pickle_filepath = PICKLE_DIRECTORY / filename
+    if not pickle_filepath.exists():
+        pytest.skip("Could not find {}".format(str(pickle_filepath)))
+    with open(str(pickle_filepath), "rb") as f:
         if check_deprecation_warning:
             msg = "A pickle file created using an old"
             with pytest.warns(UserWarning, match=msg):
                 obj = pickle.load(f)
         else:
             obj = pickle.load(f)
-    finally:
-        f.close()
     return obj
 
 
@@ -90,3 +90,8 @@ def test_complex_function():
 
     c = f(a, b)
     assert c.attribute == 3
+
+
+def test_nested_function():
+    f = load_obj("nested_function.pkl")
+    assert f(41) == 42
