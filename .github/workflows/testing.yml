@@ -222,7 +222,6 @@ jobs:
     - name: Install project and dependencies
       run: |
         python -m pip install --upgrade -r dev-requirements.txt
-        python -m pip install pickle5
         python -m pip install setproctitle psutil ray==0.8.6
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
