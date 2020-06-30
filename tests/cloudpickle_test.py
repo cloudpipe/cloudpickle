@@ -2088,10 +2088,6 @@ class CloudPickleTest(unittest.TestCase):
         with pytest.raises(pickle.PicklingError, match='recursion'):
             cloudpickle.dumps(a)
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 6),
-        reason='numpy does not support pickle protocol 5 on Python 3.5'
-    )
     def test_out_of_band_buffers(self):
         if self.protocol < 5:
             pytest.skip("Need Pickle Protocol 5 or later")
