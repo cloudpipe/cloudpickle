@@ -63,7 +63,7 @@ jobs:
         export
     - name: Install supported dependencies (only test in Python 3.6)
       shell: bash
-      run: python -m pip install typing-extensions tornado
+      run: python -m pip install typing-extensions
       if: matrix.python_version == '3.6'
     - name: Display Python version
       shell: bash
