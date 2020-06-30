@@ -44,7 +44,6 @@ except ImportError:
 import cloudpickle
 from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.compat import pickle
-from cloudpickle.cloudpickle import _is_dynamic
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
