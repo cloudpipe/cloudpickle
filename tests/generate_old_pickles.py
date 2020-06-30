@@ -29,13 +29,13 @@ def dump_obj(obj, filename):
         cloudpickle.dump(obj, f)
 
 
-def nested_function_generator():
+def nested_function_factory():
     a = 1
 
-    def nested_func(b):
+    def nested_function(b):
         return a + b
 
-    return nested_func
+    return nested_function
 
 
 if __name__ == "__main__":
@@ -85,3 +85,7 @@ if __name__ == "__main__":
         return MyClass(x.attribute + y.attribute)
 
     dump_obj([MyClass, add], "function_with_type_hints.pkl")
+
+    # Locally defined closure
+    nested_function = nested_function_factory()
+    dump_obj(nested_function, "nested_function.pkl")
