@@ -222,9 +222,11 @@ jobs:
     - name: Install project and dependencies
       run: |
         python -m pip install --upgrade -r dev-requirements.txt
-        python -m pip install setproctitle psutil ray==0.6.4
+        python -m pip install setproctitle psutil ray==0.8.6
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
+        git clone https://github.com/ray-project/ray.git
+        cp -R ray/python/ray/tests $PROJECT_DIR/tests
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
         cp cloudpickle/cloudpickle_fast.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
     - name: Test the downstream project
