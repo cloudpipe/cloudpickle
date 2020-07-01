@@ -9,7 +9,6 @@ import itertools
 import logging
 import math
 from operator import itemgetter, attrgetter
-import pickle
 import platform
 import random
 import shutil
@@ -43,6 +42,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
+from cloudpickle.compat import pickle
 from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
@@ -521,7 +521,7 @@ class CloudPickleTest(unittest.TestCase):
         pickled_func_path = os.path.join(self.tmpdir, 'local_func_g.pkl')
 
         child_process_script = '''
-        import pickle
+        from cloudpickle.compat import pickle
         import gc
         with open("{pickled_func_path}", 'rb') as f:
             func = pickle.load(f)
@@ -606,7 +606,7 @@ class CloudPickleTest(unittest.TestCase):
         child_process_module_file = os.path.join(
             self.tmpdir, 'dynamic_module_from_child_process.pkl')
         child_process_script = '''
-            import pickle
+            from cloudpickle.compat import pickle
             import textwrap
 
             import cloudpickle
@@ -626,7 +626,7 @@ class CloudPickleTest(unittest.TestCase):
 
         # The script ran by the process created by the child process
         child_of_child_process_script = """ '''
-                import pickle
+                from cloudpickle.compat import pickle
                 with open('{child_process_module_file}','rb') as fid:
                     mod = pickle.load(fid)
                 ''' """
@@ -681,7 +681,7 @@ class CloudPickleTest(unittest.TestCase):
         assert b'math' not in b
 
     def test_module_importability(self):
-        import pickle  # decouple this test from global imports
+        from cloudpickle.compat import pickle
         import os.path
         import distutils
         import distutils.ccompiler
@@ -1008,7 +1008,8 @@ class CloudPickleTest(unittest.TestCase):
 
         # choose "subprocess" rather than "multiprocessing" because the latter
         # library uses fork to preserve the parent environment.
-        command = ("import pickle, base64; "
+        command = ("import base64; "
+                   "from cloudpickle.compat import pickle; "
                    "pickle.loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
@@ -1029,7 +1030,8 @@ class CloudPickleTest(unittest.TestCase):
 
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
-        command = ("import pickle, base64; "
+        command = ("import base64; "
+                   "from cloudpickle.compat import pickle; "
                    "pickle.loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")

@@ -15,7 +15,6 @@ import copyreg
 import io
 import itertools
 import logging
-import pickle
 import sys
 import struct
 import types
@@ -25,6 +24,7 @@ import typing
 from enum import Enum
 from collections import ChainMap
 
+from .compat import pickle, Pickler
 from .cloudpickle import (
     _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _is_importable,
@@ -37,8 +37,8 @@ from .cloudpickle import (
 
 )
 
-if sys.version_info >= (3, 8) and not PYPY:
-    from _pickle import Pickler
+
+if pickle.HIGHEST_PROTOCOL >= 5 and not PYPY:
     # Shorthands similar to pickle.dump/pickle.dumps
 
     def dump(obj, file, protocol=None, buffer_callback=None):
@@ -73,8 +73,6 @@ if sys.version_info >= (3, 8) and not PYPY:
             return file.getvalue()
 
 else:
-    from pickle import _Pickler as Pickler
-
     # Shorthands similar to pickle.dump/pickle.dumps
     def dump(obj, file, protocol=None):
         """Serialize obj as bytes streamed into file
@@ -551,6 +549,17 @@ class CloudPickler(Pickler):
                 raise
 
     if pickle.HIGHEST_PROTOCOL >= 5:
+        # `CloudPickler.dispatch` is only left for backward compatibility - note
+        # that when using protocol 5, `CloudPickler.dispatch` is not an
+        # extension of `Pickler.dispatch` dictionary, because CloudPickler
+        # subclasses the C-implemented Pickler, which does not expose a
+        # `dispatch` attribute.  Earlier versions of the protocol 5 CloudPickler
+        # used `CloudPickler.dispatch` as a class-level attribute storing all
+        # reducers implemented by cloudpickle, but the attribute name was not a
+        # great choice given the meaning of `Cloudpickler.dispatch` when
+        # `CloudPickler` extends the pure-python pickler.
+        dispatch = dispatch_table
+
         # Implementation of the reducer_override callback, in order to
         # efficiently serialize dynamic functions and classes by subclassing
         # the C-implemented Pickler.
@@ -604,6 +613,11 @@ class CloudPickler(Pickler):
               reducers, such as Exceptions. See
               https://github.com/cloudpipe/cloudpickle/issues/248
             """
+            if sys.version_info[:2] < (3, 7) and _is_parametrized_type_hint(obj):  # noqa  # pragma: no branch
+                return (
+                    _create_parametrized_type_hint,
+                    parametrized_type_hint_getinitargs(obj)
+                )
             t = type(obj)
             try:
                 is_anyclass = issubclass(t, type)

@@ -5,6 +5,10 @@
   importable modules.
   ([issue #360](https://github.com/cloudpipe/cloudpickle/issues/354))
 
+- Add optional dependency on `pickle5` to get improved performance on
+  Python 3.6 and 3.7.
+  ([PR #370](https://github.com/cloudpipe/cloudpickle/pull/370))
+
 
 1.4.1
 =====

@@ -228,6 +228,7 @@ jobs:
         git clone https://github.com/ray-project/ray.git ../ray
         cp -R ../ray/python/ray/tests $PROJECT_DIR/tests
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
+        cp cloudpickle/compat.py $PROJECT_DIR/cloudpickle/compat.py
         cp cloudpickle/cloudpickle_fast.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
     - name: Test the downstream project
       run: |
