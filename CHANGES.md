@@ -1,5 +1,5 @@
-1.5.0 (in development)
-======================
+1.5.0
+=====
 
 - Fix a bug causing cloudpickle to crash when pickling dynamically created,
   importable modules.
