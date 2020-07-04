@@ -3,11 +3,13 @@ flake8
 pytest
 pytest-cov
 psutil
+# To test on older Python versions
+pickle5 >=0.0.11 ; python_version <= '3.7' and python_implementation == 'CPython'
 # To be able to test tornado coroutines
 tornado
 # To be able to test numpy specific things
 # but do not build numpy from source on Python nightly
-numpy; python_version <= '3.8'
+numpy >=1.18.5; python_version <= '3.8'
 # Code coverage uploader for Travis:
 codecov
 coverage

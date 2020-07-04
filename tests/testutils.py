@@ -4,7 +4,7 @@ import os.path as op
 import tempfile
 import base64
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
-from pickle import loads
+from cloudpickle.compat import pickle
 from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor
 
@@ -12,6 +12,7 @@ import psutil
 from cloudpickle import dumps
 from subprocess import TimeoutExpired
 
+loads = pickle.loads
 TIMEOUT = 60
 TEST_GLOBALS = "a test value"
 

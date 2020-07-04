@@ -83,7 +83,7 @@ check_files() {
         # that was not changed does not create failures
         # The github terminal is 127 characters wide
         git diff --unified=0 $COMMIT_RANGE -- $files | flake8 --diff --show-source \
-            --max-complexity=10 --max-line-length=127 $options
+            --max-complexity=40 --max-line-length=127 $options
     fi
 }
 

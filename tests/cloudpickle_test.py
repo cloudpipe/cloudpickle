@@ -10,7 +10,6 @@ import itertools
 import logging
 import math
 from operator import itemgetter, attrgetter
-import pickle
 import platform
 import random
 import shutil
@@ -44,6 +43,7 @@ except ImportError:
     tornado = None
 
 import cloudpickle
+from cloudpickle.compat import pickle
 from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
@@ -540,7 +540,7 @@ class CloudPickleTest(unittest.TestCase):
         pickled_func_path = os.path.join(self.tmpdir, 'local_func_g.pkl')
 
         child_process_script = '''
-        import pickle
+        from cloudpickle.compat import pickle
         import gc
         with open("{pickled_func_path}", 'rb') as f:
             func = pickle.load(f)
@@ -625,7 +625,7 @@ class CloudPickleTest(unittest.TestCase):
         child_process_module_file = os.path.join(
             self.tmpdir, 'dynamic_module_from_child_process.pkl')
         child_process_script = '''
-            import pickle
+            from cloudpickle.compat import pickle
             import textwrap
 
             import cloudpickle
@@ -645,7 +645,7 @@ class CloudPickleTest(unittest.TestCase):
 
         # The script ran by the process created by the child process
         child_of_child_process_script = """ '''
-                import pickle
+                from cloudpickle.compat import pickle
                 with open('{child_process_module_file}','rb') as fid:
                     mod = pickle.load(fid)
                 ''' """
@@ -700,7 +700,7 @@ class CloudPickleTest(unittest.TestCase):
         assert b'math' not in b
 
     def test_module_importability(self):
-        import pickle  # decouple this test from global imports
+        from cloudpickle.compat import pickle
         import os.path
         import distutils
         import distutils.ccompiler
@@ -1027,7 +1027,8 @@ class CloudPickleTest(unittest.TestCase):
 
         # choose "subprocess" rather than "multiprocessing" because the latter
         # library uses fork to preserve the parent environment.
-        command = ("import pickle, base64; "
+        command = ("import base64; "
+                   "from cloudpickle.compat import pickle; "
                    "pickle.loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
@@ -1048,7 +1049,8 @@ class CloudPickleTest(unittest.TestCase):
 
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
-        command = ("import pickle, base64; "
+        command = ("import base64; "
+                   "from cloudpickle.compat import pickle; "
                    "pickle.loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
@@ -1327,12 +1329,8 @@ class CloudPickleTest(unittest.TestCase):
         # some setup is required to allow pytest apimodules to be correctly
         # serializable.
         from cloudpickle import CloudPickler
-        if sys.version_info[:2] >= (3, 8):
-            from cloudpickle import cloudpickle_fast as cp_fast
-            CloudPickler.dispatch[
-                type(py.builtin)] = cp_fast._module_reduce
-        else:
-            CloudPickler.dispatch[type(py.builtin)] = CloudPickler.save_module
+        from cloudpickle import cloudpickle_fast as cp_fast
+        CloudPickler.dispatch_table[type(py.builtin)] = cp_fast._module_reduce
 
         g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
 
@@ -2266,6 +2264,24 @@ class CloudPickleTest(unittest.TestCase):
 
         f1 = pickle_depickle(f, protocol=self.protocol)
         assert f1.__annotations__ == f.__annotations__
+
+    def test_always_use_up_to_date_copyreg(self):
+        # test that updates of copyreg.dispatch_table are taken in account by
+        # cloudpickle
+        import copyreg
+        try:
+            class MyClass:
+                pass
+
+            def reduce_myclass(x):
+                return MyClass, (), {'custom_reduce': True}
+
+            copyreg.dispatch_table[MyClass] = reduce_myclass
+            my_obj = MyClass()
+            depickled_myobj = pickle_depickle(my_obj, protocol=self.protocol)
+            assert hasattr(depickled_myobj, 'custom_reduce')
+        finally:
+            copyreg.dispatch_table.pop(MyClass)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):

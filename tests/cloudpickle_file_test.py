@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 
 import os
-import pickle
 import shutil
 import sys
 import tempfile
@@ -10,6 +9,7 @@ import unittest
 import pytest
 
 import cloudpickle
+from cloudpickle.compat import pickle
 
 
 class CloudPickleFileTests(unittest.TestCase):
