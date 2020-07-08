@@ -234,6 +234,9 @@ def _lookup_module_and_qualname(obj, name=None):
     if module_name == "__main__":
         return None
 
+    if _is_dynamic_module(module_name):
+        return None
+
     # Note: if module_name is in sys.modules, the corresponding module is
     # assumed importable at unpickling time. See #357
     module = sys.modules.get(module_name, None)
