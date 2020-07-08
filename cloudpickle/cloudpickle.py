@@ -137,6 +137,21 @@ def unregister_dynamic_module(module):
     _CUSTOM_DYNAMIC_MODULES_BY_NAME.remove(module_name)
 
 
+def _is_dynamic_module(module, submodules=True):
+    module_name = module.__name__ if inspect.ismodule(module) else module
+    if module_name in _CUSTOM_DYNAMIC_MODULES_BY_NAME:
+        return True
+    if submodules:
+        while True:
+            parent_name = module_name.rsplit(".", 1)[0]
+            if parent_name == module_name:
+                break
+            if parent_name in _CUSTOM_DYNAMIC_MODULES_BY_NAME:
+                return True
+            module_name = parent_name
+    return False
+
+
 def _whichmodule(obj, name):
     """Find the module an object belongs to.
 
