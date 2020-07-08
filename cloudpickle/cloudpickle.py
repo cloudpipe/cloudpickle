@@ -87,6 +87,9 @@ else:
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
+# Names of modules whose resources should be treated as dynamic.
+_CUSTOM_DYNAMIC_MODULES_BY_NAME = set()
+
 # Track the provenance of reconstructed dynamic classes to make it possible to
 # recontruct instances from the matching singleton class definition when
 # appropriate and preserve the usual "isinstance" semantics of Python objects.
