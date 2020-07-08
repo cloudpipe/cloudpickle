@@ -44,6 +44,7 @@ from __future__ import print_function
 
 import builtins
 import dis
+import inspect
 import opcode
 import platform
 import sys
@@ -124,6 +125,16 @@ def _lookup_class_or_track(class_tracker_id, class_def):
                 class_tracker_id, class_def)
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
     return class_def
+
+
+def register_dynamic_module(module):
+    module_name = module.__name__ if inspect.ismodule(module) else module
+    _CUSTOM_DYNAMIC_MODULES_BY_NAME.add(module_name)
+
+
+def unregister_dynamic_module(module):
+    module_name = module.__name__ if inspect.ismodule(module) else module
+    _CUSTOM_DYNAMIC_MODULES_BY_NAME.remove(module_name)
 
 
 def _whichmodule(obj, name):
