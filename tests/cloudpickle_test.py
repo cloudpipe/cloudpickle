@@ -1,5 +1,6 @@
 from __future__ import division
 
+import _collections_abc
 import abc
 import collections
 import base64
@@ -31,7 +32,7 @@ try:
     # tests should be skipped if these modules are not available
     import numpy as np
     import scipy.special as spp
-except ImportError:
+except (ImportError, RuntimeError):
     np = None
     spp = None
 
@@ -206,6 +207,24 @@ class CloudPickleTest(unittest.TestCase):
         buffer_obj = memoryview(b"Hello")
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
+
+    def test_dict_keys(self):
+        keys = {"a": 1, "b": 2}.keys()
+        results = pickle_depickle(keys)
+        self.assertEqual(results, keys)
+        assert isinstance(results, _collections_abc.dict_keys)
+
+    def test_dict_values(self):
+        values = {"a": 1, "b": 2}.values()
+        results = pickle_depickle(values)
+        self.assertEqual(sorted(results), sorted(values))
+        assert isinstance(results, _collections_abc.dict_values)
+
+    def test_dict_items(self):
+        items = {"a": 1, "b": 2}.items()
+        results = pickle_depickle(items)
+        self.assertEqual(results, items)
+        assert isinstance(results, _collections_abc.dict_items)
 
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
