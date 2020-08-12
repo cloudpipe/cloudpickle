@@ -1,6 +1,9 @@
 1.5.1 (in development)
 ======================
 
+- Provide `cloudpickle.CloudPickler` as `cloudpickle.Pickler`.
+  ([issue #366](https://github.com/cloudpipe/cloudpickle/issues/366))
+
 
 1.5.0
 =====
