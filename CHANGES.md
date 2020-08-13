@@ -1,6 +1,12 @@
 1.5.1 (in development)
 ======================
 
+- `cloudpickle`'s pickle.Pickler subclass (currently defined as
+  `cloudpickle.cloudpickle_fast.CloudPickler`) can and should now be accessed
+  as `cloudpickle.Pickler`. This is the only officially supported way of
+  accessing it. 
+  ([issue #366](https://github.com/cloudpipe/cloudpickle/issues/366))
+
 
 1.5.0
 =====

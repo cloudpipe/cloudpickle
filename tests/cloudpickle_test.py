@@ -2342,5 +2342,12 @@ def _all_types_to_test():
     return types_to_test
 
 
+def test_module_level_pickler():
+    # #366: cloudpickle should expose its pickle.Pickler subclass as
+    # cloudpickle.Pickler
+    assert hasattr(cloudpickle, "Pickler")
+    assert cloudpickle.Pickler is cloudpickle.CloudPickler
+
+
 if __name__ == '__main__':
     unittest.main()
