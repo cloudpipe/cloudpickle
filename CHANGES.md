@@ -6,7 +6,6 @@
   as `cloudpickle.Pickler`. This is the only officially supported way of
   accessing it. 
   ([issue #366](https://github.com/cloudpipe/cloudpickle/issues/366))
-  ([issue #366](https://github.com/cloudpipe/cloudpickle/issues/366))
 
 
 1.5.0
