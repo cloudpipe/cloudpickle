@@ -7,6 +7,10 @@
   accessing it.
   ([issue #366](https://github.com/cloudpipe/cloudpickle/issues/366))
 
+- `cloudpickle` now supports pickling `dict_keys`, `dict_items` and
+  `dict_values`.
+  ([PR #384](https://github.com/cloudpipe/cloudpickle/pull/384))
+
 
 1.5.0
 =====
