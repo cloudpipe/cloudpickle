@@ -1,5 +1,5 @@
-1.5.1 (in development)
-======================
+1.6.0
+=====
 
 - `cloudpickle`'s pickle.Pickler subclass (currently defined as
   `cloudpickle.cloudpickle_fast.CloudPickler`) can and should now be accessed
