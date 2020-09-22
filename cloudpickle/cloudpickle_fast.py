@@ -496,9 +496,6 @@ class CloudPickler(Pickler):
     _dispatch_table[_collections_abc.dict_values] = _dict_values_reduce
     _dispatch_table[_collections_abc.dict_items] = _dict_items_reduce
 
-
-    dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
-
     # function reducers are defined as instance methods of CloudPickler
     # objects, as they rely on a CloudPickler attribute (globals_ref)
     def _dynamic_function_reduce(self, func):
@@ -572,17 +569,6 @@ class CloudPickler(Pickler):
                 raise
 
     if pickle.HIGHEST_PROTOCOL >= 5:
-        # `CloudPickler.dispatch` is only left for backward compatibility - note
-        # that when using protocol 5, `CloudPickler.dispatch` is not an
-        # extension of `Pickler.dispatch` dictionary, because CloudPickler
-        # subclasses the C-implemented Pickler, which does not expose a
-        # `dispatch` attribute.  Earlier versions of the protocol 5 CloudPickler
-        # used `CloudPickler.dispatch` as a class-level attribute storing all
-        # reducers implemented by cloudpickle, but the attribute name was not a
-        # great choice given the meaning of `Cloudpickler.dispatch` when
-        # `CloudPickler` extends the pure-python pickler.
-        dispatch = dispatch_table
-
         # Implementation of the reducer_override callback, in order to
         # efficiently serialize dynamic functions and classes by subclassing
         # the C-implemented Pickler.
@@ -603,6 +589,30 @@ class CloudPickler(Pickler):
             # their global namespace at unpickling time.
             self.globals_ref = {}
             self.proto = int(protocol)
+
+            # Instance-level public dispatch_table should not mutate the
+            # private class-level _dispatch_table while still reflecting.
+            # Note that it is important to lazy init the dispatch_table
+            # public attribute to make it possible to re-assign it later
+            # and get the C implementation of Pickler take the
+            # re-assignment into account.
+            self.dispatch_table = ChainMap(
+                {},  # to register instance-level custom reducers
+                self._dispatch_table,  # cloudpickle specific reducers
+                copyreg.dispatch_table,  # base Python types
+            )
+
+            # `CloudPickler.dispatch` is only left for backward compatibility -
+            # note that when using protocol 5, `CloudPickler.dispatch` is not
+            # an extension of `Pickler.dispatch` dictionary, because
+            # CloudPickler subclasses the C-implemented Pickler, which does not
+            # expose a `dispatch` attribute.  Earlier versions of the protocol
+            # 5 CloudPickler used `CloudPickler.dispatch` as a class-level
+            # attribute storing all reducers implemented by cloudpickle, but
+            # the attribute name was not a great choice given the meaning of
+            # `Cloudpickler.dispatch` when `CloudPickler` extends the
+            # pure-python pickler.
+            self.dispatch = self.dispatch_table
 
         def reducer_override(self, obj):
             """Type-agnostic reducing callback for function and classes.
@@ -672,6 +682,15 @@ class CloudPickler(Pickler):
             # their global namespace at unpickling time.
             self.globals_ref = {}
             assert hasattr(self, 'proto')
+
+            # Isolated the instance dispatch table to make it possible to
+            # customize the reducers of a give Pickler instance without
+            # impacting the class-level picklers.
+            self.dispatch = self.dispatch.copy()
+
+            # Compatibility alias to get the same attributes irrespective of
+            # the version of Python.
+            self.dispatch_table = self.dispatch
 
         def _save_reduce_pickle5(self, func, args, state=None, listitems=None,
                                  dictitems=None, state_setter=None, obj=None):
