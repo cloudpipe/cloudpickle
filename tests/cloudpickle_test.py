@@ -1,4 +1,5 @@
 from __future__ import division
+from pickle import HIGHEST_PROTOCOL
 
 import _collections_abc
 import abc
@@ -1330,12 +1331,17 @@ class CloudPickleTest(unittest.TestCase):
         # serializable.
         from cloudpickle import CloudPickler
         from cloudpickle import cloudpickle_fast as cp_fast
-        CloudPickler.dispatch_table[type(py.builtin)] = cp_fast._module_reduce
+        py_builtin_type = type(py.builtin)
+        assert py_builtin_type not in CloudPickler._dispatch_table
+        try:
+            CloudPickler._dispatch_table[py_builtin_type] = cp_fast._module_reduce
 
-        g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
+            g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
 
-        result = g()
-        self.assertEqual(1, result)
+            result = g()
+            self.assertEqual(1, result)
+        finally:
+            del CloudPickler._dispatch_table[py_builtin_type]
 
     def test_function_module_name(self):
         func = lambda x: x
@@ -2283,6 +2289,68 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             copyreg.dispatch_table.pop(MyClass)
 
+    def test_side_effect_free_pickler_instance(self):
+        class A:
+            pass
+
+        iob = io.BytesIO()
+        p = cloudpickle.CloudPickler(iob, protocol=self.protocol)
+        p.dispatch_table[A] = lambda obj: (int, (42,))
+        p.dump(A())
+        assert pickle.loads(iob.getvalue()) == 42
+
+        # Check there is no side-effect on other CloudPickler instances
+        iob = io.BytesIO()
+        p = cloudpickle.CloudPickler(iob, protocol=self.protocol)
+        p.dump(A())
+        assert isinstance(pickle.loads(iob.getvalue()), A)
+
+    def test_pickler_dispatch_table_reassign(self):
+        # Check that re-assigning the dispatch table attribute on an instance
+        # works as expected. This would not waork on Python 3.8 if
+        # dispatch_table was a class attribute of CloudPickler because of
+        # implementation details in initialization step of the C implementation
+        # of the Pickler class in the standard library.
+        class A:
+            pass
+
+        iob = io.BytesIO()
+        p = cloudpickle.CloudPickler(iob, protocol=self.protocol)
+        p.dispatch_table = p.dispatch_table.copy()
+        p.dispatch_table[A] = lambda obj: (int, (42,))
+        p.dump(A())
+        assert pickle.loads(iob.getvalue()) == 42
+
+    def test_pickler_subclass_with_custom_dispatch_table(self):
+        class PicklerSubclass(cloudpickle.CloudPickler):
+            def __init__(self, buffer, custom_reducers,
+                         protocol=HIGHEST_PROTOCOL):
+                # initialize the instance -level dispatch_table attribute
+                super().__init__(buffer, protocol=protocol)
+                self.dispatch_table.update(custom_reducers)
+
+        class A:
+            pass
+
+        class B:
+            pass
+
+        custom_reducers = {
+            A: lambda obj: (int, (42,))
+        }
+
+        iob = io.BytesIO()
+        p = PicklerSubclass(iob, custom_reducers, protocol=self.protocol)
+        p.dump((A(), B()))
+        a, b = pickle.loads(iob.getvalue())
+        assert a == 42
+        assert isinstance(b, B)  # pickling locally defined classes works
+
+        # Check there is no side-effect on other CloudPickler instances
+        iob = io.BytesIO()
+        p = cloudpickle.CloudPickler(iob, protocol=self.protocol)
+        p.dump(A())
+        assert isinstance(pickle.loads(iob.getvalue()), A)
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
