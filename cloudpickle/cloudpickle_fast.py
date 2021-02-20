@@ -134,47 +134,6 @@ def _file_reconstructor(retval):
     return retval
 
 
-# COLLECTION OF OBJECTS STATE GETTERS
-# -----------------------------------
-def _function_getstate(func):
-    # - Put func's dynamic attributes (stored in func.__dict__) in state. These
-    #   attributes will be restored at unpickling time using
-    #   f.__dict__.update(state)
-    # - Put func's members into slotstate. Such attributes will be restored at
-    #   unpickling time by iterating over slotstate and calling setattr(func,
-    #   slotname, slotvalue)
-    slotstate = {
-        "__name__": func.__name__,
-        "__qualname__": func.__qualname__,
-        "__annotations__": func.__annotations__,
-        "__kwdefaults__": func.__kwdefaults__,
-        "__defaults__": func.__defaults__,
-        "__module__": func.__module__,
-        "__doc__": func.__doc__,
-        "__closure__": func.__closure__,
-    }
-
-    f_globals_ref = _extract_code_globals(func.__code__)
-    f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
-                 func.__globals__}
-
-    closure_values = (
-        list(map(_get_cell_contents, func.__closure__))
-        if func.__closure__ is not None else ()
-    )
-
-    # Extract currently-imported submodules used by func. Storing these modules
-    # in a smoke _cloudpickle_subimports attribute of the object's state will
-    # trigger the side effect of importing these modules at unpickling time
-    # (which is necessary for func to work correctly once depickled)
-    slotstate["_cloudpickle_submodules"] = _find_imported_submodules(
-        func.__code__, itertools.chain(f_globals.values(), closure_values))
-    slotstate["__globals__"] = f_globals
-
-    state = func.__dict__
-    return state, slotstate
-
-
 def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop('__weakref__', None)
@@ -504,7 +463,7 @@ class CloudPickler(Pickler):
     def _dynamic_function_reduce(self, func):
         """Reduce a function that is not pickleable via attribute lookup."""
         newargs = self._function_getnewargs(func)
-        state = _function_getstate(func)
+        state = self._function_getstate(func)
         return (types.FunctionType, newargs, state, None, None,
                 _function_setstate)
 
@@ -528,25 +487,28 @@ class CloudPickler(Pickler):
     def _function_getnewargs(self, func):
         code = func.__code__
 
-        # base_globals represents the future global namespace of func at
-        # unpickling time. Looking it up and storing it in
-        # CloudpiPickler.globals_ref allow functions sharing the same globals
-        # at pickling time to also share them once unpickled, at one condition:
-        # since globals_ref is an attribute of a CloudPickler instance, and
-        # that a new CloudPickler is created each time pickle.dump or
-        # pickle.dumps is called, functions also need to be saved within the
-        # same invocation of cloudpickle.dump/cloudpickle.dumps (for example:
-        # cloudpickle.dumps([f1, f2])). There is no such limitation when using
-        # CloudPickler.dump, as long as the multiple invocations are bound to
-        # the same CloudPickler.
-        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
+        if hasattr(self, 'persistent_id') and self.persistent_id(func.__globals__) is not None:
+            base_globals = func.__globals__
+        else:
+            # base_globals represents the future global namespace of func at
+            # unpickling time. Looking it up and storing it in
+            # CloudpiPickler.globals_ref allow functions sharing the same globals
+            # at pickling time to also share them once unpickled, at one condition:
+            # since globals_ref is an attribute of a CloudPickler instance, and
+            # that a new CloudPickler is created each time pickle.dump or
+            # pickle.dumps is called, functions also need to be saved within the
+            # same invocation of cloudpickle.dump/cloudpickle.dumps (for example:
+            # cloudpickle.dumps([f1, f2])). There is no such limitation when using
+            # CloudPickler.dump, as long as the multiple invocations are bound to
+            # the same CloudPickler.
+            base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
 
-        if base_globals == {}:
-            # Add module attributes used to resolve relative imports
-            # instructions inside func.
-            for k in ["__package__", "__name__", "__path__", "__file__"]:
-                if k in func.__globals__:
-                    base_globals[k] = func.__globals__[k]
+            if base_globals == {}:
+                # Add module attributes used to resolve relative imports
+                # instructions inside func.
+                for k in ["__package__", "__name__", "__path__", "__file__"]:
+                    if k in func.__globals__:
+                        base_globals[k] = func.__globals__[k]
 
         # Do not bind the free variables before the function is created to
         # avoid infinite recursion.
@@ -557,6 +519,50 @@ class CloudPickler(Pickler):
                 _make_empty_cell() for _ in range(len(code.co_freevars)))
 
         return code, base_globals, None, None, closure
+
+    # COLLECTION OF OBJECTS STATE GETTERS
+    # -----------------------------------
+    def _function_getstate(self, func):
+        # - Put func's dynamic attributes (stored in func.__dict__) in state. These
+        #   attributes will be restored at unpickling time using
+        #   f.__dict__.update(state)
+        # - Put func's members into slotstate. Such attributes will be restored at
+        #   unpickling time by iterating over slotstate and calling setattr(func,
+        #   slotname, slotvalue)
+        slotstate = {
+            "__name__": func.__name__,
+            "__qualname__": func.__qualname__,
+            "__annotations__": func.__annotations__,
+            "__kwdefaults__": func.__kwdefaults__,
+            "__defaults__": func.__defaults__,
+            "__module__": func.__module__,
+            "__doc__": func.__doc__,
+            "__closure__": func.__closure__,
+        }
+
+        if hasattr(self, 'persistent_id') and self.persistent_id(func.__globals__) is not None:
+            f_globals = {}
+        else:
+            f_globals_ref = _extract_code_globals(func.__code__)
+            f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
+                         func.__globals__}
+
+        closure_values = (
+            list(map(_get_cell_contents, func.__closure__))
+            if func.__closure__ is not None else ()
+        )
+
+        # Extract currently-imported submodules used by func. Storing these modules
+        # in a smoke _cloudpickle_subimports attribute of the object's state will
+        # trigger the side effect of importing these modules at unpickling time
+        # (which is necessary for func to work correctly once depickled)
+        slotstate["_cloudpickle_submodules"] = _find_imported_submodules(
+            func.__code__, itertools.chain(f_globals.values(), closure_values))
+        slotstate["__globals__"] = f_globals
+
+        state = func.__dict__
+        return state, slotstate
+
 
     def dump(self, obj):
         try:
