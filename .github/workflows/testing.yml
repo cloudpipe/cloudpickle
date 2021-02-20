@@ -92,6 +92,8 @@ jobs:
 
   python-nightly:
     runs-on: ubuntu-18.04
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
     - uses: actions/checkout@v1
     - name: Install Python from ppa:deadsnakes/nightly
