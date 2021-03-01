@@ -2205,17 +2205,35 @@ class CloudPickleTest(unittest.TestCase):
                         return arg
                 MyClass.__annotations__ = {'attribute': type_}
 
-                def check_annotations(obj, expected_type):
+                def check_annotations(obj, expected_type, expected_type_str):
                     assert obj.__annotations__["attribute"] == expected_type
-                    assert obj.method.__annotations__["arg"] == expected_type
-                    assert (
-                        obj.method.__annotations__["return"] == expected_type
-                    )
+                    if sys.version_info >= (3, 10):
+                        # In Python 3.10, type annotations are stored as strings.
+                        # See PEP 563 for more details:
+                        # https://www.python.org/dev/peps/pep-0563/
+                        assert (
+                            obj.method.__annotations__["arg"]
+                            == expected_type_str
+                        )
+                        assert (
+                            obj.method.__annotations__["return"]
+                            == expected_type_str
+                        )
+                    else:
+                        assert (
+                            obj.method.__annotations__["arg"] == expected_type
+                        )
+                        assert (
+                            obj.method.__annotations__["return"]
+                            == expected_type
+                        )
                     return "ok"
 
                 obj = MyClass()
-                assert check_annotations(obj, type_) == "ok"
-                assert worker.run(check_annotations, obj, type_) == "ok"
+                assert check_annotations(obj, type_, "type_") == "ok"
+                assert (
+                    worker.run(check_annotations, obj, type_, "type_") == "ok"
+                )
 
     def test_generic_extensions_literal(self):
         typing_extensions = pytest.importorskip('typing_extensions')
