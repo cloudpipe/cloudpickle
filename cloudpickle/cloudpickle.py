@@ -137,7 +137,7 @@ def _whichmodule(obj, name):
         # T.__module__ would always be set to "typing" even when the TypeVar T
         # would be defined in a different module.
         if name is not None and getattr(typing, name, None) is obj:
-            # Built-in typeVar defined in typing such as AnyStr
+            # Built-in TypeVar defined in typing such as AnyStr
             return 'typing'
         else:
             # User defined or third-party TypeVar: __module__ attribute is
