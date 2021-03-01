@@ -2301,6 +2301,26 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             copyreg.dispatch_table.pop(MyClass)
 
+    def test_literal_misdetection(self):
+        # see https://github.com/cloudpipe/cloudpickle/issues/403
+        class MyClass:
+            @property
+            def __values__(self):
+                return ()
+
+        o = MyClass()
+        pickle_depickle(o, protocol=self.protocol)
+
+    def test_final_or_classvar_misdetection(self):
+        # see https://github.com/cloudpipe/cloudpickle/issues/403
+        class MyClass:
+            @property
+            def __type__(self):
+                return int
+
+        o = MyClass()
+        pickle_depickle(o, protocol=self.protocol)
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
 
