@@ -136,11 +136,14 @@ def _whichmodule(obj, name):
         # Workaround bug in old Python versions: prior to Python 3.7,
         # T.__module__ would always be set to "typing" even when the TypeVar T
         # would be defined in a different module.
-        #
-        # For such older Python versions, we ignore the __module__ attribute of
-        # TypeVar instances and instead exhaustively lookup those instances in
-        # all currently imported modules.
-        module_name = None
+        if name is not None and getattr(typing, name, None) is obj:
+            # Built-in TypeVar defined in typing such as AnyStr
+            return 'typing'
+        else:
+            # User defined or third-party TypeVar: __module__ attribute is
+            # irrelevant, thus trigger a exhaustive search for obj in all
+            # modules.
+            module_name = None
     else:
         module_name = getattr(obj, '__module__', None)
 
