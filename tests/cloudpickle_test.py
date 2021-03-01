@@ -2213,11 +2213,11 @@ class CloudPickleTest(unittest.TestCase):
                         # https://www.python.org/dev/peps/pep-0563/
                         assert (
                             obj.method.__annotations__["arg"]
-                                == expected_type_str
+                            == expected_type_str
                         )
                         assert (
                             obj.method.__annotations__["return"]
-                                == expected_type_str
+                            == expected_type_str
                         )
                     else:
                         assert (
@@ -2225,7 +2225,7 @@ class CloudPickleTest(unittest.TestCase):
                         )
                         assert (
                             obj.method.__annotations__["return"]
-                                == expected_type
+                            == expected_type
                         )
                     return "ok"
 
