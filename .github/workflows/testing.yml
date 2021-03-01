@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python_version: [3.5, 3.6, 3.7, 3.8, "pypy3"]
+        python_version: [3.5, 3.6, 3.7, 3.8, 3.9, "pypy3"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
@@ -37,6 +37,8 @@ jobs:
             python_version: 3.6
           - os: windows-latest
             python_version: 3.7
+          - os: windows-latest
+            python_version: 3.8
             # as of  4/02/2020, psutil won't build under PyPy + Windows
           - os: windows-latest
             python_version: "pypy3"
@@ -44,6 +46,8 @@ jobs:
             python_version: 3.6
           - os: macos-latest
             python_version: 3.7
+          - os: macos-latest
+            python_version: 3.8
           - os: macos-latest
             # numpy triggers: RuntimeError: Polyfit sanity test emitted a
             # warning
@@ -100,7 +104,7 @@ jobs:
         sudo apt update
         sudo apt install python3.9 python3.9-venv python3.9-dev
         python3.9 -m venv nightly-venv
-        echo ::add-path::nightly-venv/bin
+        echo "$PWD/nightly-venv/bin" >> $GITHUB_PATH
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
     - name: Install project and dependencies
