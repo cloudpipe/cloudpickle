@@ -8,6 +8,10 @@ dev
   https://www.python.org/dev/peps/pep-0563/
   ([PR #400](https://github.com/cloudpipe/cloudpickle/pull/400))
 
+- Stricter parametrized type detection heuristics in
+  _is_parametrized_type_hint to limit false positives.
+  ([PR #409](https://github.com/cloudpipe/cloudpickle/pull/409))
+
 1.6.0
 =====
 
