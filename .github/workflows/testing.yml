@@ -102,8 +102,8 @@ jobs:
       run: |
         sudo add-apt-repository ppa:deadsnakes/nightly
         sudo apt update
-        sudo apt install python3.9 python3.9-venv python3.9-dev
-        python3.9 -m venv nightly-venv
+        sudo apt install python3.10 python3.10-venv python3.10-dev
+        python3.10 -m venv nightly-venv
         echo "$PWD/nightly-venv/bin" >> $GITHUB_PATH
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
