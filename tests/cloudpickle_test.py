@@ -1591,6 +1591,31 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             _TEST_GLOBAL_VARIABLE = orig_value
 
+    def test_persistent_function_globals(self):
+        __globals__ = {"a": "foo"}
+
+        class Pickler(cloudpickle.CloudPickler):
+            @staticmethod
+            def persistent_id(obj):
+                if id(obj) == id(__globals__):
+                    return "__globals__"
+
+        class Unpickler(pickle.Unpickler):
+            @staticmethod
+            def persistent_load(pid):
+                return {"__globals__": __globals__}[pid]
+
+        get = eval('lambda: a', __globals__)
+        file = io.BytesIO()
+        Pickler(file).dump(get)
+        dumped = file.getvalue()
+        self.assertNotIn(b'foo', dumped)
+        get = Unpickler(io.BytesIO(dumped)).load()
+        self.assertEqual(id(__globals__), id(get.__globals__))
+        self.assertEqual('foo', get())
+        __globals__['a'] = 'bar'
+        self.assertEqual('bar', get())
+
     def test_interactive_remote_function_calls(self):
         code = """if __name__ == "__main__":
         from testutils import subprocess_worker
