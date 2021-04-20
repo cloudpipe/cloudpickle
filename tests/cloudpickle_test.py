@@ -2373,6 +2373,7 @@ def test_lookup_module_and_qualname_stdlib_typevar():
     assert module is typing
     assert name == 'AnyStr'
 
+
 def test_lookup_module_and_qualname_external_module_remove():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
@@ -2380,7 +2381,6 @@ def test_lookup_module_and_qualname_external_module_remove():
     register_deep_serialization(_cloudpickle_testpkg)
     unregister_deep_serialization(_cloudpickle_testpkg)
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    
     assert module_and_name is not None
 
 
@@ -2392,7 +2392,6 @@ def test_lookup_module_and_qualname_external_module_remove_name():
     unregister_deep_serialization("_cloudpickle_testpkg")
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
-
 
 
 def test_lookup_module_and_qualname_external_module():
