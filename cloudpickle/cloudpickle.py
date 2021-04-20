@@ -126,6 +126,7 @@ def _lookup_class_or_track(class_tracker_id, class_def):
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
     return class_def
 
+
 def register_deep_serialization(module):
     module_name = module.__name__ if inspect.ismodule(module) else module
     _DEEP_SERIALIZATION_MODULES.add(module_name)

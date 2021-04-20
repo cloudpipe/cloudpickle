@@ -2404,6 +2404,7 @@ def test_lookup_module_and_qualname_external_module():
     unregister_deep_serialization(_cloudpickle_testpkg)
     assert module_and_name is None
 
+
 def test_lookup_module_and_qualname_external_module_name():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
@@ -2413,6 +2414,7 @@ def test_lookup_module_and_qualname_external_module_name():
     unregister_deep_serialization("_cloudpickle_testpkg")
     assert module_and_name is None
 
+
 def test_deep_serialization_package_parsing_parents():
     # We should deep copy children of explicit modules, not parents
     package = "foo.bar.baz"
@@ -2421,6 +2423,7 @@ def test_deep_serialization_package_parsing_parents():
     unregister_deep_serialization(package)
     assert not result
 
+
 def test_deep_serialization_package_parsing_children():
     package = "foo.bar"
     register_deep_serialization(package)
@@ -2428,12 +2431,14 @@ def test_deep_serialization_package_parsing_children():
     unregister_deep_serialization(package)
     assert result
 
+
 def test_deep_serialization_package_parsing_children_no_submodule():
     package = "foo.bar"
     register_deep_serialization(package)
     result = _is_explicitly_serialized_module("foo.bar.baz", submodules=False)
     unregister_deep_serialization(package)
     assert not result
+
 
 def _all_types_to_test():
     T = typing.TypeVar('T')
