@@ -45,6 +45,7 @@ from __future__ import print_function
 import builtins
 import dis
 import opcode
+import inspect
 import platform
 import sys
 import types
@@ -87,6 +88,9 @@ else:
 # communication speed over compatibility:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
+# Names of modules whose resources should be treated as dynamic.
+_DEEP_SERIALIZATION_MODULES = set()
+
 # Track the provenance of reconstructed dynamic classes to make it possible to
 # reconstruct instances from the matching singleton class definition when
 # appropriate and preserve the usual "isinstance" semantics of Python objects.
@@ -122,6 +126,29 @@ def _lookup_class_or_track(class_tracker_id, class_def):
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
     return class_def
 
+def register_deep_serialization(module):
+    module_name = module.__name__ if inspect.ismodule(module) else module
+    _DEEP_SERIALIZATION_MODULES.add(module_name)
+
+
+def unregister_deep_serialization(module):
+    module_name = module.__name__ if inspect.ismodule(module) else module
+    _DEEP_SERIALIZATION_MODULES.remove(module_name)
+
+
+def _is_explicitly_serialized_module(module, submodules=True):
+    module_name = module.__name__ if inspect.ismodule(module) else module
+    if module_name in _DEEP_SERIALIZATION_MODULES:
+        return True
+    if submodules:
+        while True:
+            parent_name = module_name.rsplit(".", 1)[0]
+            if parent_name == module_name:
+                break
+            if parent_name in _DEEP_SERIALIZATION_MODULES:
+                return True
+            module_name = parent_name
+    return False
 
 def _whichmodule(obj, name):
     """Find the module an object belongs to.
@@ -206,6 +233,9 @@ def _lookup_module_and_qualname(obj, name=None):
         return None
 
     if module_name == "__main__":
+        return None
+
+    if _is_explicitly_serialized_module(module_name):
         return None
 
     # Note: if module_name is in sys.modules, the corresponding module is
