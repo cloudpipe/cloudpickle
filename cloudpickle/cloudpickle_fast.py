@@ -155,8 +155,8 @@ def _function_getstate(func):
     }
 
     f_globals_ref = _extract_code_globals(func.__code__)
-    f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
-                 func.__globals__}
+    f_globals = {k: func.__globals__[k] for k in sorted(f_globals_ref)
+                 if k in func.__globals__}
 
     closure_values = (
         list(map(_get_cell_contents, func.__closure__))
