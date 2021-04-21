@@ -2323,6 +2323,9 @@ class CloudPickleTest(unittest.TestCase):
         o = MyClass()
         pickle_depickle(o, protocol=self.protocol)
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 6, 0),
+        reason="Dict determinism is a lost cause in Python < 3.6")
     def test_sorted_globals(self):
         vals = set()
 
