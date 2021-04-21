@@ -49,6 +49,7 @@ from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
+from .testutils import subprocess_pickle_string
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
@@ -57,6 +58,7 @@ from _cloudpickle_testpkg import relative_imports_factory
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
+_TEST_GLOBAL_VARIABLE2 = "another_value"
 
 
 class RaiserOnPickle(object):
@@ -2320,6 +2322,19 @@ class CloudPickleTest(unittest.TestCase):
 
         o = MyClass()
         pickle_depickle(o, protocol=self.protocol)
+
+    def test_sorted_globals(self):
+        vals = set()
+
+        def func_with_globals():
+            return _TEST_GLOBAL_VARIABLE + _TEST_GLOBAL_VARIABLE2
+
+        for i in range(5):
+            vals.add(
+                subprocess_pickle_string(func_with_globals,
+                                         protocol=self.protocol,
+                                         add_env={"PYTHONHASHSEED": str(i)}))
+        assert len(vals) == 1
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
