@@ -2207,10 +2207,13 @@ class CloudPickleTest(unittest.TestCase):
 
                 def check_annotations(obj, expected_type, expected_type_str):
                     assert obj.__annotations__["attribute"] == expected_type
-                    if sys.version_info >= (3, 10):
-                        # In Python 3.10, type annotations are stored as strings.
+                    if sys.version_info >= (3, 11):
+                        # In Python 3.11, type annotations are stored as strings.
                         # See PEP 563 for more details:
                         # https://www.python.org/dev/peps/pep-0563/
+                        # Originaly scheduled for 3.10, then postponed.
+                        # See this for more details:
+                        # https://mail.python.org/archives/list/python-dev@python.org/thread/CLVXXPQ2T2LQ5MP2Y53VVQFCXYWQJHKZ/
                         assert (
                             obj.method.__annotations__["arg"]
                             == expected_type_str
