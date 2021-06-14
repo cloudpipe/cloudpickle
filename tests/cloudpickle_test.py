@@ -48,8 +48,8 @@ from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
-from cloudpickle.cloudpickle import register_deep_serialization
-from cloudpickle.cloudpickle import unregister_deep_serialization
+from cloudpickle.cloudpickle import register_pickle_by_value
+from cloudpickle.cloudpickle import unregister_pickle_by_value
 from cloudpickle.cloudpickle import _is_explicitly_serialized_module
 
 from .external import an_external_function
@@ -2332,10 +2332,10 @@ class CloudPickleTest(unittest.TestCase):
         reference = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
         f1 = cloudpickle.loads(reference)
 
-        register_deep_serialization("tests.external")
+        register_pickle_by_value("tests.external")
         deep = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
         f2 = cloudpickle.loads(deep)
-        unregister_deep_serialization("tests.external")
+        unregister_pickle_by_value("tests.external")
 
         # Ensure the serialisation is not the same
         assert reference != deep
@@ -2378,8 +2378,8 @@ def test_lookup_module_and_qualname_external_module_remove():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
 
-    register_deep_serialization(_cloudpickle_testpkg)
-    unregister_deep_serialization(_cloudpickle_testpkg)
+    register_pickle_by_value(_cloudpickle_testpkg)
+    unregister_pickle_by_value(_cloudpickle_testpkg)
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
 
@@ -2388,8 +2388,8 @@ def test_lookup_module_and_qualname_external_module_remove_name():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
 
-    register_deep_serialization("_cloudpickle_testpkg")
-    unregister_deep_serialization("_cloudpickle_testpkg")
+    register_pickle_by_value("_cloudpickle_testpkg")
+    unregister_pickle_by_value("_cloudpickle_testpkg")
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
 
@@ -2398,9 +2398,9 @@ def test_lookup_module_and_qualname_external_module():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
 
-    register_deep_serialization(_cloudpickle_testpkg)
+    register_pickle_by_value(_cloudpickle_testpkg)
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    unregister_deep_serialization(_cloudpickle_testpkg)
+    unregister_pickle_by_value(_cloudpickle_testpkg)
     assert module_and_name is None
 
 
@@ -2408,34 +2408,34 @@ def test_lookup_module_and_qualname_external_module_name():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
 
-    register_deep_serialization("_cloudpickle_testpkg")
+    register_pickle_by_value("_cloudpickle_testpkg")
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    unregister_deep_serialization("_cloudpickle_testpkg")
+    unregister_pickle_by_value("_cloudpickle_testpkg")
     assert module_and_name is None
 
 
 def test_deep_serialization_package_parsing_parents():
     # We should deep copy children of explicit modules, not parents
     package = "foo.bar.baz"
-    register_deep_serialization(package)
+    register_pickle_by_value(package)
     result = _is_explicitly_serialized_module("foo.bar")
-    unregister_deep_serialization(package)
+    unregister_pickle_by_value(package)
     assert not result
 
 
 def test_deep_serialization_package_parsing_children():
     package = "foo.bar"
-    register_deep_serialization(package)
+    register_pickle_by_value(package)
     result = _is_explicitly_serialized_module("foo.bar.baz")
-    unregister_deep_serialization(package)
+    unregister_pickle_by_value(package)
     assert result
 
 
 def test_deep_serialization_package_parsing_children_no_submodule():
     package = "foo.bar"
-    register_deep_serialization(package)
+    register_pickle_by_value(package)
     result = _is_explicitly_serialized_module("foo.bar.baz", submodules=False)
-    unregister_deep_serialization(package)
+    unregister_pickle_by_value(package)
     assert not result
 
 

@@ -89,7 +89,7 @@ else:
 DEFAULT_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
 # Names of modules whose resources should be treated as dynamic.
-_DEEP_SERIALIZATION_MODULES = set()
+_PICKLE_BY_VALUE_MODULES = set()
 
 # Track the provenance of reconstructed dynamic classes to make it possible to
 # reconstruct instances from the matching singleton class definition when
@@ -127,26 +127,28 @@ def _lookup_class_or_track(class_tracker_id, class_def):
     return class_def
 
 
-def register_deep_serialization(module):
+def register_pickle_by_value(module):
+    """Register that the input module should be pickled by value."""
     module_name = module.__name__ if inspect.ismodule(module) else module
-    _DEEP_SERIALIZATION_MODULES.add(module_name)
+    _PICKLE_BY_VALUE_MODULES.add(module_name)
 
 
-def unregister_deep_serialization(module):
+def unregister_pickle_by_value(module):
+    """ nregister that the input module should be pickled by value."""
     module_name = module.__name__ if inspect.ismodule(module) else module
-    _DEEP_SERIALIZATION_MODULES.remove(module_name)
+    _PICKLE_BY_VALUE_MODULES.remove(module_name)
 
 
 def _is_explicitly_serialized_module(module, submodules=True):
     module_name = module.__name__ if inspect.ismodule(module) else module
-    if module_name in _DEEP_SERIALIZATION_MODULES:
+    if module_name in _PICKLE_BY_VALUE_MODULES:
         return True
     if submodules:
         while True:
             parent_name = module_name.rsplit(".", 1)[0]
             if parent_name == module_name:
                 break
-            if parent_name in _DEEP_SERIALIZATION_MODULES:
+            if parent_name in _PICKLE_BY_VALUE_MODULES:
                 return True
             module_name = parent_name
     return False
