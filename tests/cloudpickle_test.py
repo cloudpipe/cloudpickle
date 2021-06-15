@@ -44,7 +44,7 @@ except ImportError:
 
 import cloudpickle
 from cloudpickle.compat import pickle
-from cloudpickle.cloudpickle import _is_importable
+from cloudpickle.cloudpickle import _is_importable, _PICKLE_BY_VALUE_MODULES
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
@@ -2328,7 +2328,7 @@ class CloudPickleTest(unittest.TestCase):
         o = MyClass()
         pickle_depickle(o, protocol=self.protocol)
 
-    def test_deep_serialization_external_func(self):
+    def test_pickle_module_registered_for_pickling_by_value(self):
         reference = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
         f1 = cloudpickle.loads(reference)
 
@@ -2340,6 +2340,8 @@ class CloudPickleTest(unittest.TestCase):
         # Ensure the serialisation is not the same
         assert reference != deep
         assert len(deep) > len(reference)
+        assert b"return_a_string" in deep
+        assert b"return_a_string" not in reference
         assert f1() == f2()
 
 
@@ -2374,69 +2376,71 @@ def test_lookup_module_and_qualname_stdlib_typevar():
     assert name == 'AnyStr'
 
 
-def test_lookup_module_and_qualname_external_module_remove():
+def test_register_pickle_by_value():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
 
+    # Test that adding and removing a module to pickle by value returns
+    # us to the original pickle by reference
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
     register_pickle_by_value(_cloudpickle_testpkg)
     unregister_pickle_by_value(_cloudpickle_testpkg)
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-
-def test_lookup_module_and_qualname_external_module_remove_name():
-    import _cloudpickle_testpkg
-    T = _cloudpickle_testpkg.T
-
+    # Test that doing the same with the string module name 
+    # functions identically
     register_pickle_by_value("_cloudpickle_testpkg")
     unregister_pickle_by_value("_cloudpickle_testpkg")
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-
-def test_lookup_module_and_qualname_external_module():
-    import _cloudpickle_testpkg
-    T = _cloudpickle_testpkg.T
-
+    # Test now that if we look up the module before removing
+    # we correctly get a None result, indicating to pickle
+    # by value
     register_pickle_by_value(_cloudpickle_testpkg)
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     unregister_pickle_by_value(_cloudpickle_testpkg)
     assert module_and_name is None
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-
-def test_lookup_module_and_qualname_external_module_name():
-    import _cloudpickle_testpkg
-    T = _cloudpickle_testpkg.T
-
+    # Test pickle by value behaviour using string name
     register_pickle_by_value("_cloudpickle_testpkg")
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     unregister_pickle_by_value("_cloudpickle_testpkg")
     assert module_and_name is None
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
 
-def test_deep_serialization_package_parsing_parents():
+def test_register_pickle_by_value_parents_and_children():
     # We should deep copy children of explicit modules, not parents
     package = "foo.bar.baz"
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
     register_pickle_by_value(package)
     result = _is_explicitly_serialized_module("foo.bar")
     unregister_pickle_by_value(package)
     assert not result
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-
-def test_deep_serialization_package_parsing_children():
+    # Given a child of a pickle by value module, we should
+    # pickle it by value
     package = "foo.bar"
     register_pickle_by_value(package)
     result = _is_explicitly_serialized_module("foo.bar.baz")
     unregister_pickle_by_value(package)
     assert result
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-
-def test_deep_serialization_package_parsing_children_no_submodule():
+    # Given a child of a pickle by value method with submodules set
+    # to false, we should no longer pickle it by value
     package = "foo.bar"
     register_pickle_by_value(package)
     result = _is_explicitly_serialized_module("foo.bar.baz", submodules=False)
     unregister_pickle_by_value(package)
     assert not result
+    assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
 
 def _all_types_to_test():

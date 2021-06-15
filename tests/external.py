@@ -2,4 +2,4 @@
 # only save a reference to
 
 def an_external_function():
-    return "this is something"
+    return "return_a_string"
