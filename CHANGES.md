@@ -4,6 +4,9 @@
 dev
 ===
 
+- Fix a side effect altering dynamic modules at pickling time.
+  ([PR #426](https://github.com/cloudpipe/cloudpickle/pull/426))
+
 - Support for pickling type annotations on Python 3.10 as per [PEP 563](
   https://www.python.org/dev/peps/pep-0563/)
   ([PR #400](https://github.com/cloudpipe/cloudpickle/pull/400))
