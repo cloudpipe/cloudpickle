@@ -44,13 +44,13 @@ except ImportError:
 
 import cloudpickle
 from cloudpickle.compat import pickle
-from cloudpickle.cloudpickle import _is_importable, _PICKLE_BY_VALUE_MODULES
+from cloudpickle import register_pickle_by_value
+from cloudpickle import unregister_pickle_by_value
+from cloudpickle import is_registered_pickle_by_value
+from cloudpickle.cloudpickle import _should_pickle_by_reference, _PICKLE_BY_VALUE_MODULES
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
-from cloudpickle.cloudpickle import register_pickle_by_value
-from cloudpickle.cloudpickle import unregister_pickle_by_value
-from cloudpickle.cloudpickle import is_registered_pickle_by_value
 
 from .external import an_external_function
 from .testutils import subprocess_pickle_echo
@@ -712,24 +712,24 @@ class CloudPickleTest(unittest.TestCase):
         import distutils
         import distutils.ccompiler
 
-        assert _is_importable(pickle)
-        assert _is_importable(os.path)  # fake (aliased) module
-        assert _is_importable(distutils)  # package
-        assert _is_importable(distutils.ccompiler)  # module in package
+        assert _should_pickle_by_reference(pickle)
+        assert _should_pickle_by_reference(os.path)  # fake (aliased) module
+        assert _should_pickle_by_reference(distutils)  # package
+        assert _should_pickle_by_reference(distutils.ccompiler)  # module in package
 
         dynamic_module = types.ModuleType('dynamic_module')
-        assert not _is_importable(dynamic_module)
+        assert not _should_pickle_by_reference(dynamic_module)
 
         if platform.python_implementation() == 'PyPy':
             import _codecs
-            assert _is_importable(_codecs)
+            assert _should_pickle_by_reference(_codecs)
 
         # #354: Check that modules created dynamically during the import of
         # their parent modules are considered importable by cloudpickle.
         # See the mod_with_dynamic_submodule documentation for more
         # details of this use case.
         import _cloudpickle_testpkg.mod.dynamic_submodule as m
-        assert _is_importable(m)
+        assert _should_pickle_by_reference(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
 
         # Check for similar behavior for a module that cannot be imported by
@@ -737,14 +737,14 @@ class CloudPickleTest(unittest.TestCase):
         from _cloudpickle_testpkg.mod import dynamic_submodule_two as m2
         # Note: import _cloudpickle_testpkg.mod.dynamic_submodule_two as m2
         # works only for Python 3.7+
-        assert _is_importable(m2)
+        assert _should_pickle_by_reference(m2)
         assert pickle_depickle(m2, protocol=self.protocol) is m2
 
         # Submodule_three is a dynamic module only importable via module lookup
         with pytest.raises(ImportError):
             import _cloudpickle_testpkg.mod.submodule_three  # noqa
         from _cloudpickle_testpkg.mod import submodule_three as m3
-        assert not _is_importable(m3)
+        assert not _should_pickle_by_reference(m3)
 
         # This module cannot be pickled using attribute lookup (as it does not
         # have a `__module__` attribute like classes and functions.
@@ -756,12 +756,12 @@ class CloudPickleTest(unittest.TestCase):
         # Do the same for an importable dynamic submodule inside a dynamic
         # module inside a file-backed module.
         import _cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule as sm  # noqa
-        assert _is_importable(sm)
+        assert _should_pickle_by_reference(sm)
         assert pickle_depickle(sm, protocol=self.protocol) is sm
 
         expected = "cannot check importability of object instances"
         with pytest.raises(TypeError, match=expected):
-            _is_importable(object())
+            _should_pickle_by_reference(object())
 
     def test_Ellipsis(self):
         self.assertEqual(Ellipsis,
@@ -2329,20 +2329,44 @@ class CloudPickleTest(unittest.TestCase):
         pickle_depickle(o, protocol=self.protocol)
 
     def test_pickle_module_registered_for_pickling_by_value(self):
-        reference = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
-        f1 = cloudpickle.loads(reference)
+        try:
+            reference = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            f1 = cloudpickle.loads(reference)
 
-        register_pickle_by_value("tests.external")
-        deep = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
-        f2 = cloudpickle.loads(deep)
-        unregister_pickle_by_value("tests.external")
+            register_pickle_by_value("tests.external")
+            deep = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            f2 = cloudpickle.loads(deep)
+            unregister_pickle_by_value("tests.external")
 
-        # Ensure the serialisation is not the same
-        assert reference != deep
-        assert len(deep) > len(reference)
-        assert b"return_a_string" in deep
-        assert b"return_a_string" not in reference
-        assert f1() == f2()
+            # Ensure the serialisation is not the same
+            assert reference != deep
+            assert len(deep) > len(reference)
+            assert b"return_a_string" in deep
+            assert b"return_a_string" not in reference
+            assert f1() == f2()
+        finally:
+            _PICKLE_BY_VALUE_MODULES.clear()
+
+    def test_pickle_entire_module_by_value(self):
+        import _cloudpickle_testpkg.mod as m
+
+        try:
+            reference = cloudpickle.dumps(m, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            m1 = cloudpickle.loads(reference)
+
+            register_pickle_by_value("_cloudpickle_testpkg")
+            deep = cloudpickle.dumps(m, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            m2 = cloudpickle.loads(deep)
+            unregister_pickle_by_value("_cloudpickle_testpkg")
+        
+            # Ensure the serialisation is not the same
+            assert reference != deep
+            assert len(deep) > len(reference)
+            assert b"hello from a package" in deep
+            assert b"hello from a package" not in reference
+            assert m1.package_function() == m2.package_function()
+        finally:
+            _PICKLE_BY_VALUE_MODULES.clear()
 
 
 
@@ -2380,68 +2404,72 @@ def test_register_pickle_by_value():
     import _cloudpickle_testpkg
     T = _cloudpickle_testpkg.T
 
-    # Test that adding and removing a module to pickle by value returns
-    # us to the original pickle by reference
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
-    register_pickle_by_value(_cloudpickle_testpkg)
-    unregister_pickle_by_value(_cloudpickle_testpkg)
-    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    assert module_and_name is not None
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
+    try:
+        # Test that adding and removing a module to pickle by value returns
+        # us to the original pickle by reference
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        register_pickle_by_value(_cloudpickle_testpkg)
+        unregister_pickle_by_value(_cloudpickle_testpkg)
+        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        assert pickle_by_ref
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-    # Test that doing the same with the string module name 
-    # functions identically
-    register_pickle_by_value("_cloudpickle_testpkg")
-    unregister_pickle_by_value("_cloudpickle_testpkg")
-    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    assert module_and_name is not None
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        # Test that doing the same with the string module name 
+        # functions identically
+        register_pickle_by_value("_cloudpickle_testpkg")
+        unregister_pickle_by_value("_cloudpickle_testpkg")
+        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        assert pickle_by_ref
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-    # Test now that if we look up the module before removing
-    # we correctly get a None result, indicating to pickle
-    # by value
-    register_pickle_by_value(_cloudpickle_testpkg)
-    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    unregister_pickle_by_value(_cloudpickle_testpkg)
-    assert module_and_name is None
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        # Test now that if we look up the module before removing
+        # we correctly get a None result, indicating to pickle
+        # by value
+        register_pickle_by_value(_cloudpickle_testpkg)
+        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        unregister_pickle_by_value(_cloudpickle_testpkg)
+        assert not pickle_by_ref
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-    # Test pickle by value behaviour using string name
-    register_pickle_by_value("_cloudpickle_testpkg")
-    module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
-    unregister_pickle_by_value("_cloudpickle_testpkg")
-    assert module_and_name is None
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
-
+        # Test pickle by value behaviour using string name
+        register_pickle_by_value("_cloudpickle_testpkg")
+        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        unregister_pickle_by_value("_cloudpickle_testpkg")
+        assert not pickle_by_ref
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+    finally:
+        _PICKLE_BY_VALUE_MODULES.clear()
 
 def test_register_pickle_by_value_parents_and_children():
-    # We should deep copy children of explicit modules, not parents
-    package = "foo.bar.baz"
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
-    register_pickle_by_value(package)
-    result = is_registered_pickle_by_value("foo.bar")
-    unregister_pickle_by_value(package)
-    assert not result
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
+    try:
+        # We should deep copy children of explicit modules, not parents
+        package = "foo.bar.baz"
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        register_pickle_by_value(package)
+        result = is_registered_pickle_by_value("foo.bar")
+        unregister_pickle_by_value(package)
+        assert not result
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-    # Given a child of a pickle by value module, we should
-    # pickle it by value
-    package = "foo.bar"
-    register_pickle_by_value(package)
-    result = is_registered_pickle_by_value("foo.bar.baz")
-    unregister_pickle_by_value(package)
-    assert result
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        # Given a child of a pickle by value module, we should
+        # pickle it by value
+        package = "foo.bar"
+        register_pickle_by_value(package)
+        result = is_registered_pickle_by_value("foo.bar.baz")
+        unregister_pickle_by_value(package)
+        assert result
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-    # Given a child of a pickle by value method with submodules set
-    # to false, we should no longer pickle it by value
-    package = "foo.bar"
-    register_pickle_by_value(package)
-    result = is_registered_pickle_by_value("foo.bar.baz", submodules=False)
-    unregister_pickle_by_value(package)
-    assert not result
-    assert len(_PICKLE_BY_VALUE_MODULES) == 0
-
+        # Given a child of a pickle by value method with submodules set
+        # to false, we should no longer pickle it by value
+        package = "foo.bar"
+        register_pickle_by_value(package)
+        result = is_registered_pickle_by_value("foo.bar.baz", submodules=False)
+        unregister_pickle_by_value(package)
+        assert not result
+        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+    finally:
+        _PICKLE_BY_VALUE_MODULES.clear()
 
 def _all_types_to_test():
     T = typing.TypeVar('T')

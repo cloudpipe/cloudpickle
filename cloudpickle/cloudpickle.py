@@ -199,18 +199,25 @@ def _whichmodule(obj, name):
     return None
 
 
-def _is_importable(obj, name=None):
-    """Dispatcher utility to test the importability of various constructs."""
-    if isinstance(obj, types.FunctionType):
-        return _lookup_module_and_qualname(obj, name=name) is not None
-    elif issubclass(type(obj), type):
-        return _lookup_module_and_qualname(obj, name=name) is not None
+def _should_pickle_by_reference(obj, name=None):
+    """Dispatcher utility to test whether an object should be serialised by 
+    value or reference by using importability as a proxy."""
+    if isinstance(obj, types.FunctionType) or issubclass(type(obj), 
+            type):
+        module_name = _lookup_module_and_qualname(obj, name=name)
+        if module_name is None:
+            return False
+        module, name = module_name
+        return not is_registered_pickle_by_value(module.__name__)
+
     elif isinstance(obj, types.ModuleType):
         # We assume that sys.modules is primarily used as a cache mechanism for
         # the Python import machinery. Checking if a module has been added in
         # is sys.modules therefore a cheap and simple heuristic to tell us whether
         # we can assume  that a given module could be imported by name in
         # another Python process.
+        if is_registered_pickle_by_value(obj.__name__):
+            return False
         return obj.__name__ in sys.modules
     else:
         raise TypeError(
@@ -236,9 +243,6 @@ def _lookup_module_and_qualname(obj, name=None):
         return None
 
     if module_name == "__main__":
-        return None
-
-    if is_registered_pickle_by_value(module_name):
         return None
 
     # Note: if module_name is in sys.modules, the corresponding module is
@@ -868,10 +872,15 @@ def _decompose_typevar(obj):
 
 
 def _typevar_reduce(obj):
-    # TypeVar instances have no __qualname__ hence we pass the name explicitly.
+    # TypeVar instances require the module information hence why we
+    # are not using the _should_pickle_by_reference directly
     module_and_name = _lookup_module_and_qualname(obj, name=obj.__name__)
+
     if module_and_name is None:
         return (_make_typevar, _decompose_typevar(obj))
+    elif is_registered_pickle_by_value(module_and_name[0].__name__):
+        return (_make_typevar, _decompose_typevar(obj))
+
     return (getattr, module_and_name)
 
 
