@@ -50,7 +50,7 @@ from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 from cloudpickle.cloudpickle import register_pickle_by_value
 from cloudpickle.cloudpickle import unregister_pickle_by_value
-from cloudpickle.cloudpickle import _is_explicitly_serialized_module
+from cloudpickle.cloudpickle import is_registered_pickle_by_value
 
 from .external import an_external_function
 from .testutils import subprocess_pickle_echo
@@ -2419,7 +2419,7 @@ def test_register_pickle_by_value_parents_and_children():
     package = "foo.bar.baz"
     assert len(_PICKLE_BY_VALUE_MODULES) == 0
     register_pickle_by_value(package)
-    result = _is_explicitly_serialized_module("foo.bar")
+    result = is_registered_pickle_by_value("foo.bar")
     unregister_pickle_by_value(package)
     assert not result
     assert len(_PICKLE_BY_VALUE_MODULES) == 0
@@ -2428,7 +2428,7 @@ def test_register_pickle_by_value_parents_and_children():
     # pickle it by value
     package = "foo.bar"
     register_pickle_by_value(package)
-    result = _is_explicitly_serialized_module("foo.bar.baz")
+    result = is_registered_pickle_by_value("foo.bar.baz")
     unregister_pickle_by_value(package)
     assert result
     assert len(_PICKLE_BY_VALUE_MODULES) == 0
@@ -2437,7 +2437,7 @@ def test_register_pickle_by_value_parents_and_children():
     # to false, we should no longer pickle it by value
     package = "foo.bar"
     register_pickle_by_value(package)
-    result = _is_explicitly_serialized_module("foo.bar.baz", submodules=False)
+    result = is_registered_pickle_by_value("foo.bar.baz", submodules=False)
     unregister_pickle_by_value(package)
     assert not result
     assert len(_PICKLE_BY_VALUE_MODULES) == 0

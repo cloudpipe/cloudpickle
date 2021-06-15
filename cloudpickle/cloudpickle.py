@@ -139,7 +139,7 @@ def unregister_pickle_by_value(module):
     _PICKLE_BY_VALUE_MODULES.remove(module_name)
 
 
-def _is_explicitly_serialized_module(module, submodules=True):
+def is_registered_pickle_by_value(module, submodules=True):
     module_name = module.__name__ if inspect.ismodule(module) else module
     if module_name in _PICKLE_BY_VALUE_MODULES:
         return True
@@ -238,7 +238,7 @@ def _lookup_module_and_qualname(obj, name=None):
     if module_name == "__main__":
         return None
 
-    if _is_explicitly_serialized_module(module_name):
+    if is_registered_pickle_by_value(module_name):
         return None
 
     # Note: if module_name is in sys.modules, the corresponding module is
