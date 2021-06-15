@@ -2330,11 +2330,11 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_pickle_module_registered_for_pickling_by_value(self):
         try:
-            reference = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            reference = cloudpickle.dumps(an_external_function, protocol=self.protocol)
             f1 = cloudpickle.loads(reference)
 
             register_pickle_by_value("tests.external")
-            deep = cloudpickle.dumps(an_external_function, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            deep = cloudpickle.dumps(an_external_function, protocol=self.protocol)
             f2 = cloudpickle.loads(deep)
             unregister_pickle_by_value("tests.external")
 
@@ -2348,14 +2348,14 @@ class CloudPickleTest(unittest.TestCase):
             _PICKLE_BY_VALUE_MODULES.clear()
 
     def test_pickle_entire_module_by_value(self):
-        import _cloudpickle_testpkg.mod as m
+        import _cloudpickle_testpkg as m
 
         try:
-            reference = cloudpickle.dumps(m, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            reference = cloudpickle.dumps(m, protocol=self.protocol)
             m1 = cloudpickle.loads(reference)
 
             register_pickle_by_value("_cloudpickle_testpkg")
-            deep = cloudpickle.dumps(m, protocol=cloudpickle.DEFAULT_PROTOCOL)
+            deep = cloudpickle.dumps(m, protocol=self.protocol)
             m2 = cloudpickle.loads(deep)
             unregister_pickle_by_value("_cloudpickle_testpkg")
         
