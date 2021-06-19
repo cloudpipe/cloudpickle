@@ -200,10 +200,10 @@ def _whichmodule(obj, name):
 
 
 def _should_pickle_by_reference(obj, name=None):
-    """Dispatcher utility to test whether an object should be serialised by 
+    """Dispatcher utility to test whether an object should be serialised by
     value or reference by using importability as a proxy."""
-    if isinstance(obj, types.FunctionType) or issubclass(type(obj), 
-            type) or isinstance(obj, typing.TypeVar):
+    if (isinstance(obj, types.FunctionType) or issubclass(type(obj),type) or
+        isinstance(obj, typing.TypeVar):
         module_name = _lookup_module_and_qualname(obj, name=name)
         if module_name is None:
             return False
@@ -213,9 +213,9 @@ def _should_pickle_by_reference(obj, name=None):
     elif isinstance(obj, types.ModuleType):
         # We assume that sys.modules is primarily used as a cache mechanism for
         # the Python import machinery. Checking if a module has been added in
-        # is sys.modules therefore a cheap and simple heuristic to tell us whether
-        # we can assume  that a given module could be imported by name in
-        # another Python process.
+        # is sys.modules therefore a cheap and simple heuristic to tell us
+        # whether we can assume  that a given module could be imported by name
+        # in another Python process.
         if is_registered_pickle_by_value(obj.__name__):
             return False
         return obj.__name__ in sys.modules

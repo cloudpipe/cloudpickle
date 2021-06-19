@@ -2364,7 +2364,7 @@ class CloudPickleTest(unittest.TestCase):
             deep = cloudpickle.dumps(m, protocol=self.protocol)
             m2 = cloudpickle.loads(deep)
             unregister_pickle_by_value("_cloudpickle_testpkg")
-        
+
             # Ensure the serialisation is not the same
             assert reference != deep
             assert len(deep) > len(reference)
@@ -2420,8 +2420,8 @@ def test_register_pickle_by_value():
         assert pickle_by_ref
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
-        # Test that doing the same with the string module name 
-        # functions identically
+        # Test that doing the same with the string module name functions
+        # identically
         register_pickle_by_value("_cloudpickle_testpkg")
         unregister_pickle_by_value("_cloudpickle_testpkg")
         pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
@@ -2445,6 +2445,7 @@ def test_register_pickle_by_value():
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
     finally:
         _PICKLE_BY_VALUE_MODULES.clear()
+
 
 def test_register_pickle_by_value_parents_and_children():
     try:
