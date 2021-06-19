@@ -96,6 +96,7 @@ jobs:
 
   python-nightly:
     runs-on: ubuntu-18.04
+    if: "contains(github.event.pull_request.labels.*.name, 'ci python-nightly')"
     steps:
     - uses: actions/checkout@v1
     - name: Install Python from ppa:deadsnakes/nightly
