@@ -608,7 +608,10 @@ class CloudPickleTest(unittest.TestCase):
             assert hasattr(depickled_mod.__builtins__, "abs")
         assert depickled_mod.f(-1) == 1
 
-        # Additional check testing that the issue #425 is fixed
+        # Additional check testing that the issue #425 is fixed: without the
+        # fix for #425, `mod.f` would not have access to `__builtins__`, and
+        # thus calling `mod.f(-1)` (which relies on the `abs` builtin) would
+        # fail.
         assert mod.f(-1) == 1
 
     def test_load_dynamic_module_in_grandchild_process(self):
@@ -2214,10 +2217,13 @@ class CloudPickleTest(unittest.TestCase):
 
                 def check_annotations(obj, expected_type, expected_type_str):
                     assert obj.__annotations__["attribute"] == expected_type
-                    if sys.version_info >= (3, 10):
-                        # In Python 3.10, type annotations are stored as strings.
+                    if sys.version_info >= (3, 11):
+                        # In Python 3.11, type annotations are stored as strings.
                         # See PEP 563 for more details:
                         # https://www.python.org/dev/peps/pep-0563/
+                        # Originaly scheduled for 3.10, then postponed.
+                        # See this for more details:
+                        # https://mail.python.org/archives/list/python-dev@python.org/thread/CLVXXPQ2T2LQ5MP2Y53VVQFCXYWQJHKZ/
                         assert (
                             obj.method.__annotations__["arg"]
                             == expected_type_str
