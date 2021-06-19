@@ -202,8 +202,8 @@ def _whichmodule(obj, name):
 def _should_pickle_by_reference(obj, name=None):
     """Dispatcher utility to test whether an object should be serialised by
     value or reference by using importability as a proxy."""
-    if (isinstance(obj, types.FunctionType) or issubclass(type(obj),type) or
-        isinstance(obj, typing.TypeVar):
+    if (isinstance(obj, types.FunctionType) or issubclass(type(obj), type) or
+            isinstance(obj, typing.TypeVar)):
         module_name = _lookup_module_and_qualname(obj, name=name)
         if module_name is None:
             return False
