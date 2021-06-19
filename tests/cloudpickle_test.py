@@ -604,7 +604,10 @@ class CloudPickleTest(unittest.TestCase):
             assert hasattr(depickled_mod.__builtins__, "abs")
         assert depickled_mod.f(-1) == 1
 
-        # Additional check testing that the issue #425 is fixed
+        # Additional check testing that the issue #425 is fixed: without the
+        # fix for #425, `mod.f` would not have access to `__builtins__`, and
+        # thus calling `mod.f(-1)` (which relies on the `abs` builtin) would
+        # fail.
         assert mod.f(-1) == 1
 
     def test_load_dynamic_module_in_grandchild_process(self):
