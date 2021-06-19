@@ -96,6 +96,7 @@ jobs:
 
   python-nightly:
     runs-on: ubuntu-18.04
+    # This entry is made optional for now, see https://github.com/cloudpipe/cloudpickle/pull/420
     if: "contains(github.event.pull_request.labels.*.name, 'ci python-nightly')"
     steps:
     - uses: actions/checkout@v1
