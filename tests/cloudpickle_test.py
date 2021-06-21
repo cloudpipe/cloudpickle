@@ -2353,6 +2353,28 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             _PICKLE_BY_VALUE_MODULES.clear()
 
+    def test_pickle_typevar_module_by_value(self):
+        try:
+            import _cloudpickle_testpkg
+            T = _cloudpickle_testpkg.T
+            reference = cloudpickle.dumps(T, protocol=self.protocol)
+            f1 = cloudpickle.loads(reference)
+
+            register_pickle_by_value(_cloudpickle_testpkg)
+            deep = cloudpickle.dumps(T, protocol=self.protocol)
+            f2 = cloudpickle.loads(deep)
+            unregister_pickle_by_value(_cloudpickle_testpkg)
+
+            # Ensure the serialisation is not the same
+            assert reference != deep
+            assert b"typevar" in deep
+            assert b"typevar" not in reference
+            assert b"getattr" in reference
+            assert b"getattr" not in deep
+            assert f1 == f2
+        finally:
+            _PICKLE_BY_VALUE_MODULES.clear()
+
     def test_pickle_entire_module_by_value(self):
         import _cloudpickle_testpkg as m
 
@@ -2408,7 +2430,7 @@ def test_lookup_module_and_qualname_stdlib_typevar():
 
 def test_register_pickle_by_value():
     import _cloudpickle_testpkg
-    T = _cloudpickle_testpkg.T
+    fn = _cloudpickle_testpkg.package_function
 
     try:
         # Test that adding and removing a module to pickle by value returns
@@ -2416,7 +2438,7 @@ def test_register_pickle_by_value():
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
         register_pickle_by_value(_cloudpickle_testpkg)
         unregister_pickle_by_value(_cloudpickle_testpkg)
-        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
         assert pickle_by_ref
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
@@ -2424,7 +2446,7 @@ def test_register_pickle_by_value():
         # identically
         register_pickle_by_value("_cloudpickle_testpkg")
         unregister_pickle_by_value("_cloudpickle_testpkg")
-        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
         assert pickle_by_ref
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
@@ -2432,14 +2454,14 @@ def test_register_pickle_by_value():
         # we correctly get a None result, indicating to pickle
         # by value
         register_pickle_by_value(_cloudpickle_testpkg)
-        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
         unregister_pickle_by_value(_cloudpickle_testpkg)
         assert not pickle_by_ref
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
 
         # Test pickle by value behaviour using string name
         register_pickle_by_value("_cloudpickle_testpkg")
-        pickle_by_ref = _should_pickle_by_reference(T, name=T.__name__)
+        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
         unregister_pickle_by_value("_cloudpickle_testpkg")
         assert not pickle_by_ref
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
