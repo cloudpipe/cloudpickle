@@ -134,7 +134,7 @@ def register_pickle_by_value(module):
 
 
 def unregister_pickle_by_value(module):
-    """ nregister that the input module should be pickled by value."""
+    """Unregister that the input module should be pickled by value."""
     module_name = module.__name__ if inspect.ismodule(module) else module
     _PICKLE_BY_VALUE_MODULES.remove(module_name)
 
