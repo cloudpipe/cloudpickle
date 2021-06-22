@@ -12,6 +12,10 @@ dev
   _is_parametrized_type_hint to limit false positives.
   ([PR #409](https://github.com/cloudpipe/cloudpickle/pull/409))
 
+- Support pickling / depickling of OrderedDict KeysView, ValuesView, and
+  ItemsView, following similar strategy for vanilla Python dictionaries.
+  ([PR #423](https://github.com/cloudpipe/cloudpickle/pull/423))
+
 1.6.0
 =====
 
