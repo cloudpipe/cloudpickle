@@ -24,6 +24,7 @@ import os
 import enum
 import typing
 from functools import wraps
+import time
 
 import pytest
 
@@ -59,6 +60,8 @@ from _cloudpickle_testpkg import relative_imports_factory
 
 _TEST_GLOBAL_VARIABLE = "default_value"
 _TEST_GLOBAL_VARIABLE2 = "another_value"
+
+exec("def _TEST_BIG_GLOBAL_SPACE():\n    return %s" % ", ".join([f"a{i}" for i in range(1000)]))
 
 
 class RaiserOnPickle(object):
@@ -2338,6 +2341,16 @@ class CloudPickleTest(unittest.TestCase):
                                          protocol=self.protocol,
                                          add_env={"PYTHONHASHSEED": str(i)}))
         assert len(vals) == 1
+
+    def test_efficient_sorted_globals(self):
+        # Non regression test to demonstrate that large numbers of globals
+        # do not cause slowdown
+        gvars = set(f"a{i}" for i in range(1000))
+        assert cloudpickle.cloudpickle._extract_code_globals(
+            _TEST_BIG_GLOBAL_SPACE.__code__) == gvars
+        tic = time.time()
+        subprocess_pickle_string(_TEST_BIG_GLOBAL_SPACE, protocol=self.protocol)
+        assert time.time() - tic < 0.5
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
