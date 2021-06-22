@@ -2357,20 +2357,20 @@ class CloudPickleTest(unittest.TestCase):
         try:
             import _cloudpickle_testpkg
             T = _cloudpickle_testpkg.T
-            reference = cloudpickle.dumps(T, protocol=self.protocol)
-            f1 = cloudpickle.loads(reference)
+            by_ref = cloudpickle.dumps(T, protocol=self.protocol)
+            f1 = cloudpickle.loads(by_ref)
 
             register_pickle_by_value(_cloudpickle_testpkg)
-            deep = cloudpickle.dumps(T, protocol=self.protocol)
-            f2 = cloudpickle.loads(deep)
+            by_value = cloudpickle.dumps(T, protocol=self.protocol)
+            f2 = cloudpickle.loads(by_value)
             unregister_pickle_by_value(_cloudpickle_testpkg)
 
             # Ensure the serialisation is not the same
-            assert reference != deep
-            assert b"typevar" in deep
-            assert b"typevar" not in reference
-            assert b"getattr" in reference
-            assert b"getattr" not in deep
+            assert by_ref != by_value
+            assert b"typevar" in by_value
+            assert b"typevar" not in by_ref
+            assert b"getattr" in by_ref
+            assert b"getattr" not in by_value
             assert f1 == f2
         finally:
             _PICKLE_BY_VALUE_MODULES.clear()
@@ -2379,19 +2379,19 @@ class CloudPickleTest(unittest.TestCase):
         import _cloudpickle_testpkg as m
 
         try:
-            reference = cloudpickle.dumps(m, protocol=self.protocol)
-            m1 = cloudpickle.loads(reference)
+            by_ref = cloudpickle.dumps(m, protocol=self.protocol)
+            m1 = cloudpickle.loads(by_ref)
 
             register_pickle_by_value("_cloudpickle_testpkg")
-            deep = cloudpickle.dumps(m, protocol=self.protocol)
-            m2 = cloudpickle.loads(deep)
+            by_value = cloudpickle.dumps(m, protocol=self.protocol)
+            m2 = cloudpickle.loads(by_value)
             unregister_pickle_by_value("_cloudpickle_testpkg")
 
             # Ensure the serialisation is not the same
-            assert reference != deep
-            assert len(deep) > len(reference)
-            assert b"hello from a package" in deep
-            assert b"hello from a package" not in reference
+            assert by_ref != by_value
+            assert len(by_value) > len(by_ref)
+            assert b"hello from a package" in by_value
+            assert b"hello from a package" not in by_ref
             assert m1.package_function() == m2.package_function()
         finally:
             _PICKLE_BY_VALUE_MODULES.clear()
@@ -2471,7 +2471,7 @@ def test_register_pickle_by_value():
 
 def test_register_pickle_by_value_parents_and_children():
     try:
-        # We should deep copy children of explicit modules, not parents
+        # We should by value copy children of explicit modules, not parents
         package = "foo.bar.baz"
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
         register_pickle_by_value(package)
