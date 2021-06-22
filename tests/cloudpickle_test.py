@@ -2336,19 +2336,19 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_pickle_module_registered_for_pickling_by_value(self):
         try:
-            reference = cloudpickle.dumps(an_external_function, protocol=self.protocol)
-            f1 = cloudpickle.loads(reference)
+            by_ref = cloudpickle.dumps(an_external_function, protocol=self.protocol)
+            f1 = cloudpickle.loads(by_ref)
 
             register_pickle_by_value("tests.external")
-            deep = cloudpickle.dumps(an_external_function, protocol=self.protocol)
-            f2 = cloudpickle.loads(deep)
+            by_value = cloudpickle.dumps(an_external_function, protocol=self.protocol)
+            f2 = cloudpickle.loads(by_value)
             unregister_pickle_by_value("tests.external")
 
             # Ensure the serialisation is not the same
-            assert reference != deep
-            assert len(deep) > len(reference)
-            assert b"return_a_string" in deep
-            assert b"return_a_string" not in reference
+            assert by_ref != by_value
+            assert len(by_value) > len(by_ref)
+            assert b"return_a_string" in by_value
+            assert b"return_a_string" not in by_ref
             assert f1() == f2()
         finally:
             _PICKLE_BY_VALUE_MODULES.clear()
