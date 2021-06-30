@@ -15,6 +15,10 @@ dev
   _is_parametrized_type_hint to limit false positives.
   ([PR #409](https://github.com/cloudpipe/cloudpickle/pull/409))
 
+- Suppressed a source of non-determinism when pickling dynamically defined
+  functions and handles the deprecation of co_lnotab in Python 3.10+.
+  ([PR #428](https://github.com/cloudpipe/cloudpickle/pull/428))
+
 1.6.0
 =====
 
