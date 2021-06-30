@@ -2378,11 +2378,11 @@ class CloudPickleTest(unittest.TestCase):
             # Loading by reference should pick up these local changes
             # to the variables and the patch. This simulates
             # module differences between the save env and load env
-            f1 = cloudpickle.loads(by_ref)
+            f_by_ref = cloudpickle.loads(by_ref)
 
             # Loading by value should not care about local module differences
             # and should respect only the save env
-            f2 = cloudpickle.loads(by_value)
+            f_by_val = cloudpickle.loads(by_value)
             unregister_pickle_by_value("tests.external")
 
             # Ensure the serialisation is not the same
@@ -2394,10 +2394,10 @@ class CloudPickleTest(unittest.TestCase):
             assert b"return_a_string" in by_value
             assert b"return_a_string" not in by_ref
 
-            # Ensure even if the local module is different, it
-            # doesnt get used
-            assert f1() == "newfunc_suffix"
-            assert f2() == "return_a_string_nested"
+            # Ensure even that any mutation of the module does not
+            # impact the behavior of the function if it was pickled by value.
+            assert f_by_ref() == "newfunc_suffix"
+            assert f_by_val() == "return_a_string_nested"
         finally:
             external.an_external_function = original_func
             external.mutable_variable[0] = original_var
