@@ -235,7 +235,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_odict_values(self):
         values = collections.OrderedDict([("a", 1), ("b", 2)]).values()
         results = pickle_depickle(values)
-        self.assertEqual(sorted(results), sorted(values))
+        self.assertEqual(list(results), list(values))
         assert type(values) == type(results)
 
     def test_odict_items(self):
