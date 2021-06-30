@@ -52,7 +52,7 @@ from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
-from tests import external 
+from tests import external
 from .external import an_external_function
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -2364,7 +2364,7 @@ class CloudPickleTest(unittest.TestCase):
             register_pickle_by_value("tests.external")
             by_value = cloudpickle.dumps(external.nested_function, protocol=self.protocol)
 
-            # Here we exploit the mutable variables and update it, 
+            # Here we exploit the mutable variables and update it,
             # to ensure that even nested dependencies are saved correctly
             # This will change the data in the underlying module
             external.mutable_variable[0] = "modified"
