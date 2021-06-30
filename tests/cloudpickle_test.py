@@ -2356,7 +2356,7 @@ class CloudPickleTest(unittest.TestCase):
             for val in vals:
                 pickletools.dis(val)
             pytest.fail(
-                f"Expected a single deterministic payload, got {len(vals)}/5"
+                "Expected a single deterministic payload, got %d/5" % len(vals)
             )
 
 
