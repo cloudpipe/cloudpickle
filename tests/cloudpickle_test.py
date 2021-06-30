@@ -52,6 +52,7 @@ from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
+from tests import external 
 from .external import an_external_function
 from .testutils import subprocess_pickle_echo
 from .testutils import assert_run_python_script
@@ -2351,6 +2352,56 @@ class CloudPickleTest(unittest.TestCase):
             assert b"return_a_string" not in by_ref
             assert f1() == f2()
         finally:
+            _PICKLE_BY_VALUE_MODULES.clear()
+
+    def test_nested_function_for_pickling_by_value(self):
+        original_var = external.mutable_variable[0]
+        original_var2 = external.mutable_variable2[0]
+        original_func = external.an_external_function
+        try:
+            by_ref = cloudpickle.dumps(external.nested_function, protocol=self.protocol)
+
+            register_pickle_by_value("tests.external")
+            by_value = cloudpickle.dumps(external.nested_function, protocol=self.protocol)
+
+            # Here we exploit the mutable variables and update it, 
+            # to ensure that even nested dependencies are saved correctly
+            # This will change the data in the underlying module
+            external.mutable_variable[0] = "modified"
+            external.mutable_variable2[0] = "_suffix"
+
+            # Importing as a non-relative package allows us to properly
+            # moneky-patch the function called by nested_function,
+            # rather than just changing a local reference to the module func
+            external.an_external_function = lambda: "newfunc"
+
+            # Loading by reference should pick up these local changes
+            # to the variables and the patch. This simulates
+            # module differences between the save env and load env
+            f1 = cloudpickle.loads(by_ref)
+
+            # Loading by value should not care about local module differences
+            # and should respect only the save env
+            f2 = cloudpickle.loads(by_value)
+            unregister_pickle_by_value("tests.external")
+
+            # Ensure the serialisation is not the same
+            assert by_ref != by_value
+            assert len(by_value) > len(by_ref)
+
+            # Ensure that the original content at the time
+            # of pickling is correct
+            assert b"return_a_string" in by_value
+            assert b"return_a_string" not in by_ref
+
+            # Ensure even if the local module is different, it
+            # doesnt get used
+            assert f1() == "newfunc_suffix"
+            assert f2() == "return_a_string_nested"
+        finally:
+            external.an_external_function = original_func
+            external.mutable_variable[0] = original_var
+            external.mutable_variable2[0] = original_var2
             _PICKLE_BY_VALUE_MODULES.clear()
 
     def test_pickle_typevar_module_by_value(self):
