@@ -246,14 +246,14 @@ def _code_reduce(obj):
     """codeobject reducer"""
     if hasattr(obj, "co_linetable"):  # pragma: no branch
         # Python 3.10 and later: obj.co_lnotab is deprecated and constructor
-        # expects obj.co_linetable and obj.co_exceptiontable instead.
+        # expects obj.co_linetable instead.
         args = (
             obj.co_argcount, obj.co_posonlyargcount,
             obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
             obj.co_flags, obj.co_code, obj.co_consts, obj.co_names,
             obj.co_varnames, obj.co_filename, obj.co_name,
-            obj.co_firstlineno, obj.co_linetable, obj.co_exceptiontable,
-            obj.co_freevars, obj.co_cellvars
+            obj.co_firstlineno, obj.co_linetable, obj.co_freevars,
+            obj.co_cellvars
         )
     elif hasattr(obj, "co_posonlyargcount"):
         # Backward compat for 3.9 and older
