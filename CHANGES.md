@@ -4,6 +4,8 @@
 dev
 ===
 
+- Python 3.5 is no longer supported.
+
 - Fix a side effect altering dynamic modules at pickling time.
   ([PR #426](https://github.com/cloudpipe/cloudpickle/pull/426))
 
