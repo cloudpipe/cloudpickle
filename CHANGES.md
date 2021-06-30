@@ -16,7 +16,7 @@ dev
   ([PR #409](https://github.com/cloudpipe/cloudpickle/pull/409))
 
 - Suppressed a source of non-determinism when pickling dynamically defined
-  functions.
+  functions and handles the deprecation of co_lnotab in Python 3.10+.
   ([PR #428](https://github.com/cloudpipe/cloudpickle/pull/428))
 
 1.6.0
