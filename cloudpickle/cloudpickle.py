@@ -236,7 +236,10 @@ def _extract_code_globals(co):
     out_names = _extract_code_globals_cache.get(co)
     if out_names is None:
         names = co.co_names
-        out_names = {names[oparg] for _, oparg in _walk_global_ops(co)}
+        # We use a dict with None values instead of a set to get a
+        # deterministic order (assuming Python 3.6+) and avoid introducing
+        # non-deterministic pickle bytes as a results.
+        out_names = {names[oparg]: None for _, oparg in _walk_global_ops(co)}
 
         # Declaring a function inside another one using the "def ..."
         # syntax generates a constant code object corresponding to the one
@@ -247,7 +250,7 @@ def _extract_code_globals(co):
         if co.co_consts:
             for const in co.co_consts:
                 if isinstance(const, types.CodeType):
-                    out_names |= _extract_code_globals(const)
+                    out_names.update(_extract_code_globals(const))
 
         _extract_code_globals_cache[co] = out_names
 
