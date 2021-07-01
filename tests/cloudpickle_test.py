@@ -54,7 +54,7 @@ from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
 from tests import external
-from .external import an_external_function
+from .external import inner_function
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
@@ -2340,19 +2340,19 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_pickle_module_registered_for_pickling_by_value(self):
         try:
-            by_ref = cloudpickle.dumps(an_external_function, protocol=self.protocol)
+            by_ref = cloudpickle.dumps(inner_function, protocol=self.protocol)
             f1 = cloudpickle.loads(by_ref)
 
             register_pickle_by_value("tests.external")
-            by_value = cloudpickle.dumps(an_external_function, protocol=self.protocol)
+            by_value = cloudpickle.dumps(inner_function, protocol=self.protocol)
             f2 = cloudpickle.loads(by_value)
             unregister_pickle_by_value("tests.external")
 
             # Ensure the serialisation is not the same
             assert by_ref != by_value
             assert len(by_value) > len(by_ref)
-            assert b"return_a_string" in by_value
-            assert b"return_a_string" not in by_ref
+            assert b"original_string" in by_value
+            assert b"original_string" not in by_ref
             assert f1() == f2()
         finally:
             _PICKLE_BY_VALUE_MODULES.clear()
@@ -2360,12 +2360,12 @@ class CloudPickleTest(unittest.TestCase):
     def test_nested_function_for_pickling_by_value(self):
         original_var = external.mutable_variable[0]
         original_var2 = external.mutable_variable2[0]
-        original_func = external.an_external_function
+        original_func = external.inner_function
         try:
-            by_ref = cloudpickle.dumps(external.nested_function, protocol=self.protocol)
+            by_ref = cloudpickle.dumps(external.wrapping_func, protocol=self.protocol)
 
             register_pickle_by_value("tests.external")
-            by_value = cloudpickle.dumps(external.nested_function, protocol=self.protocol)
+            by_value = cloudpickle.dumps(external.wrapping_func, protocol=self.protocol)
 
             # Here we exploit the mutable variables and update it,
             # to ensure that even nested dependencies are saved correctly
@@ -2374,9 +2374,9 @@ class CloudPickleTest(unittest.TestCase):
             external.mutable_variable2[0] = "_suffix"
 
             # Importing as a non-relative package allows us to properly
-            # moneky-patch the function called by nested_function,
-            # rather than just changing a local reference to the module func
-            external.an_external_function = lambda: "newfunc"
+            # monkey-patch the function calls, rather than just
+            # changing a local reference to the module func
+            external.inner_function = lambda: "newfunc"
 
             # Loading by reference should pick up these local changes
             # to the variables and the patch. This simulates
@@ -2394,15 +2394,17 @@ class CloudPickleTest(unittest.TestCase):
 
             # Ensure that the original content at the time
             # of pickling is correct
-            assert b"return_a_string" in by_value
-            assert b"return_a_string" not in by_ref
+            assert b"original_string" in by_value
+            assert b"second_string" in by_value
+            assert b"original_string" not in by_ref
+            assert b"second_string" not in by_ref
 
             # Ensure even that any mutation of the module does not
             # impact the behavior of the function if it was pickled by value.
             assert f_by_ref() == "newfunc_suffix"
-            assert f_by_val() == "return_a_string_nested"
+            assert f_by_val() == "original_string_second_string"
         finally:
-            external.an_external_function = original_func
+            external.inner_function = original_func
             external.mutable_variable[0] = original_var
             external.mutable_variable2[0] = original_var2
             _PICKLE_BY_VALUE_MODULES.clear()
