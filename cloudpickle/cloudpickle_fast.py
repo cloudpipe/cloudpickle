@@ -580,11 +580,8 @@ class CloudPickler(Pickler):
         # cloudpickle.dumps([f1, f2])). There is no such limitation when using
         # CloudPickler.dump, as long as the multiple invocations are bound to
         # the same CloudPickler instance.
-        base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
-        base_globals = _FuncMetadataGlobals(
-            func,
-            shared_namespace=base_globals,
-        )
+        shared_ns = self.globals_ref.setdefault(id(func.__globals__), {})
+        base_globals = _FuncMetadataGlobals(func, shared_namespace=shared_ns)
 
         # Do not bind the free variables before the function is created to
         # avoid infinite recursion.
