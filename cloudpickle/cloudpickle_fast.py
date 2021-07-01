@@ -244,7 +244,19 @@ def _enum_getstate(obj):
 
 def _code_reduce(obj):
     """codeobject reducer"""
-    if hasattr(obj, "co_posonlyargcount"):  # pragma: no branch
+    if hasattr(obj, "co_linetable"):  # pragma: no branch
+        # Python 3.10 and later: obj.co_lnotab is deprecated and constructor
+        # expects obj.co_linetable instead.
+        args = (
+            obj.co_argcount, obj.co_posonlyargcount,
+            obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
+            obj.co_flags, obj.co_code, obj.co_consts, obj.co_names,
+            obj.co_varnames, obj.co_filename, obj.co_name,
+            obj.co_firstlineno, obj.co_linetable, obj.co_freevars,
+            obj.co_cellvars
+        )
+    elif hasattr(obj, "co_posonlyargcount"):
+        # Backward compat for 3.9 and older
         args = (
             obj.co_argcount, obj.co_posonlyargcount,
             obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
@@ -254,6 +266,7 @@ def _code_reduce(obj):
             obj.co_cellvars
         )
     else:
+        # Backward compat for even older versions of Python
         args = (
             obj.co_argcount, obj.co_kwonlyargcount, obj.co_nlocals,
             obj.co_stacksize, obj.co_flags, obj.co_code, obj.co_consts,
@@ -342,8 +355,13 @@ def _module_reduce(obj):
     if _is_importable(obj):
         return subimport, (obj.__name__,)
     else:
-        obj.__dict__.pop('__builtins__', None)
-        return dynamic_subimport, (obj.__name__, vars(obj))
+        # Some external libraries can populate the "__builtins__" entry of a
+        # module's `__dict__` with unpicklable objects (see #316). For that
+        # reason, we do not attempt to pickle the "__builtins__" entry, and
+        # restore a default value for it at unpickling time.
+        state = obj.__dict__.copy()
+        state.pop('__builtins__', None)
+        return dynamic_subimport, (obj.__name__, state)
 
 
 def _method_reduce(obj):

@@ -10,6 +10,7 @@ import itertools
 import logging
 import math
 from operator import itemgetter, attrgetter
+import pickletools
 import platform
 import random
 import shutil
@@ -50,6 +51,7 @@ from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
 from .testutils import subprocess_pickle_echo
+from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
 
@@ -57,6 +59,7 @@ from _cloudpickle_testpkg import relative_imports_factory
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
+_TEST_GLOBAL_VARIABLE2 = "another_value"
 
 
 class RaiserOnPickle(object):
@@ -621,6 +624,12 @@ class CloudPickleTest(unittest.TestCase):
                 depickled_mod.__dict__['__builtins__'], types.ModuleType):
             assert hasattr(depickled_mod.__builtins__, "abs")
         assert depickled_mod.f(-1) == 1
+
+        # Additional check testing that the issue #425 is fixed: without the
+        # fix for #425, `mod.f` would not have access to `__builtins__`, and
+        # thus calling `mod.f(-1)` (which relies on the `abs` builtin) would
+        # fail.
+        assert mod.f(-1) == 1
 
     def test_load_dynamic_module_in_grandchild_process(self):
         # Make sure that when loaded, a dynamic module preserves its dynamic
@@ -2107,8 +2116,8 @@ class CloudPickleTest(unittest.TestCase):
                 return _TEST_GLOBAL_VARIABLE
             return inner_function
 
-        globals_ = cloudpickle.cloudpickle._extract_code_globals(
-            function_factory.__code__)
+        globals_ = set(cloudpickle.cloudpickle._extract_code_globals(
+            function_factory.__code__).keys())
         assert globals_ == {'_TEST_GLOBAL_VARIABLE'}
 
         depickled_factory = pickle_depickle(function_factory,
@@ -2225,10 +2234,13 @@ class CloudPickleTest(unittest.TestCase):
 
                 def check_annotations(obj, expected_type, expected_type_str):
                     assert obj.__annotations__["attribute"] == expected_type
-                    if sys.version_info >= (3, 10):
-                        # In Python 3.10, type annotations are stored as strings.
+                    if sys.version_info >= (3, 11):
+                        # In Python 3.11, type annotations are stored as strings.
                         # See PEP 563 for more details:
                         # https://www.python.org/dev/peps/pep-0563/
+                        # Originaly scheduled for 3.10, then postponed.
+                        # See this for more details:
+                        # https://mail.python.org/archives/list/python-dev@python.org/thread/CLVXXPQ2T2LQ5MP2Y53VVQFCXYWQJHKZ/
                         assert (
                             obj.method.__annotations__["arg"]
                             == expected_type_str
@@ -2338,6 +2350,32 @@ class CloudPickleTest(unittest.TestCase):
 
         o = MyClass()
         pickle_depickle(o, protocol=self.protocol)
+
+    @pytest.mark.skipif(
+        sys.version_info < (3, 7),
+        reason="Determinism can only be guaranteed for Python 3.7+"
+    )
+    def test_deterministic_pickle_bytes_for_function(self):
+        # Ensure that functions with references to several global names are
+        # pickled to fixed bytes that do not depend on the PYTHONHASHSEED of
+        # the Python process.
+        vals = set()
+
+        def func_with_globals():
+            return _TEST_GLOBAL_VARIABLE + _TEST_GLOBAL_VARIABLE2
+
+        for i in range(5):
+            vals.add(
+                subprocess_pickle_string(func_with_globals,
+                                         protocol=self.protocol,
+                                         add_env={"PYTHONHASHSEED": str(i)}))
+        if len(vals) > 1:
+            # Print additional debug info on stdout with dis:
+            for val in vals:
+                pickletools.dis(val)
+            pytest.fail(
+                "Expected a single deterministic payload, got %d/5" % len(vals)
+            )
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
