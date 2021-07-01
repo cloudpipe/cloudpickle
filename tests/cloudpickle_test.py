@@ -49,6 +49,7 @@ from cloudpickle.cloudpickle import _is_importable
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
+from cloudpickle.cloudpickle import _FuncMetadataGlobals, _FuncCodeGlobals
 
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
@@ -2376,6 +2377,45 @@ class CloudPickleTest(unittest.TestCase):
             pytest.fail(
                 "Expected a single deterministic payload, got %d/5" % len(vals)
             )
+
+    def test_externally_managed_function_globals(self):
+        common_globals = {"a": "foo"}
+
+        class CustomPickler(cloudpickle.CloudPickler):
+            @staticmethod
+            def persistent_id(obj):
+                if (
+                    isinstance(obj, _FuncMetadataGlobals)
+                    and obj.func.__globals__ is common_globals
+                ):
+                    return "common_globals"
+                elif (
+                    isinstance(obj, _FuncCodeGlobals)
+                    and obj.func.__globals__ is common_globals
+                ):
+                    return "empty_dict"
+
+        class CustomUnpickler(pickle.Unpickler):
+            @staticmethod
+            def persistent_load(pid):
+                return {
+                    "common_globals": common_globals,
+                    "empty_dict": {}
+                }[pid]
+
+        lookup_a = eval('lambda: a', common_globals)
+        assert lookup_a() == "foo"
+
+        file = io.BytesIO()
+        CustomPickler(file).dump(lookup_a)
+        dumped = file.getvalue()
+        assert b'foo' not in dumped
+
+        lookup_a_cloned = CustomUnpickler(io.BytesIO(dumped)).load()
+        assert lookup_a_cloned() == "foo"
+        assert lookup_a_cloned.__globals__ is common_globals
+        common_globals['a'] = 'bar'
+        assert lookup_a_cloned() == "bar"
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):

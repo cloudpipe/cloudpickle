@@ -36,6 +36,7 @@ from .cloudpickle import (
     parametrized_type_hint_getinitargs, _create_parametrized_type_hint,
     builtin_code_type,
     _make_dict_keys, _make_dict_values, _make_dict_items,
+    _FuncMetadataGlobals, _FuncCodeGlobals,
 )
 
 
@@ -153,11 +154,7 @@ def _function_getstate(func):
         "__doc__": func.__doc__,
         "__closure__": func.__closure__,
     }
-
-    f_globals_ref = _extract_code_globals(func.__code__)
-    f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
-                 func.__globals__}
-
+    f_globals = _FuncCodeGlobals(func)
     closure_values = (
         list(map(_get_cell_contents, func.__closure__))
         if func.__closure__ is not None else ()
@@ -168,7 +165,12 @@ def _function_getstate(func):
     # trigger the side effect of importing these modules at unpickling time
     # (which is necessary for func to work correctly once depickled)
     slotstate["_cloudpickle_submodules"] = _find_imported_submodules(
-        func.__code__, itertools.chain(f_globals.values(), closure_values))
+        func.__code__,
+        itertools.chain(
+            f_globals.func_code_globals.values(),
+            closure_values,
+        ),
+    )
     slotstate["__globals__"] = f_globals
 
     state = func.__dict__
@@ -577,15 +579,12 @@ class CloudPickler(Pickler):
         # same invocation of cloudpickle.dump/cloudpickle.dumps (for example:
         # cloudpickle.dumps([f1, f2])). There is no such limitation when using
         # CloudPickler.dump, as long as the multiple invocations are bound to
-        # the same CloudPickler.
+        # the same CloudPickler instance.
         base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
-
-        if base_globals == {}:
-            # Add module attributes used to resolve relative imports
-            # instructions inside func.
-            for k in ["__package__", "__name__", "__path__", "__file__"]:
-                if k in func.__globals__:
-                    base_globals[k] = func.__globals__[k]
+        base_globals = _FuncMetadataGlobals(
+            func,
+            shared_namespace=base_globals,
+        )
 
         # Do not bind the free variables before the function is created to
         # avoid infinite recursion.
