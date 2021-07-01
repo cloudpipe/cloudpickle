@@ -229,6 +229,24 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(results, items)
         assert isinstance(results, _collections_abc.dict_items)
 
+    def test_odict_keys(self):
+        keys = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
+        results = pickle_depickle(keys)
+        self.assertEqual(results, keys)
+        assert type(keys) == type(results)
+
+    def test_odict_values(self):
+        values = collections.OrderedDict([("a", 1), ("b", 2)]).values()
+        results = pickle_depickle(values)
+        self.assertEqual(list(results), list(values))
+        assert type(values) == type(results)
+
+    def test_odict_items(self):
+        items = collections.OrderedDict([("a", 1), ("b", 2)]).items()
+        results = pickle_depickle(items)
+        self.assertEqual(results, items)
+        assert type(items) == type(results)
+
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),

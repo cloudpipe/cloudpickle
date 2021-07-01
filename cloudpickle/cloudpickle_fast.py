@@ -23,7 +23,7 @@ import weakref
 import typing
 
 from enum import Enum
-from collections import ChainMap
+from collections import ChainMap, OrderedDict
 
 from .compat import pickle, Pickler
 from .cloudpickle import (
@@ -437,6 +437,24 @@ def _dict_items_reduce(obj):
     return _make_dict_items, (dict(obj), )
 
 
+def _odict_keys_reduce(obj):
+    # Safer not to ship the full dict as sending the rest might
+    # be unintended and could potentially cause leaking of
+    # sensitive information
+    return _make_dict_keys, (list(obj), True)
+
+
+def _odict_values_reduce(obj):
+    # Safer not to ship the full dict as sending the rest might
+    # be unintended and could potentially cause leaking of
+    # sensitive information
+    return _make_dict_values, (list(obj), True)
+
+
+def _odict_items_reduce(obj):
+    return _make_dict_items, (dict(obj), True)
+
+
 # COLLECTIONS OF OBJECTS STATE SETTERS
 # ------------------------------------
 # state setters are called at unpickling time, once the object is created and
@@ -513,6 +531,9 @@ class CloudPickler(Pickler):
     _dispatch_table[_collections_abc.dict_keys] = _dict_keys_reduce
     _dispatch_table[_collections_abc.dict_values] = _dict_values_reduce
     _dispatch_table[_collections_abc.dict_items] = _dict_items_reduce
+    _dispatch_table[type(OrderedDict().keys())] = _odict_keys_reduce
+    _dispatch_table[type(OrderedDict().values())] = _odict_values_reduce
+    _dispatch_table[type(OrderedDict().items())] = _odict_items_reduce
 
 
     dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
