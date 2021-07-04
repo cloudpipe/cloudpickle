@@ -9,4 +9,8 @@ def inner_function():
 
 
 def wrapping_func():
-    return inner_function() + mutable_variable2[0]
+    from .external_two import function_from_external_two
+    return (
+        inner_function() + mutable_variable2[0] +
+        function_from_external_two()
+    )
