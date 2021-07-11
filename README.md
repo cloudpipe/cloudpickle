@@ -66,6 +66,51 @@ Pickling a function interactively defined in a Python shell session
 85
 ```
 
+
+Overriding pickle's serialization mechanism for importable constructs:
+----------------------------------------------------------------------
+
+An important difference between `cloudpickle` and `pickle` is that
+`cloudpickle` can serialize a function or class **by value**, whereas `pickle`
+can only serialize it **by reference**, e.g. by serializing its *module
+attribute path* (such as `my_module.my_function`).
+
+By default, `cloudpickle` only uses serialization by value in cases where
+serialization by reference is usually ineffective, for example when the
+function/class to be pickled was constructed in an interactive Python session.
+
+Since `cloudpickle 1.7.0`, it is possible to extend the use of serialization by
+value to functions or classes coming from **any pure Python module**. This feature
+is useful when the said module is unavailable in the unpickling environment
+(making traditional serialization by reference ineffective). To this end,
+`cloudpickle` exposes the
+`register_pickle_by_value`/`unregister_pickle_by_value` functions:
+
+```python
+>>> import cloudpickle
+>>> import my_module
+>>> cloudpickle.register_pickle_by_value(my_module)
+>>> # cloudpickle.register_pickle_by_value("my_module") also works
+>>> cloudpickle.dumps(my_module.my_function)  # my_function is pickled by value
+>>> cloudpickle.unregister_pickle_by_value(my_module)
+>>> cloudpickle.dumps(my_module.my_function)  # my_function is pickled by reference
+```
+
+Note that this feature is still **experimental**, and may fail in the following
+situations:
+
+- If the body of a function/class pickled by value contains an `import` statement:
+  ```python
+  >>> def f():
+  >>> ... from another_module import g
+  >>> ... # calling f in the unpickling environment may fail if another_module
+  >>> ... # is unavailable
+  >>> ... return g() + 1
+  ```
+
+- If a function pickled by reference uses a function pickled by value during its execution.
+
+
 Running the tests
 -----------------
 
