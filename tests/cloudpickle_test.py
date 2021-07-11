@@ -2569,15 +2569,6 @@ def test_register_pickle_by_value_parents_and_children():
         unregister_pickle_by_value(package)
         assert result
         assert len(_PICKLE_BY_VALUE_MODULES) == 0
-
-        # Given a child of a pickle by value method with submodules set
-        # to false, we should no longer pickle it by value
-        package = "foo.bar"
-        register_pickle_by_value(package)
-        result = is_registered_pickle_by_value("foo.bar.baz", submodules=False)
-        unregister_pickle_by_value(package)
-        assert not result
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
     finally:
         _PICKLE_BY_VALUE_MODULES.clear()
 
