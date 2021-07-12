@@ -2509,68 +2509,42 @@ def test_lookup_module_and_qualname_stdlib_typevar():
     assert name == 'AnyStr'
 
 
-def test_register_pickle_by_value():
+@pytest.mark.parametrize("use_module_name", [True, False])
+def test_register_pickle_by_value(use_module_name):
     import _cloudpickle_testpkg
-    fn = _cloudpickle_testpkg.package_function
+
+    if use_module_name:
+        package_ref = "_cloudpickle_testpkg"
+        module_ref = "_cloudpickle_testpkg.mod"
+    else:
+        package_ref = _cloudpickle_testpkg
+        module_ref = _cloudpickle_testpkg.mod
 
     try:
-        # Test that adding and removing a module to pickle by value returns
-        # us to the original pickle by reference
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
-        register_pickle_by_value(_cloudpickle_testpkg)
-        unregister_pickle_by_value(_cloudpickle_testpkg)
-        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
-        assert pickle_by_ref
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        assert not is_registered_pickle_by_value(package_ref)
+        assert not is_registered_pickle_by_value(module_ref)
 
-        # Test that doing the same with the string module name functions
-        # identically
-        register_pickle_by_value("_cloudpickle_testpkg")
-        unregister_pickle_by_value("_cloudpickle_testpkg")
-        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
-        assert pickle_by_ref
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        register_pickle_by_value(package_ref)
+        assert is_registered_pickle_by_value(package_ref)
 
-        # Test now that if we look up the module before removing
-        # we correctly get a None result, indicating to pickle
-        # by value
-        register_pickle_by_value(_cloudpickle_testpkg)
-        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
-        unregister_pickle_by_value(_cloudpickle_testpkg)
-        assert not pickle_by_ref
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        # registering a package for pickling by value automatically registers
+        # all of its submodules:
+        assert is_registered_pickle_by_value(module_ref)
+        unregister_pickle_by_value(package_ref)
 
-        # Test pickle by value behaviour using string name
-        register_pickle_by_value("_cloudpickle_testpkg")
-        pickle_by_ref = _should_pickle_by_reference(fn, name=fn.__name__)
-        unregister_pickle_by_value("_cloudpickle_testpkg")
-        assert not pickle_by_ref
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
+        # registering a submodule for pickling by value should not register
+        # its parent package
+        register_pickle_by_value(module_ref)
+        assert is_registered_pickle_by_value(module_ref)
+        assert not is_registered_pickle_by_value(package_ref)
+
+        unregister_pickle_by_value(module_ref)
+        assert not is_registered_pickle_by_value(package_ref)
+        assert not is_registered_pickle_by_value(module_ref)
+
     finally:
         _PICKLE_BY_VALUE_MODULES.clear()
 
-
-def test_register_pickle_by_value_parents_and_children():
-    try:
-        # We should by value copy children of explicit modules, not parents
-        package = "foo.bar.baz"
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
-        register_pickle_by_value(package)
-        result = is_registered_pickle_by_value("foo.bar")
-        unregister_pickle_by_value(package)
-        assert not result
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
-
-        # Given a child of a pickle by value module, we should
-        # pickle it by value
-        package = "foo.bar"
-        register_pickle_by_value(package)
-        result = is_registered_pickle_by_value("foo.bar.baz")
-        unregister_pickle_by_value(package)
-        assert result
-        assert len(_PICKLE_BY_VALUE_MODULES) == 0
-    finally:
-        _PICKLE_BY_VALUE_MODULES.clear()
 
 def _all_types_to_test():
     T = typing.TypeVar('T')
