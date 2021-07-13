@@ -2381,9 +2381,21 @@ class CloudPickleTest(unittest.TestCase):
                 w.run(
                     lambda p: sys.path.remove(p), _mock_interactive_session_cwd
                 )
-                raise ValueError(w.run(lambda: sys.path))
                 with pytest.raises(ImportError):
                     w.run(lambda: __import__("mock_local_file"))
+
+                for o in [mod, local_function, LocalT, LocalClass]:
+                    imported_objs = []
+                    try:
+                        w.run(lambda: o)
+                    except ImportError:
+                        continue
+                    else:
+                        imported_objs.append(o)
+                __import__('pdb').set_trace()
+
+                if imported_objs != []:
+                    raise ValueError(imported_objs)
 
                 for o in [mod, local_function, LocalT, LocalClass]:
                     with pytest.raises(ImportError):
