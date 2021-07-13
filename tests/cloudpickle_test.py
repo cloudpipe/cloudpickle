@@ -2375,7 +2375,6 @@ class CloudPickleTest(unittest.TestCase):
             # register_pickle_by_value are functions, classes, TypeVar and
             # modules.
             import mock_local_file as mod
-            raise ValueError(cloudpickle.dumps(mod))
             from mock_local_file import local_function, LocalT, LocalClass
             with subprocess_worker(protocol=self.protocol) as w:
                 # make the module unavailable in the remote worker
@@ -2397,7 +2396,7 @@ class CloudPickleTest(unittest.TestCase):
                 if imported_objs != [] or True:
                     raise ValueError(
                         [*imported_objs,
-                         w.run(lambda: __import__("mock_local_file").__path__),
+                         w.run(lambda: __import__("mock_local_file").__file__),
                          w.run(lambda: __import__("sys").path)
                          ]
                     )
