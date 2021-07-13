@@ -2392,7 +2392,6 @@ class CloudPickleTest(unittest.TestCase):
                         continue
                     else:
                         imported_objs.append(o)
-                __import__('pdb').set_trace()
 
                 if imported_objs != []:
                     raise ValueError(imported_objs)
