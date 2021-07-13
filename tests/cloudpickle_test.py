@@ -2384,8 +2384,8 @@ class CloudPickleTest(unittest.TestCase):
                 # with pytest.raises(ImportError):
                 #     w.run(lambda: __import__("mock_local_file"))
 
+                imported_objs = []
                 for o in [mod, local_function, LocalT, LocalClass]:
-                    imported_objs = []
                     try:
                         w.run(lambda: o)
                     except Exception:
