@@ -2397,6 +2397,7 @@ class CloudPickleTest(unittest.TestCase):
                     raise ValueError(
                         [*imported_objs,
                          w.run(lambda: __import__("mock_local_file").__file__),
+                         w.run(lambda: __import__("mock_local_file").__spec__),
                          w.run(lambda: __import__("sys").path)
                          ]
                     )
