@@ -2393,8 +2393,13 @@ class CloudPickleTest(unittest.TestCase):
                     else:
                         imported_objs.append(o)
 
-                if imported_objs != []:
-                    raise ValueError(imported_objs)
+                if imported_objs != [] or True:
+                    raise ValueError(
+                        [*imported_objs,
+                         w.run(lambda: __import__("mock_local_file").__path__),
+                         w.run(lambda: __import__("sys").path)
+                         ]
+                    )
 
                 for o in [mod, local_function, LocalT, LocalClass]:
                     with pytest.raises(ImportError):
