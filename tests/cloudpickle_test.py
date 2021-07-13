@@ -53,8 +53,6 @@ from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
-from tests import external
-from .external import inner_function
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
@@ -2356,119 +2354,59 @@ class CloudPickleTest(unittest.TestCase):
         o = MyClass()
         pickle_depickle(o, protocol=self.protocol)
 
-    def test_pickle_module_registered_for_pickling_by_value(self):
+    def test_pickle_constructs_from_module_registered_for_pickling_by_value(self):  # noqa
         try:
-            by_ref = cloudpickle.dumps(inner_function, protocol=self.protocol)
-            f1 = cloudpickle.loads(by_ref)
+            # We simulate an interactive session that:
+            # - relies on locally-importable constructs defined in .py files
+            #   located in the directory from which the session was launched.
+            # - uses these constructs in remote workers that do not have
+            #   access to the files in which the constructs were defined: this
+            #   situation is the justification behind the
+            #   (un)register_pickle_by_value(module) api that cloudpickle
+            #   exposes.
 
-            register_pickle_by_value("tests.external")
-            by_value = cloudpickle.dumps(inner_function, protocol=self.protocol)
-            f2 = cloudpickle.loads(by_value)
-            unregister_pickle_by_value("tests.external")
+            # Simulate an interactive session started from
+            # /path/to/cloudpickle/tests.
+            _mock_interactive_session_cwd = os.path.dirname(__file__)
+            if _mock_interactive_session_cwd not in sys.path:
+                sys.path.insert(0, _mock_interactive_session_cwd)
 
-            # Ensure the serialisation is not the same
-            assert by_ref != by_value
-            assert len(by_value) > len(by_ref)
-            assert b"original_string" in by_value
-            assert b"original_string" not in by_ref
-            assert f1() == f2()
+            # The constructs whose pickling mechanism is changed using
+            # register_pickle_by_value are functions, classes, TypeVar and
+            # modules.
+            import mock_local_file as mod
+            from mock_local_file import local_function, LocalT, LocalClass
+            with subprocess_worker(protocol=self.protocol) as w:
+                # make the module unavailable in the remote worker
+                w.run(
+                    lambda p: sys.path.remove(p), _mock_interactive_session_cwd
+                )
+                with pytest.raises(ImportError):
+                    w.run(lambda: __import__("mock_local_file"))
+
+                for o in [mod, local_function, LocalT, LocalClass]:
+                    with pytest.raises(ImportError):
+                        w.run(lambda: o)
+
+                register_pickle_by_value("mock_local_file")
+                # function
+                assert w.run(lambda: local_function()) == local_function()
+                # typevar
+                assert w.run(lambda: LocalT.__name__) == LocalT.__name__
+                # classes
+                assert w.run(
+                    lambda: LocalClass().method() == LocalClass().method()
+                )
+                # modules
+                assert (
+                    w.run(lambda: mod).local_function() == local_function()
+                )
+
         finally:
-            _PICKLE_BY_VALUE_MODULES.clear()
-
-    def test_nested_function_for_pickling_by_value(self):
-        original_var = external.mutable_variable[0]
-        original_var2 = external.mutable_variable2[0]
-        original_func = external.inner_function
-        try:
-            by_ref = cloudpickle.dumps(external.wrapping_func, protocol=self.protocol)
-
-            register_pickle_by_value("tests.external")
-            by_value = cloudpickle.dumps(external.wrapping_func, protocol=self.protocol)
-
-            # Here we exploit the mutable variables and update it,
-            # to ensure that even nested dependencies are saved correctly
-            # This will change the data in the underlying module
-            external.mutable_variable[0] = "modified"
-            external.mutable_variable2[0] = "_suffix"
-
-            # Importing as a non-relative package allows us to properly
-            # monkey-patch the function calls, rather than just
-            # changing a local reference to the module func
-            external.inner_function = lambda: "newfunc"
-
-            # Loading by reference should pick up these local changes
-            # to the variables and the patch. This simulates
-            # module differences between the save env and load env
-            f_by_ref = cloudpickle.loads(by_ref)
-
-            # Loading by value should not care about local module differences
-            # and should respect only the save env
-            f_by_val = cloudpickle.loads(by_value)
-            unregister_pickle_by_value("tests.external")
-
-            # Ensure the serialisation is not the same
-            assert by_ref != by_value
-            assert len(by_value) > len(by_ref)
-
-            # Ensure that the original content at the time
-            # of pickling is correct
-            assert b"original_string" in by_value
-            assert b"second_string" in by_value
-            assert b"original_string" not in by_ref
-            assert b"second_string" not in by_ref
-
-            # Ensure even that any mutation of the module does not
-            # impact the behavior of the function if it was pickled by value.
-            assert f_by_ref() == "newfunc_suffix"
-            assert f_by_val() == "original_string_second_string"
-        finally:
-            external.inner_function = original_func
-            external.mutable_variable[0] = original_var
-            external.mutable_variable2[0] = original_var2
-            _PICKLE_BY_VALUE_MODULES.clear()
-
-    def test_pickle_typevar_module_by_value(self):
-        try:
-            import _cloudpickle_testpkg
-            T = _cloudpickle_testpkg.T
-            by_ref = cloudpickle.dumps(T, protocol=self.protocol)
-            f1 = cloudpickle.loads(by_ref)
-
-            register_pickle_by_value(_cloudpickle_testpkg)
-            by_value = cloudpickle.dumps(T, protocol=self.protocol)
-            f2 = cloudpickle.loads(by_value)
-            unregister_pickle_by_value(_cloudpickle_testpkg)
-
-            # Ensure the serialisation is not the same
-            assert by_ref != by_value
-            assert b"typevar" in by_value
-            assert b"typevar" not in by_ref
-            assert b"getattr" in by_ref
-            assert b"getattr" not in by_value
-            assert f1 == f2
-        finally:
-            _PICKLE_BY_VALUE_MODULES.clear()
-
-    def test_pickle_entire_module_by_value(self):
-        import _cloudpickle_testpkg as m
-
-        try:
-            by_ref = cloudpickle.dumps(m, protocol=self.protocol)
-            m1 = cloudpickle.loads(by_ref)
-
-            register_pickle_by_value("_cloudpickle_testpkg")
-            by_value = cloudpickle.dumps(m, protocol=self.protocol)
-            m2 = cloudpickle.loads(by_value)
-            unregister_pickle_by_value("_cloudpickle_testpkg")
-
-            # Ensure the serialisation is not the same
-            assert by_ref != by_value
-            assert len(by_value) > len(by_ref)
-            assert b"hello from a package" in by_value
-            assert b"hello from a package" not in by_ref
-            assert m1.package_function() == m2.package_function()
-        finally:
-            _PICKLE_BY_VALUE_MODULES.clear()
+            if _mock_interactive_session_cwd in sys.path:
+                sys.path.remove(_mock_interactive_session_cwd)
+            if is_registered_pickle_by_value("mock_local_file"):
+                unregister_pickle_by_value("mock_local_file")
 
     @pytest.mark.skipif(
         sys.version_info < (3, 7),
