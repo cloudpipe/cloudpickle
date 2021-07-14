@@ -2373,14 +2373,14 @@ class CloudPickleTest(unittest.TestCase):
             #   the justification behind the
             #   (un)register_pickle_by_value(module) api that cloudpickle
             #   exposes.
+            _mock_interactive_session_cwd = os.path.dirname(__file__)
 
             # First, remove sys.path entries that could point to
             # /path/to/cloudpickle/tests and be in inherited by the worker
             _maybe_remove(sys.path, '')
-            _maybe_remove(sys.path, os.getcwd())
+            _maybe_remove(sys.path, _mock_interactive_session_cwd)
 
             # Add the desired session working directory
-            _mock_interactive_session_cwd = os.path.dirname(__file__)
             sys.path.insert(0, _mock_interactive_session_cwd)
 
             with subprocess_worker(protocol=self.protocol) as w:
