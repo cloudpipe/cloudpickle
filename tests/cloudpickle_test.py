@@ -86,6 +86,14 @@ def _escape(raw_filepath):
     return raw_filepath.replace("\\", r"\\\\")
 
 
+def _maybe_remove(list_, item):
+    try:
+        list_.remove(item)
+    except ValueError:
+        pass
+    return list_
+
+
 def test_extract_class_dict():
     class A(int):
         """A docstring"""
@@ -2355,54 +2363,47 @@ class CloudPickleTest(unittest.TestCase):
         pickle_depickle(o, protocol=self.protocol)
 
     def test_pickle_constructs_from_module_registered_for_pickling_by_value(self):  # noqa
+        _prev_sys_path = sys.path.copy()
         try:
             # We simulate an interactive session that:
-            # - relies on locally-importable constructs defined in .py files
-            #   located in the directory from which the session was launched.
-            # - uses these constructs in remote workers that do not have
-            #   access to the files in which the constructs were defined: this
-            #   situation is the justification behind the
+            # - we start from the /path/to/cloudpickle/tests directory, where a
+            #   local .py file (mock_local_file) is located.
+            # - uses constructs from mock_local_file in remote workers that do
+            #   not have access to this file. This situation is
+            #   the justification behind the
             #   (un)register_pickle_by_value(module) api that cloudpickle
             #   exposes.
 
-            # Simulate an interactive session started from
-            # /path/to/cloudpickle/tests.
-            _mock_interactive_session_cwd = os.path.dirname(__file__)
-            if _mock_interactive_session_cwd not in sys.path:
-                sys.path.insert(0, _mock_interactive_session_cwd)
+            # First, remove sys.path entries that could point to
+            # /path/to/cloudpickle/tests and be in inherited by the worker
+            _maybe_remove(sys.path, '')
+            _maybe_remove(sys.path, os.getcwd())
 
-            # The constructs whose pickling mechanism is changed using
-            # register_pickle_by_value are functions, classes, TypeVar and
-            # modules.
-            import mock_local_file as mod
-            from mock_local_file import local_function, LocalT, LocalClass
+            # Add the desired session working directory
+            _mock_interactive_session_cwd = os.path.dirname(__file__)
+            sys.path.insert(0, _mock_interactive_session_cwd)
+
             with subprocess_worker(protocol=self.protocol) as w:
-                # make the module unavailable in the remote worker
+                # Make the module unavailable in the remote worker
                 w.run(
                     lambda p: sys.path.remove(p), _mock_interactive_session_cwd
                 )
-                # START OF CI DEBUGGING STATEMENTS
-                # with pytest.raises(ImportError):
-                #     w.run(lambda: __import__("mock_local_file"))
+                # Import the actual file after starting the module since the
+                # worker is started using fork on Linux, which will inherits
+                # the parent sys.modules. On Python>3.6, the worker can be
+                # started using spawn using mp_context in ProcessPoolExectutor.
+                # TODO Once Python 3.6 reaches end of life, rely on mp_context
+                # instead.
+                import mock_local_file as mod
+                # The constructs whose pickling mechanism is changed using
+                # register_pickle_by_value are functions, classes, TypeVar and
+                # modules.
+                from mock_local_file import local_function, LocalT, LocalClass
 
-                imported_objs = []
-                for o in [mod, local_function, LocalT, LocalClass]:
-                    try:
-                        w.run(lambda: o)
-                    except Exception:
-                        continue
-                    else:
-                        imported_objs.append(o)
-
-                if imported_objs != []:
-                    raise ValueError(
-                        [*imported_objs,
-                         w.run(lambda: __import__("mock_local_file").__file__),
-                         w.run(lambda: __import__("mock_local_file").__spec__),
-                         w.run(lambda: __import__("sys").path)
-                         ]
-                    )
-                # END OF CI DEBUGGING STATEMENTS
+                # Make sure the mdodule/constructs are unimportable in the
+                # worker.
+                with pytest.raises(ImportError):
+                    w.run(lambda: __import__("mock_local_file"))
 
                 for o in [mod, local_function, LocalT, LocalClass]:
                     with pytest.raises(ImportError):
@@ -2423,8 +2424,8 @@ class CloudPickleTest(unittest.TestCase):
                 )
 
         finally:
-            if _mock_interactive_session_cwd in sys.path:
-                sys.path.remove(_mock_interactive_session_cwd)
+            sys.path = _prev_sys_path
+            sys.modules.pop("mock_local_file", None)
             if is_registered_pickle_by_value("mock_local_file"):
                 unregister_pickle_by_value("mock_local_file")
 
