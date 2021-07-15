@@ -47,7 +47,8 @@ import cloudpickle
 from cloudpickle.compat import pickle
 from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
-from cloudpickle import is_registered_pickle_by_value
+from cloudpickle import list_registry_pickle_by_value
+from cloudpickle.cloudpickle import _is_registered_pickle_by_value
 from cloudpickle.cloudpickle import _should_pickle_by_reference, _PICKLE_BY_VALUE_MODULES
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
@@ -2394,22 +2395,24 @@ class CloudPickleTest(unittest.TestCase):
                 # started using spawn using mp_context in ProcessPoolExectutor.
                 # TODO Once Python 3.6 reaches end of life, rely on mp_context
                 # instead.
-                import mock_local_file as mod
+                import mock_local_folder.mod as mod
                 # The constructs whose pickling mechanism is changed using
                 # register_pickle_by_value are functions, classes, TypeVar and
                 # modules.
-                from mock_local_file import local_function, LocalT, LocalClass
+                from mock_local_folder.mod import (
+                    local_function, LocalT, LocalClass
+                )
 
-                # Make sure the mdodule/constructs are unimportable in the
+                # Make sure the module/constructs are unimportable in the
                 # worker.
                 with pytest.raises(ImportError):
-                    w.run(lambda: __import__("mock_local_file"))
+                    w.run(lambda: __import__("mock_local_folder.mod"))
 
                 for o in [mod, local_function, LocalT, LocalClass]:
                     with pytest.raises(ImportError):
                         w.run(lambda: o)
 
-                register_pickle_by_value("mock_local_file")
+                register_pickle_by_value("mock_local_folder.mod")
                 # function
                 assert w.run(lambda: local_function()) == local_function()
                 # typevar
@@ -2425,9 +2428,10 @@ class CloudPickleTest(unittest.TestCase):
 
         finally:
             sys.path = _prev_sys_path
-            sys.modules.pop("mock_local_file", None)
-            if is_registered_pickle_by_value("mock_local_file"):
-                unregister_pickle_by_value("mock_local_file")
+            for m in ["mock_local_folder", "mock_local_folder.mod"]:
+                sys.modules.pop(m, None)
+                if m in list_registry_pickle_by_value():
+                    unregister_pickle_by_value(m)
 
     @pytest.mark.skipif(
         sys.version_info < (3, 7),
@@ -2490,35 +2494,29 @@ def test_lookup_module_and_qualname_stdlib_typevar():
 def test_register_pickle_by_value(use_module_name):
     import _cloudpickle_testpkg
 
+    package_name = "_cloudpickle_testpkg"
+    module_name = "_cloudpickle_testpkg.mod"
     if use_module_name:
-        package_ref = "_cloudpickle_testpkg"
-        module_ref = "_cloudpickle_testpkg.mod"
+        package_ref = package_name
+        module_ref = module_name
     else:
         package_ref = _cloudpickle_testpkg
         module_ref = _cloudpickle_testpkg.mod
 
     try:
-        assert not is_registered_pickle_by_value(package_ref)
-        assert not is_registered_pickle_by_value(module_ref)
+        assert list_registry_pickle_by_value() == set()
 
         register_pickle_by_value(package_ref)
-        assert is_registered_pickle_by_value(package_ref)
+        assert list_registry_pickle_by_value() == {package_name}
 
-        # registering a package for pickling by value automatically registers
-        # all of its submodules:
-        assert is_registered_pickle_by_value(module_ref)
-        unregister_pickle_by_value(package_ref)
-
-        # registering a submodule for pickling by value should not register
-        # its parent package
         register_pickle_by_value(module_ref)
-        assert is_registered_pickle_by_value(module_ref)
-        assert not is_registered_pickle_by_value(package_ref)
+        assert list_registry_pickle_by_value() == {package_name, module_name}
 
         unregister_pickle_by_value(module_ref)
-        assert not is_registered_pickle_by_value(package_ref)
-        assert not is_registered_pickle_by_value(module_ref)
+        assert list_registry_pickle_by_value() == {package_name}
 
+        unregister_pickle_by_value(package_ref)
+        assert list_registry_pickle_by_value() == set()
     finally:
         _PICKLE_BY_VALUE_MODULES.clear()
 

@@ -140,7 +140,11 @@ def unregister_pickle_by_value(module):
     _PICKLE_BY_VALUE_MODULES.remove(module_name)
 
 
-def is_registered_pickle_by_value(module):
+def list_registry_pickle_by_value():
+    return _PICKLE_BY_VALUE_MODULES.copy()
+
+
+def _is_registered_pickle_by_value(module):
     module_name = module.__name__ if inspect.ismodule(module) else module
     if module_name in _PICKLE_BY_VALUE_MODULES:
         return True
@@ -152,6 +156,7 @@ def is_registered_pickle_by_value(module):
             return True
         module_name = parent_name
     return False
+
 
 def _whichmodule(obj, name):
     """Find the module an object belongs to.
@@ -208,7 +213,7 @@ def _should_pickle_by_reference(obj, name=None):
         if module_name is None:
             return False
         module, name = module_name
-        return not is_registered_pickle_by_value(module.__name__)
+        return not _is_registered_pickle_by_value(module.__name__)
 
     elif isinstance(obj, types.ModuleType):
         # We assume that sys.modules is primarily used as a cache mechanism for
@@ -216,7 +221,7 @@ def _should_pickle_by_reference(obj, name=None):
         # is sys.modules therefore a cheap and simple heuristic to tell us
         # whether we can assume  that a given module could be imported by name
         # in another Python process.
-        if is_registered_pickle_by_value(obj.__name__):
+        if _is_registered_pickle_by_value(obj.__name__):
             return False
         return obj.__name__ in sys.modules
     else:
@@ -881,7 +886,7 @@ def _typevar_reduce(obj):
 
     if module_and_name is None:
         return (_make_typevar, _decompose_typevar(obj))
-    elif is_registered_pickle_by_value(module_and_name[0].__name__):
+    elif _is_registered_pickle_by_value(module_and_name[0].__name__):
         return (_make_typevar, _decompose_typevar(obj))
 
     return (getattr, module_and_name)
