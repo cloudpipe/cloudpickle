@@ -48,7 +48,6 @@ from cloudpickle.compat import pickle
 from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
 from cloudpickle import list_registry_pickle_by_value
-from cloudpickle.cloudpickle import _is_registered_pickle_by_value
 from cloudpickle.cloudpickle import _should_pickle_by_reference, _PICKLE_BY_VALUE_MODULES
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
