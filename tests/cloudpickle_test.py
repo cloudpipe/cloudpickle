@@ -2563,6 +2563,7 @@ class CloudPickleTest(unittest.TestCase):
                 w.run(_add_to_registry, f, "f_by_ref")
 
                 register_pickle_by_value("_cloudpickle_testpkg")
+                _cloudpickle_testpkg.global_variable = "modified global"
                 w.run(_add_to_registry, f, "f_by_val")
                 assert (
                     w.run(_call_from_registry, "f_by_ref") == _original_global
