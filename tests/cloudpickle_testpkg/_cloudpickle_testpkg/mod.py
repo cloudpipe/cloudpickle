@@ -63,3 +63,11 @@ sys.modules[subsubmodule_name] = dynamic_subsubmodule
 
 def module_function():
     return "hello from a module!"
+
+
+global_variable = "some global variable"
+
+
+def module_function_with_global():
+    global global_variable
+    return global_variable
