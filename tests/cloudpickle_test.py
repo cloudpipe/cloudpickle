@@ -2507,6 +2507,34 @@ class CloudPickleTest(unittest.TestCase):
                 if m in list_registry_pickle_by_value():
                     unregister_pickle_by_value(m)
 
+    def test_pickle_constructs_from_installed_packages_registered_for_pickling_by_value(  # noqa
+        self
+    ):
+        for package_or_module in ["package", "modue"]:
+            if package_or_module == "package":
+                m = __import__("_cloudpickle_testpkg")
+                f = m.package_function_with_global
+                _original_global = m.global_variable
+            elif package_or_module == "module":
+                m = __import__("_cloudpickle_testpkg.mod")
+                f = m.module_function_with_global
+                _original_global = m.global_variable
+            try:
+                with subprocess_worker(protocol=self.protocol) as w:
+                    assert w.run(lambda: f()) == _original_global
+
+                    # Test that f is pickled by value by modifying a global
+                    # variable that f uses, and making sure that this
+                    # modification shows up when calling the function remotely
+                    register_pickle_by_value(m.__name__)
+                    assert w.run(lambda: f()) == _original_global
+                    m.global_variable = "modified global"
+                    assert w.run(lambda: f()) == "modified global"
+                    unregister_pickle_by_value(m.__name__)
+            finally:
+                m.global_variable = _original_global
+                if m.__name__ in list_registry_pickle_by_value():
+                    unregister_pickle_by_value(m.__name__)
     @pytest.mark.skipif(
         sys.version_info < (3, 7),
         reason="Determinism can only be guaranteed for Python 3.7+"
