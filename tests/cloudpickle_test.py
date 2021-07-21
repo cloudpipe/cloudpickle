@@ -2406,6 +2406,10 @@ class CloudPickleTest(unittest.TestCase):
                 # worker.
                 with pytest.raises(ImportError):
                     w.run(lambda: __import__("mock_local_folder.mod"))
+                with pytest.raises(ImportError):
+                    w.run(
+                        lambda: __import__("mock_local_folder.subfolder.mod")
+                    )
 
                 for o in [mod, local_function, LocalT, LocalClass]:
                     with pytest.raises(ImportError):
@@ -2425,9 +2429,80 @@ class CloudPickleTest(unittest.TestCase):
                     w.run(lambda: mod).local_function() == local_function()
                 )
 
+                # Constructs from modules inside subfolders should be pickled
+                # by value if a namespace module pointing to some parent folder
+                # was registered for pickling by value. A "mock_local_folder"
+                # namespace module falls into that category, but a
+                # "mock_local_folder.mod" one does not.
+                from mock_local_folder.subfolder.submod import (
+                    LocalSubmodClass, LocalSubmodT, local_submod_function
+                )
+                # Shorter aliases to comply with line-length limits
+                _t, _func, _class = (
+                    LocalSubmodT, local_submod_function, LocalSubmodClass
+                )
+                with pytest.raises(ImportError):
+                    w.run(
+                        lambda: __import__("mock_local_folder.subfolder.mod")
+                    )
+                with pytest.raises(ImportError):
+                    w.run(lambda: local_submod_function)
+
+                unregister_pickle_by_value("mock_local_folder.mod")
+
+                with pytest.raises(ImportError):
+                    w.run(lambda: local_function)
+
+                with pytest.raises(ImportError):
+                    w.run(lambda: __import__("mock_local_folder.mod"))
+
+                # Test the namespace folder case
+                register_pickle_by_value("mock_local_folder")
+                assert w.run(lambda: local_function()) == local_function()
+                assert w.run(lambda: _func()) == _func()
+                unregister_pickle_by_value("mock_local_folder")
+
+                with pytest.raises(ImportError):
+                    w.run(lambda: local_function)
+                with pytest.raises(ImportError):
+                    w.run(lambda: local_submod_function)
+
+                # Test the case of registering a single module inside a
+                # subfolder.
+                register_pickle_by_value("mock_local_folder.subfolder.submod")
+                assert w.run(lambda: _func()) == _func()
+                assert w.run(lambda: _t.__name__) == _t.__name__
+                assert w.run(lambda: _class().method()) == _class().method()
+
+                # Registering a module from a subfolder for pickling by value
+                # should not make constructs from modules from the parent
+                # folder pickleable
+                with pytest.raises(ImportError):
+                    w.run(lambda: local_function)
+                with pytest.raises(ImportError):
+                    w.run(lambda: __import__("mock_local_folder.mod"))
+
+                unregister_pickle_by_value(
+                    "mock_local_folder.subfolder.submod"
+                )
+                with pytest.raises(ImportError):
+                    w.run(lambda: local_submod_function)
+
+                # Test the subfolder namespace module case
+                register_pickle_by_value("mock_local_folder.subfolder")
+                assert w.run(lambda: _func()) == _func()
+                assert w.run(lambda: _t.__name__) == _t.__name__
+                assert w.run(lambda: _class().method()) == _class().method()
+
+                unregister_pickle_by_value("mock_local_folder.subfolder")
+                # TODO: add a test making sure that different version of the
+                # same function (with possibly mutated globals) can peacefully
+                # co-exist in the worker.
         finally:
+            _fname = "mock_local_folder"
             sys.path = _prev_sys_path
-            for m in ["mock_local_folder", "mock_local_folder.mod"]:
+            for m in [_fname, f"{_fname}.mod", f"{_fname}.subfolder",
+                      f"{_fname}.subfolder.submod"]:
                 sys.modules.pop(m, None)
                 if m in list_registry_pickle_by_value():
                     unregister_pickle_by_value(m)
