@@ -2495,9 +2495,6 @@ class CloudPickleTest(unittest.TestCase):
                 assert w.run(lambda: _class().method()) == _class().method()
 
                 unregister_pickle_by_value("mock_local_folder.subfolder")
-                # TODO: add a test making sure that different version of the
-                # same function (with possibly mutated globals) can peacefully
-                # co-exist in the worker.
         finally:
             _fname = "mock_local_folder"
             sys.path = _prev_sys_path
@@ -2535,6 +2532,51 @@ class CloudPickleTest(unittest.TestCase):
                 m.global_variable = _original_global
                 if m.__name__ in list_registry_pickle_by_value():
                     unregister_pickle_by_value(m.__name__)
+
+    def test_pickle_various_versions_of_the_same_function_with_different_pickling_method(  # noqa
+        self
+    ):
+        # Make sure that different version of the same function (possibly
+        # pickled in a different way - by value and/or by reference) can
+        # peacefully co-exist (e.g. without globals interaction) in a remote
+        # worker.
+        import _cloudpickle_testpkg
+        from _cloudpickle_testpkg import package_function_with_global as f
+        _original_global = _cloudpickle_testpkg.global_variable
+
+        def _create_registry():
+            _main = __import__("sys").modules["__main__"]
+            _main._cloudpickle_registry = {}
+            # global _cloudpickle_registry
+
+        def _add_to_registry(v, k):
+            _main = __import__("sys").modules["__main__"]
+            _main._cloudpickle_registry[k] = v
+
+        def _call_from_registry(k):
+            _main = __import__("sys").modules["__main__"]
+            return _main._cloudpickle_registry[k]()
+
+        try:
+            with subprocess_worker(protocol=self.protocol) as w:
+                w.run(_create_registry)
+                w.run(_add_to_registry, f, "f_by_ref")
+
+                register_pickle_by_value("_cloudpickle_testpkg")
+                w.run(_add_to_registry, f, "f_by_val")
+                assert (
+                    w.run(_call_from_registry, "f_by_ref") == _original_global
+                )
+                assert (
+                    w.run(_call_from_registry, "f_by_val") == "modified global"
+                )
+
+        finally:
+            _cloudpickle_testpkg.global_variable = _original_global
+
+            if "_cloudpickle_testpkg" in list_registry_pickle_by_value():
+                unregister_pickle_by_value("_cloudpickle_testpkg")
+
     @pytest.mark.skipif(
         sys.version_info < (3, 7),
         reason="Determinism can only be guaranteed for Python 3.7+"
