@@ -2653,25 +2653,25 @@ def test_register_pickle_by_value():
     unregister_pickle_by_value(mod)
     assert list_registry_pickle_by_value() == {pkg.__name__}
 
-    msg = f"Input should be a module object, got {str} instead"
+    msg = fr"Input should be a module object, got {str} instead"
     with pytest.raises(ValueError, match=msg):
         unregister_pickle_by_value(pkg.__name__)
 
     unregister_pickle_by_value(pkg)
     assert list_registry_pickle_by_value() == set()
 
-    msg = f"{pkg} is not registered for pickle by value"
+    msg = fr"{pkg} is not registered for pickle by value"
     with pytest.raises(ValueError, match=msg):
         unregister_pickle_by_value(pkg)
 
-    msg = f"Input should be a module object, got {str} instead"
+    msg = fr"Input should be a module object, got {str} instead"
     with pytest.raises(ValueError, match=msg):
         register_pickle_by_value(pkg.__name__)
 
     dynamic_mod = types.ModuleType('dynamic_mod')
     msg = (
-        f"{dynamic_mod} was not imported correctly, have you used an "
-        f"`import` statement to access it?"
+        fr"{dynamic_mod} was not imported correctly, have you used an "
+        fr"`import` statement to access it?"
     )
     with pytest.raises(ValueError, match=msg):
         register_pickle_by_value(dynamic_mod)
