@@ -2511,13 +2511,13 @@ class CloudPickleTest(unittest.TestCase):
     def test_pickle_constructs_from_installed_packages_registered_for_pickling_by_value(  # noqa
         self
     ):
-        for package_or_module in ["package", "modue"]:
+        for package_or_module in ["package", "module"]:
             if package_or_module == "package":
-                m = __import__("_cloudpickle_testpkg")
+                import _cloudpickle_testpkg as m
                 f = m.package_function_with_global
                 _original_global = m.global_variable
             elif package_or_module == "module":
-                m = __import__("_cloudpickle_testpkg.mod")
+                import _cloudpickle_testpkg.mod as m
                 f = m.module_function_with_global
                 _original_global = m.global_variable
             try:
