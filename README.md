@@ -90,7 +90,6 @@ is useful when the said module is unavailable in the unpickling environment
 >>> import cloudpickle
 >>> import my_module
 >>> cloudpickle.register_pickle_by_value(my_module)
->>> # cloudpickle.register_pickle_by_value("my_module") also works
 >>> cloudpickle.dumps(my_module.my_function)  # my_function is pickled by value
 >>> cloudpickle.unregister_pickle_by_value(my_module)
 >>> cloudpickle.dumps(my_module.my_function)  # my_function is pickled by reference
