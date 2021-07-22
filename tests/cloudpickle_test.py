@@ -48,7 +48,7 @@ from cloudpickle.compat import pickle
 from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
 from cloudpickle import list_registry_pickle_by_value
-from cloudpickle.cloudpickle import _should_pickle_by_reference, _PICKLE_BY_VALUE_MODULES
+from cloudpickle.cloudpickle import _should_pickle_by_reference
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
@@ -2415,7 +2415,7 @@ class CloudPickleTest(unittest.TestCase):
                     with pytest.raises(ImportError):
                         w.run(lambda: o)
 
-                register_pickle_by_value("mock_local_folder.mod")
+                register_pickle_by_value(mod)
                 # function
                 assert w.run(lambda: local_function()) == local_function()
                 # typevar
@@ -2448,7 +2448,7 @@ class CloudPickleTest(unittest.TestCase):
                 with pytest.raises(ImportError):
                     w.run(lambda: local_submod_function)
 
-                unregister_pickle_by_value("mock_local_folder.mod")
+                unregister_pickle_by_value(mod)
 
                 with pytest.raises(ImportError):
                     w.run(lambda: local_function)
@@ -2457,10 +2457,11 @@ class CloudPickleTest(unittest.TestCase):
                     w.run(lambda: __import__("mock_local_folder.mod"))
 
                 # Test the namespace folder case
-                register_pickle_by_value("mock_local_folder")
+                import mock_local_folder
+                register_pickle_by_value(mock_local_folder)
                 assert w.run(lambda: local_function()) == local_function()
                 assert w.run(lambda: _func()) == _func()
-                unregister_pickle_by_value("mock_local_folder")
+                unregister_pickle_by_value(mock_local_folder)
 
                 with pytest.raises(ImportError):
                     w.run(lambda: local_function)
@@ -2469,7 +2470,8 @@ class CloudPickleTest(unittest.TestCase):
 
                 # Test the case of registering a single module inside a
                 # subfolder.
-                register_pickle_by_value("mock_local_folder.subfolder.submod")
+                import mock_local_folder.subfolder.submod
+                register_pickle_by_value(mock_local_folder.subfolder.submod)
                 assert w.run(lambda: _func()) == _func()
                 assert w.run(lambda: _t.__name__) == _t.__name__
                 assert w.run(lambda: _class().method()) == _class().method()
@@ -2483,26 +2485,27 @@ class CloudPickleTest(unittest.TestCase):
                     w.run(lambda: __import__("mock_local_folder.mod"))
 
                 unregister_pickle_by_value(
-                    "mock_local_folder.subfolder.submod"
+                    mock_local_folder.subfolder.submod
                 )
                 with pytest.raises(ImportError):
                     w.run(lambda: local_submod_function)
 
                 # Test the subfolder namespace module case
-                register_pickle_by_value("mock_local_folder.subfolder")
+                import mock_local_folder.subfolder
+                register_pickle_by_value(mock_local_folder.subfolder)
                 assert w.run(lambda: _func()) == _func()
                 assert w.run(lambda: _t.__name__) == _t.__name__
                 assert w.run(lambda: _class().method()) == _class().method()
 
-                unregister_pickle_by_value("mock_local_folder.subfolder")
+                unregister_pickle_by_value(mock_local_folder.subfolder)
         finally:
             _fname = "mock_local_folder"
             sys.path = _prev_sys_path
             for m in [_fname, f"{_fname}.mod", f"{_fname}.subfolder",
                       f"{_fname}.subfolder.submod"]:
-                sys.modules.pop(m, None)
-                if m in list_registry_pickle_by_value():
-                    unregister_pickle_by_value(m)
+                mod = sys.modules.pop(m, None)
+                if mod and mod.__name__ in list_registry_pickle_by_value():
+                    unregister_pickle_by_value(mod)
 
     def test_pickle_constructs_from_installed_packages_registered_for_pickling_by_value(  # noqa
         self
@@ -2523,15 +2526,15 @@ class CloudPickleTest(unittest.TestCase):
                     # Test that f is pickled by value by modifying a global
                     # variable that f uses, and making sure that this
                     # modification shows up when calling the function remotely
-                    register_pickle_by_value(m.__name__)
+                    register_pickle_by_value(m)
                     assert w.run(lambda: f()) == _original_global
                     m.global_variable = "modified global"
                     assert w.run(lambda: f()) == "modified global"
-                    unregister_pickle_by_value(m.__name__)
+                    unregister_pickle_by_value(m)
             finally:
                 m.global_variable = _original_global
                 if m.__name__ in list_registry_pickle_by_value():
-                    unregister_pickle_by_value(m.__name__)
+                    unregister_pickle_by_value(m)
 
     def test_pickle_various_versions_of_the_same_function_with_different_pickling_method(  # noqa
         self
@@ -2562,7 +2565,7 @@ class CloudPickleTest(unittest.TestCase):
                 w.run(_create_registry)
                 w.run(_add_to_registry, f, "f_by_ref")
 
-                register_pickle_by_value("_cloudpickle_testpkg")
+                register_pickle_by_value(_cloudpickle_testpkg)
                 _cloudpickle_testpkg.global_variable = "modified global"
                 w.run(_add_to_registry, f, "f_by_val")
                 assert (
@@ -2576,7 +2579,7 @@ class CloudPickleTest(unittest.TestCase):
             _cloudpickle_testpkg.global_variable = _original_global
 
             if "_cloudpickle_testpkg" in list_registry_pickle_by_value():
-                unregister_pickle_by_value("_cloudpickle_testpkg")
+                unregister_pickle_by_value(_cloudpickle_testpkg)
 
     @pytest.mark.skipif(
         sys.version_info < (3, 7),
@@ -2635,35 +2638,43 @@ def test_lookup_module_and_qualname_stdlib_typevar():
     assert name == 'AnyStr'
 
 
-@pytest.mark.parametrize("use_module_name", [True, False])
-def test_register_pickle_by_value(use_module_name):
-    import _cloudpickle_testpkg
+def test_register_pickle_by_value():
+    import _cloudpickle_testpkg as pkg
+    import _cloudpickle_testpkg.mod as mod
 
-    package_name = "_cloudpickle_testpkg"
-    module_name = "_cloudpickle_testpkg.mod"
-    if use_module_name:
-        package_ref = package_name
-        module_ref = module_name
-    else:
-        package_ref = _cloudpickle_testpkg
-        module_ref = _cloudpickle_testpkg.mod
+    assert list_registry_pickle_by_value() == set()
 
-    try:
-        assert list_registry_pickle_by_value() == set()
+    register_pickle_by_value(pkg)
+    assert list_registry_pickle_by_value() == {pkg.__name__}
 
-        register_pickle_by_value(package_ref)
-        assert list_registry_pickle_by_value() == {package_name}
+    register_pickle_by_value(mod)
+    assert list_registry_pickle_by_value() == {pkg.__name__, mod.__name__}
 
-        register_pickle_by_value(module_ref)
-        assert list_registry_pickle_by_value() == {package_name, module_name}
+    unregister_pickle_by_value(mod)
+    assert list_registry_pickle_by_value() == {pkg.__name__}
 
-        unregister_pickle_by_value(module_ref)
-        assert list_registry_pickle_by_value() == {package_name}
+    msg = f"Input should be a module object, got {str} instead"
+    with pytest.raises(ValueError, match=msg):
+        unregister_pickle_by_value(pkg.__name__)
 
-        unregister_pickle_by_value(package_ref)
-        assert list_registry_pickle_by_value() == set()
-    finally:
-        _PICKLE_BY_VALUE_MODULES.clear()
+    unregister_pickle_by_value(pkg)
+    assert list_registry_pickle_by_value() == set()
+
+    msg = f"{pkg} is not registered for pickle by value"
+    with pytest.raises(ValueError, match=msg):
+        unregister_pickle_by_value(pkg)
+
+    msg = f"Input should be a module object, got {str} instead"
+    with pytest.raises(ValueError, match=msg):
+        register_pickle_by_value(pkg.__name__)
+
+    dynamic_mod = types.ModuleType('dynamic_mod')
+    msg = (
+        f"{dynamic_mod} was not imported correctly, have you used an "
+        f"`import` statement to access it?"
+    )
+    with pytest.raises(ValueError, match=msg):
+        register_pickle_by_value(dynamic_mod)
 
 
 def _all_types_to_test():

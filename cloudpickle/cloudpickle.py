@@ -130,14 +130,34 @@ def _lookup_class_or_track(class_tracker_id, class_def):
 
 def register_pickle_by_value(module):
     """Register that the input module should be pickled by value."""
-    module_name = module.__name__ if inspect.ismodule(module) else module
-    _PICKLE_BY_VALUE_MODULES.add(module_name)
+    if not isinstance(module, types.ModuleType):
+        raise ValueError(
+            f"Input should be a module object, got {type(module)} instead"
+        )
+    # cloudpickle needs a way to access any module registered for pickling by
+    # value when introspecting relative imports inside functions pickled by
+    # value. Access is ensured by checking that module is present in
+    # sys.modules at registering time and assuming that it will still be in
+    # there when accessed during pickling. Another alternative would be to
+    # store a weakref to the module.
+    if module.__name__ not in sys.modules:
+        raise ValueError(
+            f"{module} was not imported correctly, have you used an "
+            f"`import` statement to access it?"
+        )
+    _PICKLE_BY_VALUE_MODULES.add(module.__name__)
 
 
 def unregister_pickle_by_value(module):
     """Unregister that the input module should be pickled by value."""
-    module_name = module.__name__ if inspect.ismodule(module) else module
-    _PICKLE_BY_VALUE_MODULES.remove(module_name)
+    if not isinstance(module, types.ModuleType):
+        raise ValueError(
+            f"Input should be a module object, got {type(module)} instead"
+        )
+    if module.__name__ not in _PICKLE_BY_VALUE_MODULES:
+        raise ValueError(f"{module} is not registered for pickle by value")
+    else:
+        _PICKLE_BY_VALUE_MODULES.remove(module.__name__)
 
 
 def list_registry_pickle_by_value():
