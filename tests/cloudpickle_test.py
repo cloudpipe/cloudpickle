@@ -2422,12 +2422,13 @@ class CloudPickleTest(unittest.TestCase):
                 # typevar
                 assert w.run(lambda: LocalT.__name__) == LocalT.__name__
                 # classes
-                assert w.run(
-                    lambda: LocalClass().method() == LocalClass().method()
+                assert (
+                    w.run(lambda: LocalClass().method())
+                    == LocalClass().method()
                 )
                 # modules
                 assert (
-                    w.run(lambda: mod).local_function() == local_function()
+                    w.run(lambda: mod.local_function()) == local_function()
                 )
 
                 # Constructs from modules inside subfolders should be pickled
@@ -2530,6 +2531,7 @@ class CloudPickleTest(unittest.TestCase):
                     register_pickle_by_value(m)
                     assert w.run(lambda: f()) == _original_global
                     m.global_variable = "modified global"
+                    assert m.global_variable != _original_global
                     assert w.run(lambda: f()) == "modified global"
                     unregister_pickle_by_value(m)
             finally:
