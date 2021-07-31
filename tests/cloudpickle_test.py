@@ -2540,7 +2540,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_pickle_various_versions_of_the_same_function_with_different_pickling_method(  # noqa
         self
     ):
-        # Make sure that different version of the same function (possibly
+        # Make sure that different versions of the same function (possibly
         # pickled in a different way - by value and/or by reference) can
         # peacefully co-exist (e.g. without globals interaction) in a remote
         # worker.
