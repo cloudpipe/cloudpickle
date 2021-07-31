@@ -132,7 +132,7 @@ def register_pickle_by_value(module):
     """Register that the input module should be pickled by value."""
     if not isinstance(module, types.ModuleType):
         raise ValueError(
-            f"Input should be a module object, got {type(module)} instead"
+            f"Input should be a module object, got {str(module)} instead"
         )
     # In the future, cloudpickle may need a way to access any module registered
     # for pickling by value in order to introspect relative imports inside
@@ -156,7 +156,7 @@ def unregister_pickle_by_value(module):
     """Unregister that the input module should be pickled by value."""
     if not isinstance(module, types.ModuleType):
         raise ValueError(
-            f"Input should be a module object, got {type(module)} instead"
+            f"Input should be a module object, got {str(module)} instead"
         )
     if module.__name__ not in _PICKLE_BY_VALUE_MODULES:
         raise ValueError(f"{module} is not registered for pickle by value")

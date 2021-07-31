@@ -2654,7 +2654,7 @@ def test_register_pickle_by_value():
     unregister_pickle_by_value(mod)
     assert list_registry_pickle_by_value() == {pkg.__name__}
 
-    msg = f"Input should be a module object, got {str} instead"
+    msg = f"Input should be a module object, got {pkg.__name__} instead"
     with pytest.raises(ValueError, match=msg):
         unregister_pickle_by_value(pkg.__name__)
 
@@ -2665,7 +2665,7 @@ def test_register_pickle_by_value():
     with pytest.raises(ValueError, match=re.escape(msg)):
         unregister_pickle_by_value(pkg)
 
-    msg = f"Input should be a module object, got {str} instead"
+    msg = f"Input should be a module object, got {pkg.__name__} instead"
     with pytest.raises(ValueError, match=msg):
         register_pickle_by_value(pkg.__name__)
 
