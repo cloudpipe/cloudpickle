@@ -45,7 +45,6 @@ from __future__ import print_function
 import builtins
 import dis
 import opcode
-import inspect
 import platform
 import sys
 import types
