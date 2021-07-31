@@ -128,7 +128,24 @@ def _lookup_class_or_track(class_tracker_id, class_def):
 
 
 def register_pickle_by_value(module):
-    """Register that the input module should be pickled by value."""
+    """Register a module to make it functions and classes picklable by value.
+    
+    By default, functions and classes that are attributes of an importable
+    module are to be pickled by reference, that is relying on re-importing
+    the attribute from the module at load time.
+    
+    If `register_pickle_by_value(module)` is called, all its functions and
+    classes are subsequently to be pickled by value, meaning that they can
+    be loaded in Python processes where the module is not importable.
+    
+    This is especially useful when developing a module in a distributed
+    execution environment: restarting the client Python process with the new
+    source code is enough: there is no need to re-install the new version
+    of the module on all the worker nodes nor to restart the workers.
+    
+    Note: this feature is considered experimental. See the cloudpickle
+    README.md file for more details and limitations.
+    """
     if not isinstance(module, types.ModuleType):
         raise ValueError(
             f"Input should be a module object, got {str(module)} instead"
@@ -228,8 +245,19 @@ def _whichmodule(obj, name):
 
 
 def _should_pickle_by_reference(obj, name=None):
-    """Dispatcher utility to test whether an object should be serialised by
-    value or reference by using importability as a proxy."""
+    """Test whether an function or a class should be pickled by reference
+    
+     Pickling by reference means by that the object (typically a function
+     or a class) is an attribute of a module that is assumed to be importable
+     in the target Python environment. Loading will therefore rely on importing
+     the module and then calling `getattr` on it to access the function or class.
+     
+     Pickling by reference is the only option to pickle functions and classes in the
+     standard library. In cloudpickle the alternative option is to pickle by value (for
+     instance for interactively or locally defined functions and classes or for
+     attributes of modules that have been explicitly registered to be pickled by
+     value.
+     """
     if isinstance(obj, types.FunctionType) or issubclass(type(obj), type):
         module_and_name = _lookup_module_and_qualname(obj, name=name)
         if module_and_name is None:
@@ -241,7 +269,7 @@ def _should_pickle_by_reference(obj, name=None):
         # We assume that sys.modules is primarily used as a cache mechanism for
         # the Python import machinery. Checking if a module has been added in
         # is sys.modules therefore a cheap and simple heuristic to tell us
-        # whether we can assume  that a given module could be imported by name
+        # whether we can assume that a given module could be imported by name
         # in another Python process.
         if _is_registered_pickle_by_value(obj):
             return False
