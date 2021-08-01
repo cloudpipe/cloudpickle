@@ -66,6 +66,59 @@ Pickling a function interactively defined in a Python shell session
 85
 ```
 
+
+Overriding pickle's serialization mechanism for importable constructs:
+----------------------------------------------------------------------
+
+An important difference between `cloudpickle` and `pickle` is that
+`cloudpickle` can serialize a function or class **by value**, whereas `pickle`
+can only serialize it **by reference**. Serialization by reference treats
+functions and classes as attributes of modules, and pickles them through
+instructions that trigger the import of their module at load time.
+Serialization by reference is thus limited in that it assumes that the module
+containing the function or class is available/importable in the unpickling
+environment. This assumption breaks when pickling constructs defined in an
+interactive session, a case that is automatically detected by `cloudpickle`,
+that pickles such constructs **by value**.
+
+Another case where the importability assumption is expected to break is when
+developing a module in a distributed execution environment: the worker
+processes may not have access to the said module, for example if they live on a
+different machine than the process in which the module is being developed.
+By itself, `cloudpickle` cannot detect such "locally importable" modules and
+switch to serialization by value; instead, it relies on its default mode,
+which is serialization by reference. However, since `cloudpickle 1.7.0`, one
+can explicitly specify modules for which serialization by value should be used,
+using the `register_pickle_by_value(module)`/`/unregister_pickle(module)` API:
+
+```python
+>>> import cloudpickle
+>>> import my_module
+>>> cloudpickle.register_pickle_by_value(my_module)
+>>> cloudpickle.dumps(my_module.my_function)  # my_function is pickled by value
+>>> cloudpickle.unregister_pickle_by_value(my_module)
+>>> cloudpickle.dumps(my_module.my_function)  # my_function is pickled by reference
+```
+
+Using this API, there is no need to re-install the new version of the module on
+all the worker nodes nor to restart the workers: restarting the client Python
+process with the new source code is enough.
+
+Note that this feature is still **experimental**, and may fail in the following
+situations:
+
+- If the body of a function/class pickled by value contains an `import` statement:
+  ```python
+  >>> def f():
+  >>> ... from another_module import g
+  >>> ... # calling f in the unpickling environment may fail if another_module
+  >>> ... # is unavailable
+  >>> ... return g() + 1
+  ```
+
+- If a function pickled by reference uses a function pickled by value during its execution.
+
+
 Running the tests
 -----------------
 
