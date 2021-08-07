@@ -59,7 +59,14 @@ from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
 
-from _cloudpickle_testpkg import relative_imports_factory
+# from _cloudpickle_testpkg import relative_imports_factory
+
+from itertools import product
+
+from cloudpickle.cloudpickle import VIEW_ATTRS_INFO
+from cloudpickle.cloudpickle_fast import VIEWABLE_TYPES
+
+VIEW_TYPES = list(product(VIEWABLE_TYPES, VIEW_ATTRS_INFO.keys()))
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -259,26 +266,19 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(results, items)
         assert type(items) == type(results)
 
-    from itertools import product
-
-    from cloudpickle.cloudpickle import VIEW_ATTRS_INFO
-    from cloudpickle.cloudpickle_fast import VIEWABLE_TYPES
-
-    view_types = product(VIEWABLE_TYPES, VIEW_ATTRS_INFO.keys())
-
-    @pytest.mark.parametrize("view_type", view_types)
-    def test_view_types(self, view_type):
-        t, view = view_type
-        obj = t([("a", 1), ("b", 2)])
-        at = getattr(obj, view, None)
-        if at is not None:
-            if callable(at):
-                data = at()
-            else:
-                data = at
-            results = pickle_depickle(data)
-            self.assertEqual(results, data)
-            assert type(data) == type(results)
+    def test_view_types(self):
+        for view_type in VIEW_TYPES:
+            t, view = view_type
+            obj = t([("a", 1), ("b", 2)])
+            at = getattr(obj, view, None)
+            if at is not None:
+                if callable(at):
+                    data = at()
+                else:
+                    data = at
+                results = pickle_depickle(data)
+                self.assertEqual(results, data)
+                assert type(data) == type(results)
 
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
