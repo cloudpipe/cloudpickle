@@ -259,6 +259,27 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(results, items)
         assert type(items) == type(results)
 
+    from itertools import product
+
+    from cloudpickle.cloudpickle import VIEW_ATTRS_INFO
+    from cloudpickle.cloudpickle_fast import VIEWABLE_TYPES
+
+    view_types = product(VIEWABLE_TYPES, VIEW_ATTRS_INFO.keys())
+
+    @pytest.mark.parametrize("view_type", view_types)
+    def test_view_types(self, view_type):
+        t, view = view_type
+        obj = t([("a", 1), ("b", 2)])
+        at = getattr(obj, view, None)
+        if at is not None:
+            if callable(at):
+                data = at()
+            else:
+                data = at
+            results = pickle_depickle(data)
+            self.assertEqual(results, data)
+            assert type(data) == type(results)
+
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
