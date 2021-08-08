@@ -1,6 +1,5 @@
 from __future__ import division
 
-import _collections_abc
 import abc
 import collections
 import base64
@@ -59,14 +58,11 @@ from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
 
-# from _cloudpickle_testpkg import relative_imports_factory
-
-from itertools import product
-
-from cloudpickle.cloudpickle import VIEW_ATTRS_INFO
-from cloudpickle.cloudpickle_fast import VIEWABLE_TYPES
-
-VIEW_TYPES = list(product(VIEWABLE_TYPES, VIEW_ATTRS_INFO.keys()))
+try:
+    # import seems to break tests
+    from _cloudpickle_testpkg import relative_imports_factory
+except ImportError:
+    pass
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -231,54 +227,55 @@ class CloudPickleTest(unittest.TestCase):
                          buffer_obj.tobytes())
 
     def test_dict_keys(self):
-        keys = {"a": 1, "b": 2}.keys()
-        results = pickle_depickle(keys)
-        self.assertEqual(results, keys)
-        assert isinstance(results, _collections_abc.dict_keys)
+        data = {"a": 1, "b": 2}.keys()
+        results = pickle_depickle(data)
+        self.assertEqual(results, data)
+        assert isinstance(results, type(data))
 
     def test_dict_values(self):
-        values = {"a": 1, "b": 2}.values()
-        results = pickle_depickle(values)
-        self.assertEqual(sorted(results), sorted(values))
-        assert isinstance(results, _collections_abc.dict_values)
+        data = {"a": 1, "b": 2}.values()
+        results = pickle_depickle(data)
+        self.assertEqual(sorted(results), sorted(data))
+        assert isinstance(results, type(data))
 
     def test_dict_items(self):
-        items = {"a": 1, "b": 2}.items()
-        results = pickle_depickle(items)
-        self.assertEqual(results, items)
-        assert isinstance(results, _collections_abc.dict_items)
+        data = {"a": 1, "b": 2}.items()
+        results = pickle_depickle(data)
+        self.assertEqual(results, data)
+        assert isinstance(results, type(data))
 
     def test_odict_keys(self):
-        keys = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
-        results = pickle_depickle(keys)
-        self.assertEqual(results, keys)
-        assert type(keys) == type(results)
+        data = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
+        results = pickle_depickle(data)
+        self.assertEqual(results, data)
+        assert isinstance(results, type(data))
 
     def test_odict_values(self):
-        values = collections.OrderedDict([("a", 1), ("b", 2)]).values()
-        results = pickle_depickle(values)
-        self.assertEqual(list(results), list(values))
-        assert type(values) == type(results)
+        data = collections.OrderedDict([("a", 1), ("b", 2)]).values()
+        results = pickle_depickle(data)
+        self.assertEqual(list(results), list(data))
+        assert isinstance(results, type(data))
 
     def test_odict_items(self):
-        items = collections.OrderedDict([("a", 1), ("b", 2)]).items()
-        results = pickle_depickle(items)
-        self.assertEqual(results, items)
-        assert type(items) == type(results)
+        data = collections.OrderedDict([("a", 1), ("b", 2)]).items()
+        results = pickle_depickle(data)
+        self.assertEqual(results, data)
+        assert isinstance(results, type(data))
 
     def test_view_types(self):
-        for view_type in VIEW_TYPES:
-            t, view = view_type
-            obj = t([("a", 1), ("b", 2)])
-            at = getattr(obj, view, None)
+        from cloudpickle.cloudpickle_fast import _VIEWS_TYPES_TABLE
+
+        for view_type, info in _VIEWS_TYPES_TABLE.items():
+            obj = info.object_type([("a", 1), ("b", 2)])
+            at = getattr(obj, info.view, None)
             if at is not None:
                 if callable(at):
                     data = at()
                 else:
                     data = at
                 results = pickle_depickle(data)
-                self.assertEqual(results, data)
-                assert type(data) == type(results)
+                assert isinstance(results, view_type)
+                self.assertEqual(list(results), list(data))
 
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]

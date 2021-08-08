@@ -52,10 +52,8 @@ import typing
 import uuid
 import warnings
 import weakref
-from collections import OrderedDict, namedtuple
-from functools import partial
 from pickle import _getattribute
-from typing import Callable, Generic, Tuple, Union
+from typing import Any, Callable, Generic, Tuple, Union
 
 import opcode
 
@@ -981,85 +979,3 @@ def _make_items_view(obj, typ):
     if hasattr(o, "items"):
         return o.items()
     return o
-
-
-ViewInfo = namedtuple("ViewInfo", ["packer", "maker"])
-VIEW_ATTRS_INFO = {
-    "keys": ViewInfo(list, _make_keys_view),
-    "values": ViewInfo(list, _make_values_view),
-    "items": ViewInfo(dict, _make_items_view),
-}
-
-from typing import Any
-
-class ViewPickleInfo:
-
-    obj: Any
-    view_name: str
-
-    def __init__(
-        self,
-        obj: Any,
-        view_name: str,
-    ) -> None:
-        self.obj = obj
-        self.view_name = view_name
-        self.__post_init__()
-
-    def __post_init__(self) -> None:
-        obj = self.obj
-        if isinstance(obj, type):
-            self.object_type = obj
-            obj_instance = self.object_type()
-        else:
-            self.object_type = type(obj)
-            obj_instance = obj
-        a = getattr(obj_instance, self.view_name, None)
-        if callable(a):
-            view_obj = a()
-        else:
-            view_obj = a
-        if a is not None:
-            self.view_type = type(view_obj)
-        else:
-            self.view_type = None
-
-    def get_packer(self):
-        """Run prepacker, return tuple of (packed, type)."""
-        prepacker = VIEW_ATTRS_INFO[self.view_name].packer
-
-        def packer(obj):
-            if callable(prepacker):
-                packed = prepacker(obj)
-            packed = obj
-            return packed, type(obj)
-        return packer
-
-    def get_maker(self):
-        base_maker = VIEW_ATTRS_INFO[self.view_name].maker
-
-        def maker(obj):
-            if callable(base_maker):
-                return base_maker(obj, self.view_type)
-            return obj
-        return maker
-
-    def get_reducer(self):
-        maker = self.get_maker()
-        packer = self.get_packer()
-
-        def reducer(obj):
-            return maker, (packer(obj), type(obj))
-
-        return reducer
-
-
-def build_views_types_table(types):
-    """Register views types."""
-    results = {}
-    for obj in types:
-        for atr in VIEW_ATTRS_INFO.keys():
-            info = ViewPickleInfo(obj, atr)
-            if hasattr(info, "view_type") and info.view_type:
-                results[info.view_type] = info
-    return results
