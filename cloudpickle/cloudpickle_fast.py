@@ -21,8 +21,8 @@ import types
 import weakref
 import typing
 
-from collections import ChainMap, OrderedDict, namedtuple
 from enum import Enum
+from collections import ChainMap, OrderedDict, namedtuple
 from typing import Iterable
 
 from .compat import pickle, Pickler

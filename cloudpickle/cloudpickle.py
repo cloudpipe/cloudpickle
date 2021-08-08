@@ -44,24 +44,24 @@ from __future__ import print_function
 
 import builtins
 import dis
+import opcode
 import platform
 import sys
-import threading
 import types
-import typing
-import uuid
-import warnings
 import weakref
-from pickle import _getattribute
-from typing import Any, Callable, Generic, Tuple, Union
-
-import opcode
+import uuid
+import threading
+import typing
+import warnings
 
 from .compat import pickle
+from typing import Any, Generic, Union, Tuple, Callable
+from pickle import _getattribute
+from importlib._bootstrap import _find_spec
 
 try:  # pragma: no branch
     import typing_extensions as _typing_extensions
-    from typing_extensions import Final, Literal
+    from typing_extensions import Literal, Final
 except ImportError:
     _typing_extensions = Literal = Final = None
 
