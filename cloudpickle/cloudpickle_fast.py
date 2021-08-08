@@ -420,7 +420,7 @@ def _class_reduce(obj):
 
 # DICT VIEWS TYPES
 
-ViewInfo = namedtuple("ViewInfo", ["view", "packer", "maker", "object_type"])
+ViewInfo = namedtuple("ViewInfo", ["view", "packer", "maker", "object_type"])  #noqa
 
 
 _VIEW_ATTRS_INFO = [
