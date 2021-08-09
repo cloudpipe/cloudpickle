@@ -957,10 +957,10 @@ def _make_keys_view(obj, typ):
         o = t.fromkeys(obj)
     else:
         o = dict.fromkeys(obj)
-    try:
-        o = t(o)
-    except Exception:
-        pass
+        try:
+            o = t(o)
+        except Exception:
+            pass
     return o.keys()
 
 
