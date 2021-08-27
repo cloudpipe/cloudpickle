@@ -2084,7 +2084,7 @@ class CloudPickleTest(unittest.TestCase):
         # Make sure relative imports inside round-tripped functions is not
         # broken. This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
-        pytest.importorskip("_cloudpickle_testpkg")
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
         f, g = _cloudpickle_testpkg.relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
