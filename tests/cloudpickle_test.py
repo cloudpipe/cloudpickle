@@ -221,49 +221,42 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
-    @pytest.mark.dict_views
     def test_dict_keys(self):
         data = {"a": 1, "b": 2}.keys()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
-    @pytest.mark.dict_views
     def test_dict_values(self):
         data = {"a": 1, "b": 2}.values()
         results = pickle_depickle(data)
         self.assertEqual(sorted(results), sorted(data))
         assert isinstance(results, type(data))
 
-    @pytest.mark.dict_views
     def test_dict_items(self):
         data = {"a": 1, "b": 2}.items()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
-    @pytest.mark.dict_views
     def test_odict_keys(self):
         data = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
-    @pytest.mark.dict_views
     def test_odict_values(self):
         data = collections.OrderedDict([("a", 1), ("b", 2)]).values()
         results = pickle_depickle(data)
         self.assertEqual(list(results), list(data))
         assert isinstance(results, type(data))
 
-    @pytest.mark.dict_views
     def test_odict_items(self):
         data = collections.OrderedDict([("a", 1), ("b", 2)]).items()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
-    @pytest.mark.dict_views
     def test_view_types(self):
         for view_type, info in _VIEWS_TYPES_TABLE.items():
             obj = info.object_type([("a", 1), ("b", 2)])
@@ -778,6 +771,7 @@ class CloudPickleTest(unittest.TestCase):
         # their parent modules are considered importable by cloudpickle.
         # See the mod_with_dynamic_submodule documentation for more
         # details of this use case.
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
         import _cloudpickle_testpkg.mod.dynamic_submodule as m
         assert _should_pickle_by_reference(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
@@ -2134,6 +2128,7 @@ class CloudPickleTest(unittest.TestCase):
     def test___reduce___returns_string(self):
         # Non regression test for objects with a __reduce__ method returning a
         # string, meaning "save by attribute using save_global"
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
         from _cloudpickle_testpkg import some_singleton
         assert some_singleton.__reduce__() == "some_singleton"
         depickled_singleton = pickle_depickle(
@@ -2206,6 +2201,7 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_T1 is depickled_T2
 
     def test_pickle_importable_typevar(self):
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
         from _cloudpickle_testpkg import T
         T1 = pickle_depickle(T, protocol=self.protocol)
         assert T1 is T
@@ -2531,6 +2527,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_pickle_constructs_from_installed_packages_registered_for_pickling_by_value(  # noqa
         self
     ):
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
         for package_or_module in ["package", "module"]:
             if package_or_module == "package":
                 import _cloudpickle_testpkg as m
@@ -2565,7 +2562,7 @@ class CloudPickleTest(unittest.TestCase):
         # pickled in a different way - by value and/or by reference) can
         # peacefully co-exist (e.g. without globals interaction) in a remote
         # worker.
-        import _cloudpickle_testpkg
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
         from _cloudpickle_testpkg import package_function_with_global as f
         _original_global = _cloudpickle_testpkg.global_variable
 
@@ -2642,7 +2639,7 @@ def test_lookup_module_and_qualname_dynamic_typevar():
 
 
 def test_lookup_module_and_qualname_importable_typevar():
-    import _cloudpickle_testpkg
+    _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
     T = _cloudpickle_testpkg.T
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
@@ -2661,6 +2658,7 @@ def test_lookup_module_and_qualname_stdlib_typevar():
 
 
 def test_register_pickle_by_value():
+    _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
     import _cloudpickle_testpkg as pkg
     import _cloudpickle_testpkg.mod as mod
 
