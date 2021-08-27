@@ -52,6 +52,7 @@ from cloudpickle.cloudpickle import _should_pickle_by_reference
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
+from cloudpickle.cloudpickle_fast import _VIEWS_TYPES_TABLE, register_views_types
 
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
@@ -226,45 +227,50 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
                          buffer_obj.tobytes())
 
+    @pytest.mark.dict_views
     def test_dict_keys(self):
         data = {"a": 1, "b": 2}.keys()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
+    @pytest.mark.dict_views
     def test_dict_values(self):
         data = {"a": 1, "b": 2}.values()
         results = pickle_depickle(data)
         self.assertEqual(sorted(results), sorted(data))
         assert isinstance(results, type(data))
 
+    @pytest.mark.dict_views
     def test_dict_items(self):
         data = {"a": 1, "b": 2}.items()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
+    @pytest.mark.dict_views
     def test_odict_keys(self):
         data = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
+    @pytest.mark.dict_views
     def test_odict_values(self):
         data = collections.OrderedDict([("a", 1), ("b", 2)]).values()
         results = pickle_depickle(data)
         self.assertEqual(list(results), list(data))
         assert isinstance(results, type(data))
 
+    @pytest.mark.dict_views
     def test_odict_items(self):
         data = collections.OrderedDict([("a", 1), ("b", 2)]).items()
         results = pickle_depickle(data)
         self.assertEqual(results, data)
         assert isinstance(results, type(data))
 
+    @pytest.mark.dict_views
     def test_view_types(self):
-        from cloudpickle.cloudpickle_fast import _VIEWS_TYPES_TABLE
-
         for view_type, info in _VIEWS_TYPES_TABLE.items():
             obj = info.object_type([("a", 1), ("b", 2)])
             at = getattr(obj, info.view, None)

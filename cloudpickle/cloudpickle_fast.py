@@ -22,7 +22,7 @@ import weakref
 import typing
 
 from enum import Enum
-from collections import ChainMap, OrderedDict, namedtuple
+from collections import ChainMap, OrderedDict, UserDict, namedtuple
 from typing import Iterable
 
 from .compat import pickle, Pickler
@@ -467,7 +467,7 @@ def register_views_types(types, attr_info=None, overwrite=False):
     return _VIEWS_TYPES_TABLE
 
 
-_VIEWABLE_TYPES = [dict, OrderedDict]
+_VIEWABLE_TYPES = [dict, OrderedDict, UserDict]
 register_views_types(_VIEWABLE_TYPES)
 
 
