@@ -52,7 +52,7 @@ from cloudpickle.cloudpickle import _should_pickle_by_reference
 from cloudpickle.cloudpickle import _make_empty_cell, cell_set
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
-from cloudpickle.cloudpickle_fast import _VIEWS_TYPES_TABLE, register_views_types
+from cloudpickle.cloudpickle_fast import _VIEWS_TYPES_TABLE
 
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
