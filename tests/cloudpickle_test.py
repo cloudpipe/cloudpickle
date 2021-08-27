@@ -59,12 +59,6 @@ from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
 
-try:
-    # import seems to break tests
-    from _cloudpickle_testpkg import relative_imports_factory
-except ImportError:
-    pass
-
 
 _TEST_GLOBAL_VARIABLE = "default_value"
 _TEST_GLOBAL_VARIABLE2 = "another_value"
@@ -2090,7 +2084,8 @@ class CloudPickleTest(unittest.TestCase):
         # Make sure relative imports inside round-tripped functions is not
         # broken. This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
-        f, g = relative_imports_factory()
+        pytest.importorskip("_cloudpickle_testpkg")
+        f, g = _cloudpickle_testpkg.relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
             assert func() == "hello from a {}!".format(source)
