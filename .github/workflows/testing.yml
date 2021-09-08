@@ -238,7 +238,7 @@ jobs:
         pushd ..
         git clone https://github.com/ray-project/ray.git
         pushd ray
-        python python/ray/setup-dev.py
+        python python/ray/setup-dev.py --yes
         popd
         popd
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
