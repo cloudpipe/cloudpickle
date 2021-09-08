@@ -232,7 +232,15 @@ jobs:
     - name: Install project and dependencies
       run: |
         python -m pip install --upgrade -r dev-requirements.txt
-        python -m pip install setproctitle psutil ray==1.6.0
+        python -m pip install setproctitle psutil
+        # from https://docs.ray.io/en/master/development.html#building-ray
+        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl
+        pushd ..
+        git clone https://github.com/ray-project/ray.git
+        pushd ray
+        python python/ray/setup-dev.py
+        popd
+        popd
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
         git clone https://github.com/ray-project/ray.git ../ray
