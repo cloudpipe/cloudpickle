@@ -195,7 +195,6 @@ jobs:
       PROJECT: loky
       TEST_REQUIREMENTS: "pytest psutil"
       PROJECT_URL: https://github.com/joblib/loky.git
-      ADDITIONAL_PYTEST_ARGS: -k test_serialization
     strategy:
       matrix:
         python_version: [3.9]
