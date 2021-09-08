@@ -195,6 +195,7 @@ jobs:
       PROJECT: loky
       TEST_REQUIREMENTS: "pytest psutil"
       PROJECT_URL: https://github.com/tomMoral/loky.git
+      ADDITIONAL_PYTEST_ARGS: "-k 'test_serialization'"
     strategy:
       matrix:
         python_version: [3.7]
@@ -210,7 +211,6 @@ jobs:
     - name: Install cloudpickle
       shell: bash
       run: |
-        pushd ../cloudpickle
         python -m pip install -e .
     - name: Test the downstream project
       run: |
