@@ -143,7 +143,6 @@ jobs:
       PROJECT: distributed
       TEST_REQUIREMENTS: cryptography pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
       PROJECT_URL: https://github.com/dask/distributed.git
-      PYTEST_ADDOPTS: "-k \'not test_pickle_empty\'"
     strategy:
       matrix:
         python_version: [3.7]
@@ -165,6 +164,7 @@ jobs:
         # FIXME ipv6-related failures on Ubuntu github actions CI
         # https://github.com/dask/distributed/issues/4514
         export DISABLE_IPV6=1
+        export PYTEST_ADDOPTS=("-k" "not test_pickle_empty")
         bash ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
