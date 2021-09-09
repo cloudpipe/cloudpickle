@@ -142,7 +142,7 @@ jobs:
     env:
       PROJECT: distributed
       TEST_REQUIREMENTS: cryptography pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
-      PROJECT_URL: https://github.com/dask/distributed.git
+      PROJECT_URL: https://github.com/jakirkham/distributed.git
       PYTEST_ADDOPTS: "--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_workspace_concurrency and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args  and not test_remote_access\""
     strategy:
       matrix:
