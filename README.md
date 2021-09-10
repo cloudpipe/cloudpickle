@@ -87,7 +87,7 @@ processes may not have access to the said module, for example if they live on a
 different machine than the process in which the module is being developed.
 By itself, `cloudpickle` cannot detect such "locally importable" modules and
 switch to serialization by value; instead, it relies on its default mode,
-which is serialization by reference. However, since `cloudpickle 1.7.0`, one
+which is serialization by reference. However, since `cloudpickle 2.0.0`, one
 can explicitly specify modules for which serialization by value should be used,
 using the `register_pickle_by_value(module)`/`/unregister_pickle(module)` API:
 
