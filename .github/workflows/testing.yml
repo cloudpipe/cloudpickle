@@ -166,10 +166,10 @@ jobs:
         # https://github.com/dask/distributed/issues/4514
         export DISABLE_IPV6=1
         # Skipping
-        # - test_pickle_empty until https://github.com/dask/distributed/pull/5303 gets merged,
         # - test_dont_steal_unknown_function (https://github.com/dask/distributed/issues/3574)
+        # - test_target_duration (https://github.com/dask/distributed/issues/4859)
         # See https://github.com/cloudpipe/cloudpickle/pull/432
-        export PYTEST_ADDOPTS=("-k" "not test_pickle_empty and not test_dont_steal_unknown_functions")
+        export PYTEST_ADDOPTS=("-k" "not test_dont_steal_unknown_functions and not test_target_duration")
         source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
