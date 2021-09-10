@@ -141,9 +141,8 @@ jobs:
     if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
-      TEST_REQUIREMENTS: pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
+      TEST_REQUIREMENTS: cryptography pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
       PROJECT_URL: https://github.com/dask/distributed.git
-      PYTEST_ADDOPTS: "--timeout-method=thread --timeout=300 -m \"not avoid_travis\" -k \"not test_dask_scheduler and not test_workspace_concurrency and not test_defaults and not test_service_hosts and not test_logging_file_config and not test_hostport and not test_workdir_simple and not test_two_workspaces_in_same_directory and not test_recompute_released_results and not test_connection_args and not test_listen_args  and not test_remote_access\""
     strategy:
       matrix:
         python_version: [3.7]
@@ -156,9 +155,22 @@ jobs:
     - name: Install project and dependencies
       run: |
         bash ./.github/scripts/install_downstream_project.sh
-    - name: Test the downstream project
+    - name: Install developed version of cloudpickle
+      shell: bash
       run: |
-        bash ./.github/scripts/test_downstream_project.sh
+        python -m pip install -e .
+    - name: Test the downstream project
+      shell: bash
+      run: |
+        # FIXME ipv6-related failures on Ubuntu github actions CI
+        # https://github.com/dask/distributed/issues/4514
+        export DISABLE_IPV6=1
+        # Skipping
+        # - test_pickle_empty until https://github.com/dask/distributed/pull/5303 gets merged,
+        # - test_dont_steal_unknown_function (https://github.com/dask/distributed/issues/3574)
+        # See https://github.com/cloudpipe/cloudpickle/pull/432
+        export PYTEST_ADDOPTS=("-k" "not test_pickle_empty and not test_dont_steal_unknown_functions")
+        source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
     runs-on: ubuntu-latest
@@ -194,7 +206,7 @@ jobs:
     env:
       PROJECT: loky
       TEST_REQUIREMENTS: "pytest psutil"
-      PROJECT_URL: https://github.com/tomMoral/loky.git
+      PROJECT_URL: https://github.com/joblib/loky.git
     strategy:
       matrix:
         python_version: [3.7]
@@ -204,9 +216,13 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
-    - name: Install project and dependencies
+    - name: Install downstream project and dependencies
       run: |
         bash ./.github/scripts/install_downstream_project.sh
+    - name: Install developed version of cloudpickle
+      shell: bash
+      run: |
+        python -m pip install -e .
     - name: Test the downstream project
       run: |
         bash ./.github/scripts/test_downstream_project.sh
@@ -218,21 +234,27 @@ jobs:
       PROJECT: ray
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: [3.8]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python 3.8
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
       run: |
         python -m pip install --upgrade -r dev-requirements.txt
-        python -m pip install setproctitle psutil ray==0.8.6
+        python -m pip install setproctitle psutil
+        # from https://docs.ray.io/en/master/development.html#building-ray
+        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl
+        pushd ..
+        git clone https://github.com/ray-project/ray.git
+        pushd ray
+        python python/ray/setup-dev.py --yes
+        popd
+        popd
         PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         rm $PROJECT_DIR/cloudpickle/cloudpickle.py
-        git clone https://github.com/ray-project/ray.git ../ray
-        cp -R ../ray/python/ray/tests $PROJECT_DIR/tests
         cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
         cp cloudpickle/compat.py $PROJECT_DIR/cloudpickle/compat.py
         cp cloudpickle/cloudpickle_fast.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
