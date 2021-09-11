@@ -10,7 +10,6 @@ Note that the C Pickler subclassing API is CPython-specific. Therefore, some
 guards present in cloudpickle.py that were written to handle PyPy specificities
 are not present in cloudpickle_fast.py
 """
-import _collections_abc
 import abc
 import copyreg
 import io
@@ -23,7 +22,8 @@ import weakref
 import typing
 
 from enum import Enum
-from collections import ChainMap, OrderedDict
+from collections import ChainMap, OrderedDict, UserDict, namedtuple
+from typing import Iterable
 
 from .compat import pickle, Pickler
 from .cloudpickle import (
@@ -35,7 +35,7 @@ from .cloudpickle import (
     _is_parametrized_type_hint, PYPY, cell_set,
     parametrized_type_hint_getinitargs, _create_parametrized_type_hint,
     builtin_code_type,
-    _make_dict_keys, _make_dict_values, _make_dict_items,
+    _make_keys_view, _make_values_view, _make_items_view,
 )
 
 
@@ -418,41 +418,66 @@ def _class_reduce(obj):
         return _dynamic_class_reduce(obj)
     return NotImplemented
 
+# DICT VIEWS TYPES
 
-def _dict_keys_reduce(obj):
-    # Safer not to ship the full dict as sending the rest might
-    # be unintended and could potentially cause leaking of
-    # sensitive information
-    return _make_dict_keys, (list(obj), )
+ViewInfo = namedtuple("ViewInfo", ["view", "packer", "maker", "object_type"])  # noqa
 
 
-def _dict_values_reduce(obj):
-    # Safer not to ship the full dict as sending the rest might
-    # be unintended and could potentially cause leaking of
-    # sensitive information
-    return _make_dict_values, (list(obj), )
+_VIEW_ATTRS_INFO = [
+    ViewInfo("keys", list, _make_keys_view, None),
+    ViewInfo("values", list, _make_values_view, None),
+    ViewInfo("items", dict, _make_items_view, None),
+]
 
 
-def _dict_items_reduce(obj):
-    return _make_dict_items, (dict(obj), )
+_VIEWS_TYPES_TABLE = {}
 
 
-def _odict_keys_reduce(obj):
-    # Safer not to ship the full dict as sending the rest might
-    # be unintended and could potentially cause leaking of
-    # sensitive information
-    return _make_dict_keys, (list(obj), True)
+def register_views_types(types, attr_info=None, overwrite=False):
+    """Register views types, returns a copy."""
+    if not isinstance(types, Iterable):
+        types = [types]
+    if attr_info is None:
+        attr_info = _VIEW_ATTRS_INFO.copy()
+    elif isinstance(attr_info, ViewInfo):
+        attr_info = [attr_info]
+    for typ in types:
+        for info in attr_info:
+            if isinstance(typ, type):
+                object_type = typ
+                obj_instance = object_type()
+            else:
+                object_type = type(typ)
+                obj_instance = typ
+            a = getattr(obj_instance, info.view, None)
+            if callable(a):
+                view_obj = a()
+            else:
+                view_obj = a
+            if a is None:
+                continue
+            view_type = type(view_obj)
+            if view_type not in _VIEWS_TYPES_TABLE or overwrite:
+                _VIEWS_TYPES_TABLE[view_type] = ViewInfo(
+                    info.view,
+                    info.packer,
+                    info.maker,
+                    object_type,
+                )
+    return _VIEWS_TYPES_TABLE
 
 
-def _odict_values_reduce(obj):
-    # Safer not to ship the full dict as sending the rest might
-    # be unintended and could potentially cause leaking of
-    # sensitive information
-    return _make_dict_values, (list(obj), True)
+_VIEWABLE_TYPES = [dict, OrderedDict, UserDict]
+register_views_types(_VIEWABLE_TYPES)
 
 
-def _odict_items_reduce(obj):
-    return _make_dict_items, (dict(obj), True)
+def _views_reducer(obj):
+    typ = type(obj)
+    info = _VIEWS_TYPES_TABLE[typ]
+    return info.maker, (info.packer(obj), info.object_type)
+
+
+_VIEWS_DISPATCH_TABLE = {k: _views_reducer for k in _VIEWS_TYPES_TABLE.keys()}
 
 
 # COLLECTIONS OF OBJECTS STATE SETTERS
@@ -528,13 +553,7 @@ class CloudPickler(Pickler):
     _dispatch_table[types.MappingProxyType] = _mappingproxy_reduce
     _dispatch_table[weakref.WeakSet] = _weakset_reduce
     _dispatch_table[typing.TypeVar] = _typevar_reduce
-    _dispatch_table[_collections_abc.dict_keys] = _dict_keys_reduce
-    _dispatch_table[_collections_abc.dict_values] = _dict_values_reduce
-    _dispatch_table[_collections_abc.dict_items] = _dict_items_reduce
-    _dispatch_table[type(OrderedDict().keys())] = _odict_keys_reduce
-    _dispatch_table[type(OrderedDict().values())] = _odict_values_reduce
-    _dispatch_table[type(OrderedDict().items())] = _odict_items_reduce
-
+    _dispatch_table.update(_VIEWS_DISPATCH_TABLE)
 
     dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
 

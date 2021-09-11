@@ -55,7 +55,6 @@ import typing
 import warnings
 
 from .compat import pickle
-from collections import OrderedDict
 from typing import Generic, Union, Tuple, Callable
 from pickle import _getattribute
 from importlib._bootstrap import _find_spec
@@ -952,22 +951,31 @@ def _get_bases(typ):
     return getattr(typ, bases_attr)
 
 
-def _make_dict_keys(obj, is_ordered=False):
-    if is_ordered:
-        return OrderedDict.fromkeys(obj).keys()
+def _make_keys_view(obj, typ):
+    t = typ or dict
+    if hasattr(t, "fromkeys"):
+        o = t.fromkeys(obj)
     else:
-        return dict.fromkeys(obj).keys()
+        o = dict.fromkeys(obj)
+        try:
+            o = t(o)
+        except Exception:
+            pass
+    return o.keys()
 
 
-def _make_dict_values(obj, is_ordered=False):
-    if is_ordered:
-        return OrderedDict((i, _) for i, _ in enumerate(obj)).values()
-    else:
-        return {i: _ for i, _ in enumerate(obj)}.values()
+def _make_values_view(obj, typ):
+    t = typ or dict
+    o = t({i: _ for i, _ in enumerate(obj)})
+    return o.values()
 
 
-def _make_dict_items(obj, is_ordered=False):
-    if is_ordered:
-        return OrderedDict(obj).items()
-    else:
-        return obj.items()
+def _make_items_view(obj, typ):
+    t = typ or dict
+    try:
+        o = t(obj)
+    except Exception:
+        o = dict(obj)
+    if hasattr(o, "items"):
+        return o.items()
+    return o
