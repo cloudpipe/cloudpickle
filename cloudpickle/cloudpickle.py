@@ -889,15 +889,10 @@ def _make_typevar(name, bound, constraints, covariant, contravariant,
 
 
 def _decompose_typevar(obj):
-    try:
-        class_tracker_id = _get_or_create_tracker_id(obj)
-    except TypeError:  # pragma: nocover
-        # TypeVar instances are not weakref-able in Python 3.5.3
-        class_tracker_id = None
     return (
         obj.__name__, obj.__bound__, obj.__constraints__,
         obj.__covariant__, obj.__contravariant__,
-        class_tracker_id,
+        _get_or_create_tracker_id(obj),
     )
 
 
