@@ -73,7 +73,7 @@ def subprocess_pickle_string(input_data, protocol=None, timeout=TIMEOUT,
     except TimeoutExpired as e:
         proc.kill()
         out, err = proc.communicate()
-        message = u"\n".join([out.decode('utf-8'), err.decode('utf-8')])
+        message = "\n".join([out.decode('utf-8'), err.decode('utf-8')])
         raise RuntimeError(message) from e
 
 
@@ -134,7 +134,7 @@ def call_func(payload, protocol):
     return dumps(result, protocol=protocol)
 
 
-class _Worker(object):
+class _Worker:
     def __init__(self, protocol=None):
         self.protocol = protocol
         self.pool = ProcessPoolExecutor(max_workers=1)
@@ -201,12 +201,12 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
             try:
                 out = check_output(cmd, **kwargs)
             except CalledProcessError as e:
-                raise RuntimeError(u"script errored with output:\n%s"
+                raise RuntimeError("script errored with output:\n%s"
                                    % e.output.decode('utf-8')) from e
             if out != b"":
                 raise AssertionError(out.decode('utf-8'))
         except TimeoutExpired as e:
-            raise RuntimeError(u"script timeout, output so far:\n%s"
+            raise RuntimeError("script timeout, output so far:\n%s"
                                % e.output.decode('utf-8')) from e
     finally:
         os.unlink(source_file)

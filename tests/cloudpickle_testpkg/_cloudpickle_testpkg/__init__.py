@@ -15,7 +15,7 @@ def package_function_with_global():
     return global_variable
 
 
-class _SingletonClass(object):
+class _SingletonClass:
     def __reduce__(self):
         # This reducer is only valid for the top level "some_singleton" object.
         return "some_singleton"
