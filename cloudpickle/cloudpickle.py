@@ -645,27 +645,6 @@ def parametrized_type_hint_getinitargs(obj):
     return initargs
 
 
-# Tornado support
-
-def is_tornado_coroutine(func):
-    """
-    Return whether *func* is a Tornado coroutine function.
-    Running coroutines are not supported.
-    """
-    if 'tornado.gen' not in sys.modules:
-        return False
-    gen = sys.modules['tornado.gen']
-    if not hasattr(gen, "is_coroutine_function"):
-        # Tornado version is too old
-        return False
-    return gen.is_coroutine_function(func)
-
-
-def _rebuild_tornado_coroutine(func):
-    from tornado import gen
-    return gen.coroutine(func)
-
-
 # including pickles unloading functions in this namespace
 load = pickle.load
 loads = pickle.loads
@@ -685,14 +664,6 @@ def dynamic_subimport(name, vars):
     mod.__dict__.update(vars)
     mod.__dict__['__builtins__'] = builtins.__dict__
     return mod
-
-
-def _gen_ellipsis():
-    return Ellipsis
-
-
-def _gen_not_implemented():
-    return NotImplemented
 
 
 def _get_cell_contents(cell):
