@@ -24,7 +24,7 @@ def load_obj(filename, check_deprecation_warning='auto'):
         check_deprecation_warning = (sys.version_info < (3, 8))
     pickle_filepath = PICKLE_DIRECTORY / filename
     if not pickle_filepath.exists():
-        pytest.skip("Could not find {}".format(str(pickle_filepath)))
+        pytest.skip(f"Could not find {str(pickle_filepath)}")
     with open(str(pickle_filepath), "rb") as f:
         if check_deprecation_warning:
             msg = "A pickle file created using an old"

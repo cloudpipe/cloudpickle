@@ -123,7 +123,7 @@ def _class_getnewargs(obj):
 
 
 def _enum_getnewargs(obj):
-    members = dict((e.name, e.value) for e in obj)
+    members = {e.name: e.value for e in obj}
     return (obj.__bases__, obj.__name__, obj.__qualname__, members,
             obj.__module__, _get_or_create_tracker_id(obj), None)
 
@@ -218,7 +218,7 @@ def _class_getstate(obj):
 def _enum_getstate(obj):
     clsdict, slotstate = _class_getstate(obj)
 
-    members = dict((e.name, e.value) for e in obj)
+    members = {e.name: e.value for e in obj}
     # Cleanup the clsdict that will be passed to _rehydrate_skeleton_class:
     # Those attributes are already handled by the metaclass.
     for attrname in ["_generate_next_value_", "_member_names_",

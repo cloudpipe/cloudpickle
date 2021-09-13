@@ -1,5 +1,3 @@
-from __future__ import division
-
 import _collections_abc
 import abc
 import collections
@@ -66,7 +64,7 @@ _TEST_GLOBAL_VARIABLE = "default_value"
 _TEST_GLOBAL_VARIABLE2 = "another_value"
 
 
-class RaiserOnPickle(object):
+class RaiserOnPickle:
 
     def __init__(self, exc):
         self.exc = exc
@@ -165,7 +163,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(getter(d), getter2(d))
 
     def test_attrgetter(self):
-        class C(object):
+        class C:
             def __getattr__(self, item):
                 return item
         d = C()
@@ -191,7 +189,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(out1, out2)
 
     def test_func_globals(self):
-        class Unpicklable(object):
+        class Unpicklable:
             def __reduce__(self):
                 raise Exception("not picklable")
 
@@ -345,14 +343,14 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_dynamically_generated_class_that_uses_super(self):
 
-        class Base(object):
+        class Base:
             def method(self):
                 return 1
 
         class Derived(Base):
             "Derived Docstring"
             def method(self):
-                return super(Derived, self).method() + 1
+                return super().method() + 1
 
         self.assertEqual(Derived().method(), 2)
 
@@ -371,7 +369,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_cycle_in_classdict_globals(self):
 
-        class C(object):
+        class C:
 
             def it_works(self):
                 return "woohoo!"
@@ -402,7 +400,7 @@ class CloudPickleTest(unittest.TestCase):
 
         hidden_constant = lambda: LOCAL_CONSTANT
 
-        class SomeClass(object):
+        class SomeClass:
             """Overly complicated class with nested references to symbols"""
             def __init__(self, value):
                 self.value = value
@@ -485,7 +483,7 @@ class CloudPickleTest(unittest.TestCase):
         assert list(gen2(3)) == list(range(3))
 
     def test_classmethod(self):
-        class A(object):
+        class A:
             @staticmethod
             def test_sm():
                 return "sm"
@@ -516,7 +514,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(f('abc'), 'ABC')
 
     def test_instancemethods_without_self(self):
-        class F(object):
+        class F:
             def f(self, x):
                 return x + 1
 
@@ -603,7 +601,7 @@ class CloudPickleTest(unittest.TestCase):
         # __builtins__ module, which appears in every module's __dict__ under
         # the '__builtins__' key. In such cases, cloudpickle used to fail
         # when pickling dynamic modules.
-        class UnpickleableObject(object):
+        class UnpickleableObject:
             def __reduce__(self):
                 raise ValueError('Unpicklable object')
 
@@ -826,13 +824,9 @@ class CloudPickleTest(unittest.TestCase):
         # builtin function from a "regular" module
         assert pickle_depickle(mkdir, protocol=self.protocol) is mkdir
 
-    @pytest.mark.skipif(platform.python_implementation() == 'PyPy' and
-                        sys.version_info[:2] == (3, 5),
-                        reason="bug of pypy3.5 in builtin-type constructors")
     def test_builtin_type_constructor(self):
-        # Due to a bug in pypy3.5, cloudpickling builtin-type constructors
-        # fails. This test makes sure that cloudpickling builtin-type
-        # constructors works for all other python versions/implementation.
+        # This test makes sure that cloudpickling builtin-type
+        # constructors works for all python versions/implementation.
 
         # pickle_depickle some builtin methods of the __builtin__ module
         for t in list, tuple, set, frozenset, dict, object:
@@ -1128,7 +1122,7 @@ class CloudPickleTest(unittest.TestCase):
         out, _ = proc.communicate()
         self.assertEqual(proc.wait(), 0)
         self.assertEqual(out.strip().decode(),
-                         'INFO:{}:hello'.format(logger.name))
+                         f'INFO:{logger.name}:hello')
 
     def test_logger(self):
         # logging.RootLogger object
@@ -1247,7 +1241,7 @@ class CloudPickleTest(unittest.TestCase):
         # pickled in a larger data structure that includes other references to
         # their inhabitants.
 
-        class SomeClass(object):
+        class SomeClass:
             def __init__(self, x):
                 self.x = x
 
@@ -1279,7 +1273,7 @@ class CloudPickleTest(unittest.TestCase):
         # explicitly setting the function's module to None
         func.__module__ = None
 
-        class NonModuleObject(object):
+        class NonModuleObject:
             def __ini__(self):
                 self.some_attr = None
 
@@ -1330,7 +1324,7 @@ class CloudPickleTest(unittest.TestCase):
                         # pickle.whichmodule or getattr(module, name, None)
                         raise Exception()
 
-                class Foo(object):
+                class Foo:
                     __module__ = module_name
 
                     def foo(self):
@@ -1397,7 +1391,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_property(self):
         # Note that the @property decorator only has an effect on new-style
         # classes.
-        class MyObject(object):
+        class MyObject:
             _read_only_value = 1
             _read_write_value = 1
 
@@ -1943,7 +1937,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_instance_with_slots(self):
         for slots in [["registered_attribute"], "registered_attribute"]:
-            class ClassWithSlots(object):
+            class ClassWithSlots:
                 __slots__ = slots
 
                 def __init__(self):
@@ -2069,11 +2063,11 @@ class CloudPickleTest(unittest.TestCase):
         f, g = relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
-            assert func() == "hello from a {}!".format(source)
+            assert func() == f"hello from a {source}!"
 
             # Make sure relative imports still work after round-tripping
             cloned_func = pickle_depickle(func, protocol=self.protocol)
-            assert cloned_func() == "hello from a {}!".format(source)
+            assert cloned_func() == f"hello from a {source}!"
 
     def test_interactively_defined_func_with_keyword_only_argument(self):
         # fixes https://github.com/cloudpipe/cloudpickle/issues/263
@@ -2172,9 +2166,6 @@ class CloudPickleTest(unittest.TestCase):
         for attr in attr_list:
             assert getattr(T, attr) == getattr(depickled_T, attr)
 
-    @pytest.mark.skipif(
-        sys.version_info[:3] == (3, 5, 3),
-        reason="TypeVar instances are not weakref-able in Python 3.5.3")
     def test_pickle_dynamic_typevar_tracking(self):
         T = typing.TypeVar("T")
         T2 = subprocess_pickle_echo(T, protocol=self.protocol)
@@ -2212,13 +2203,9 @@ class CloudPickleTest(unittest.TestCase):
             def check_generic(generic, origin, type_value, use_args):
                 assert generic.__origin__ is origin
 
-                if sys.version_info >= (3, 5, 3):
-                    assert len(origin.__orig_bases__) == 1
-                    ob = origin.__orig_bases__[0]
-                    assert ob.__origin__ is typing.Generic
-                else:  # Python 3.5.[0-1-2], pragma: no cover
-                    assert len(origin.__bases__) == 1
-                    ob = origin.__bases__[0]
+                assert len(origin.__orig_bases__) == 1
+                ob = origin.__orig_bases__[0]
+                assert ob.__origin__ is typing.Generic
 
                 if use_args:
                     assert len(generic.__args__) == 1
@@ -2279,36 +2266,15 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_generic_extensions_literal(self):
         typing_extensions = pytest.importorskip('typing_extensions')
-
-        def check_literal_equal(obj1, obj2):
-            assert obj1.__values__ == obj2.__values__
-            assert type(obj1) == type(obj2) == typing_extensions._LiteralMeta
-        literal_objs = [
-            typing_extensions.Literal, typing_extensions.Literal['a']
-        ]
-        for obj in literal_objs:
+        for obj in [typing_extensions.Literal, typing_extensions.Literal['a']]:
             depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            if sys.version_info[:3] >= (3, 5, 3):
-                assert depickled_obj == obj
-            else:
-                # __eq__ does not work for Literal objects in early Python 3.5
-                check_literal_equal(obj, depickled_obj)
+            assert depickled_obj == obj
 
     def test_generic_extensions_final(self):
         typing_extensions = pytest.importorskip('typing_extensions')
-
-        def check_final_equal(obj1, obj2):
-            assert obj1.__type__ == obj2.__type__
-            assert type(obj1) == type(obj2) == typing_extensions._FinalMeta
-        final_objs = [typing_extensions.Final, typing_extensions.Final[int]]
-
-        for obj in final_objs:
+        for obj in [typing_extensions.Final, typing_extensions.Final[int]]:
             depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            if sys.version_info[:3] >= (3, 5, 3):
-                assert depickled_obj == obj
-            else:
-                # __eq__ does not work for Final objects in early Python 3.5
-                check_final_equal(obj, depickled_obj)
+            assert depickled_obj == obj
 
     def test_class_annotations(self):
         class C:
@@ -2699,12 +2665,10 @@ def _all_types_to_test():
         typing.Tuple[int, C[int]],
         typing.List[int],
         typing.Dict[int, str],
+        typing.ClassVar,
+        typing.ClassVar[C[int]],
+        typing.NoReturn,
     ]
-    if sys.version_info[:3] >= (3, 5, 3):
-        types_to_test.append(typing.ClassVar)
-        types_to_test.append(typing.ClassVar[C[int]])
-    if sys.version_info >= (3, 5, 4):
-        types_to_test.append(typing.NoReturn)
     return types_to_test
 
 
