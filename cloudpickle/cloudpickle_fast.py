@@ -328,7 +328,7 @@ def _file_reduce(obj):
         obj.seek(0)
         contents = obj.read()
         obj.seek(curloc)
-    except OSError as e:
+    except IOError as e:
         raise pickle.PicklingError(
             "Cannot pickle file %s as it cannot be read" % name
         ) from e
