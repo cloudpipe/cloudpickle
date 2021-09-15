@@ -700,10 +700,7 @@ class _empty_cell_value(object):
 
 
 def _fill_function(*args):
-    """Fills in the rest of function data into the skeleton function object
-
-    The skeleton itself is create by _make_skel_func().
-    """
+    """Fills in the rest of function data into the skeleton function object"""
     if len(args) == 2:
         func = args[0]
         state = args[1]
@@ -778,33 +775,6 @@ def _make_cell(value=_empty_cell_value):
     if value is not _empty_cell_value:
         cell_set(cell, value)
     return cell
-
-
-def _make_skel_func(code, cell_count, base_globals=None):
-    """ Creates a skeleton function object that contains just the provided
-        code and the correct number of cells in func_closure.  All other
-        func attributes (e.g. func_globals) are empty.
-    """
-    # This function is deprecated and should be removed in cloudpickle 1.7
-    warnings.warn(
-        "A pickle file created using an old (<=1.4.1) version of cloudpickle "
-        "is currently being loaded. This is not supported by cloudpickle and "
-        "will break in cloudpickle 1.7", category=UserWarning
-    )
-    # This is backward-compatibility code: for cloudpickle versions between
-    # 0.5.4 and 0.7, base_globals could be a string or None. base_globals
-    # should now always be a dictionary.
-    if base_globals is None or isinstance(base_globals, str):
-        base_globals = {}
-
-    base_globals['__builtins__'] = __builtins__
-
-    closure = (
-        tuple(_make_empty_cell() for _ in range(cell_count))
-        if cell_count >= 0 else
-        None
-    )
-    return types.FunctionType(code, base_globals, None, None, closure)
 
 
 def _make_skeleton_class(type_constructor, name, bases, type_kwargs,
