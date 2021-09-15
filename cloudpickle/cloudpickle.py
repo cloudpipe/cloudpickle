@@ -645,6 +645,17 @@ def parametrized_type_hint_getinitargs(obj):
     return initargs
 
 
+def _rebuild_tornado_coroutine(func):
+    # This function is deprecated and should be removed in cloudpickle 2.1
+    warnings.warn(
+        "A pickle file created using an old version of cloudpickle "
+        "is currently being loaded. This is no longer supported by cloudpickle and "
+        "will be removed in cloudpickle 2.1", category=FutureWarning
+    )
+    from tornado import gen
+    return gen.coroutine(func)
+
+
 # including pickles unloading functions in this namespace
 load = pickle.load
 loads = pickle.loads
@@ -664,6 +675,26 @@ def dynamic_subimport(name, vars):
     mod.__dict__.update(vars)
     mod.__dict__['__builtins__'] = builtins.__dict__
     return mod
+
+
+def _gen_ellipsis():
+    # this function is deprecated and should be removed in cloudpickle 2.1
+    warnings.warn(
+        "a pickle file created using an old version of cloudpickle "
+        "is currently being loaded. this is no longer supported by cloudpickle and "
+        "will be removed in cloudpickle 2.1", category=futurewarning
+    )
+    return Ellipsis
+
+
+def _gen_not_implemented():
+    # This function is deprecated and should be removed in cloudpickle 2.1
+    warnings.warn(
+        "A pickle file created using an old version of cloudpickle "
+        "is currently being loaded. This is no longer supported by cloudpickle and "
+        "will be removed in cloudpickle 2.1", category=FutureWarning
+    )
+    return NotImplemented
 
 
 def _get_cell_contents(cell):
