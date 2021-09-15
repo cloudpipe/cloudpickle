@@ -682,7 +682,7 @@ def _gen_ellipsis():
     warnings.warn(
         "a pickle file created using an old version of cloudpickle "
         "is currently being loaded. this is no longer supported by cloudpickle and "
-        "will be removed in cloudpickle 2.1", category=futurewarning
+        "will be removed in cloudpickle 2.1", category=FutureWarning
     )
     return Ellipsis
 
