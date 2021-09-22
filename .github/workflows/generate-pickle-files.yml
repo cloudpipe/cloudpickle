@@ -1,0 +1,46 @@
+name: Generate static pickle files
+
+on: push
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        python_version: [3.6, 3.7, 3.8, "pypy3"]
+        cloudpickle_version: [1.5.0]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python_version }}
+
+    - name: Install project and dependencies
+      shell: bash
+      run: python -m pip install cloudpickle==${{ matrix.cloudpickle_version }}
+
+    - name: Display Python version
+      shell: bash
+      run: python -c "import sys; print(sys.version)"
+
+    - name: List software environment
+      shell: bash
+      run: python -m pip list
+
+    - name: Generate pickle files
+      shell: bash
+      run: |
+        cd tests
+        rm -rf old_pickles
+        python generate_old_pickles.py
+        cd ../
+
+    - name: Upload pickle files
+      uses: actions/upload-artifact@v2
+      with:
+        name: old_pickles
+        path: tests/old_pickles
