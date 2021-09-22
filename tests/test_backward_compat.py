@@ -17,11 +17,7 @@ import pytest
 from .generate_old_pickles import PICKLE_DIRECTORY
 
 
-def load_obj(filename, check_deprecation_warning='auto'):
-    if check_deprecation_warning == 'auto':
-        # pickles files generated with cloudpickle_fast.py on old versions of
-        # coudpickle with Python < 3.8 use non-deprecated reconstructors.
-        check_deprecation_warning = (sys.version_info < (3, 8))
+def load_obj(filename, check_deprecation_warning=False):
     pickle_filepath = PICKLE_DIRECTORY / filename
     if not pickle_filepath.exists():
         pytest.skip("Could not find {}".format(str(pickle_filepath)))
@@ -61,13 +57,13 @@ def test_dynamic_module():
 
 
 def test_simple_enum():
-    enum = load_obj("simple_enum.pkl", check_deprecation_warning=False)
+    enum = load_obj("simple_enum.pkl")
     assert hasattr(enum, "RED")
     assert enum.RED == 1
     assert enum.BLUE == 2
 
     # test enum tracking feature
-    new_enum = load_obj("simple_enum.pkl", check_deprecation_warning=False)
+    new_enum = load_obj("simple_enum.pkl")
     assert new_enum is enum
 
 
