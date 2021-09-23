@@ -7,6 +7,7 @@ import io
 import itertools
 import logging
 import math
+import multiprocessing
 from operator import itemgetter, attrgetter
 import pickletools
 import platform
@@ -1088,6 +1089,11 @@ class CloudPickleTest(unittest.TestCase):
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
         assert not subprocess.call([sys.executable, '-c', command])
+
+    def test_multiprocessing_lock_raises(self):
+        lock = multiprocessing.Lock()
+        with pytest.raises(RuntimeError, match="only be shared between processes through inheritance"):
+            cloudpickle.dumps(lock)
 
     def test_cell_manipulation(self):
         cell = _make_empty_cell()
