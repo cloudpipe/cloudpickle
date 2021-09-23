@@ -6,7 +6,7 @@ jobs:
   build:
     strategy:
       matrix:
-        python_version: [3.6, 3.7, 3.8, "pypy3"]
+        python_version: [3.6, 3.7, 3.8, 3.9, "pypy3"]
         cloudpickle_version: [1.5.0]
 
     runs-on: ubuntu-latest
