@@ -1184,6 +1184,11 @@ class CloudPickleTest(unittest.TestCase):
             def some_staticmethod():
                 """A staticmethod"""
 
+            @property
+            @abc.abstractmethod
+            def some_property():
+                """A property"""
+
         class ConcreteClass(AbstractClass):
             def some_method(self):
                 return 'it works!'
@@ -1195,6 +1200,10 @@ class CloudPickleTest(unittest.TestCase):
 
             @staticmethod
             def some_staticmethod():
+                return 'it works!'
+
+            @property
+            def some_property(self):
                 return 'it works!'
 
         # This abstract class is locally defined so we can safely register
@@ -1218,6 +1227,9 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(depickled_class().some_staticmethod(), 'it works!')
         self.assertEqual(depickled_instance.some_staticmethod(), 'it works!')
+
+        self.assertEqual(depickled_class().some_property, 'it works!')
+        self.assertEqual(depickled_instance.some_property, 'it works!')
         self.assertRaises(TypeError, depickled_base)
 
         class DepickledBaseSubclass(depickled_base):
@@ -1231,6 +1243,10 @@ class CloudPickleTest(unittest.TestCase):
 
             @staticmethod
             def some_staticmethod():
+                return 'it works for realz!'
+
+            @property
+            def some_property():
                 return 'it works for realz!'
 
         self.assertEqual(DepickledBaseSubclass().some_method(),
@@ -1261,7 +1277,7 @@ class CloudPickleTest(unittest.TestCase):
 
             @abc.abstractproperty
             def some_property(self):
-                """A staticmethod"""
+                """A property"""
 
         class ConcreteClass(AbstractClass):
             def some_method(self):
