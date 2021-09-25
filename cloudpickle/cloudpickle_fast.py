@@ -534,6 +534,10 @@ class CloudPickler(Pickler):
     _dispatch_table[type(OrderedDict().keys())] = _odict_keys_reduce
     _dispatch_table[type(OrderedDict().values())] = _odict_values_reduce
     _dispatch_table[type(OrderedDict().items())] = _odict_items_reduce
+    _dispatch_table[abc.abstractmethod] = _classmethod_reduce
+    _dispatch_table[abc.abstractclassmethod] = _classmethod_reduce
+    _dispatch_table[abc.abstractstaticmethod] = _classmethod_reduce
+    _dispatch_table[abc.abstractproperty] = _property_reduce
 
 
     dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
