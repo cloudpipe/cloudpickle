@@ -141,7 +141,7 @@ jobs:
     if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
-      TEST_REQUIREMENTS: cryptography pytest pytest-timeout numpy pandas mock bokeh fsspec>=0.3.3
+      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3
       PROJECT_URL: https://github.com/dask/distributed.git
     strategy:
       matrix:
@@ -165,11 +165,7 @@ jobs:
         # FIXME ipv6-related failures on Ubuntu github actions CI
         # https://github.com/dask/distributed/issues/4514
         export DISABLE_IPV6=1
-        # Skipping
-        # - test_dont_steal_unknown_function (https://github.com/dask/distributed/issues/3574)
-        # - test_target_duration (https://github.com/dask/distributed/issues/4859)
-        # See https://github.com/cloudpipe/cloudpickle/pull/432
-        export PYTEST_ADDOPTS=("-k" "not test_dont_steal_unknown_functions and not test_target_duration")
+        export PYTEST_ADDOPTS=("-m" "not avoid_ci")
         source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
