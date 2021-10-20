@@ -1,7 +1,8 @@
 import sys
+import platform
 
 
-if sys.version_info < (3, 8):
+if sys.version_info < (3, 8) or platform.python_implementation() == "PyPy":
     try:
         import pickle5 as pickle  # noqa: F401
         from pickle5 import Pickler  # noqa: F401
