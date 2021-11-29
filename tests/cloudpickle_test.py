@@ -1184,6 +1184,11 @@ class CloudPickleTest(unittest.TestCase):
             def some_staticmethod():
                 """A staticmethod"""
 
+            @property
+            @abc.abstractmethod
+            def some_property():
+                """A property"""
+
         class ConcreteClass(AbstractClass):
             def some_method(self):
                 return 'it works!'
@@ -1195,6 +1200,10 @@ class CloudPickleTest(unittest.TestCase):
 
             @staticmethod
             def some_staticmethod():
+                return 'it works!'
+
+            @property
+            def some_property(self):
                 return 'it works!'
 
         # This abstract class is locally defined so we can safely register
@@ -1218,6 +1227,9 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertEqual(depickled_class().some_staticmethod(), 'it works!')
         self.assertEqual(depickled_instance.some_staticmethod(), 'it works!')
+
+        self.assertEqual(depickled_class().some_property, 'it works!')
+        self.assertEqual(depickled_instance.some_property, 'it works!')
         self.assertRaises(TypeError, depickled_base)
 
         class DepickledBaseSubclass(depickled_base):
@@ -1231,6 +1243,100 @@ class CloudPickleTest(unittest.TestCase):
 
             @staticmethod
             def some_staticmethod():
+                return 'it works for realz!'
+
+            @property
+            def some_property():
+                return 'it works for realz!'
+
+        self.assertEqual(DepickledBaseSubclass().some_method(),
+                         'it works for realz!')
+
+        class IncompleteBaseSubclass(depickled_base):
+            def some_method(self):
+                return 'this class lacks some concrete methods'
+
+        self.assertRaises(TypeError, IncompleteBaseSubclass)
+
+    def test_abstracts(self):
+        # Same as `test_abc` but using deprecated `abc.abstract*` methods.
+        # See https://github.com/cloudpipe/cloudpickle/issues/367
+
+        class AbstractClass(abc.ABC):
+            @abc.abstractmethod
+            def some_method(self):
+                """A method"""
+
+            @abc.abstractclassmethod
+            def some_classmethod(cls):
+                """A classmethod"""
+
+            @abc.abstractstaticmethod
+            def some_staticmethod():
+                """A staticmethod"""
+
+            @abc.abstractproperty
+            def some_property(self):
+                """A property"""
+
+        class ConcreteClass(AbstractClass):
+            def some_method(self):
+                return 'it works!'
+
+            @classmethod
+            def some_classmethod(cls):
+                assert cls == ConcreteClass
+                return 'it works!'
+
+            @staticmethod
+            def some_staticmethod():
+                return 'it works!'
+
+            @property
+            def some_property(self):
+                return 'it works!'
+
+        # This abstract class is locally defined so we can safely register
+        # tuple in it to verify the unpickled class also register tuple.
+        AbstractClass.register(tuple)
+
+        concrete_instance = ConcreteClass()
+        depickled_base = pickle_depickle(AbstractClass, protocol=self.protocol)
+        depickled_class = pickle_depickle(ConcreteClass,
+                                          protocol=self.protocol)
+        depickled_instance = pickle_depickle(concrete_instance)
+
+        assert issubclass(tuple, AbstractClass)
+        assert issubclass(tuple, depickled_base)
+
+        self.assertEqual(depickled_class().some_method(), 'it works!')
+        self.assertEqual(depickled_instance.some_method(), 'it works!')
+
+        self.assertEqual(depickled_class.some_classmethod(), 'it works!')
+        self.assertEqual(depickled_instance.some_classmethod(), 'it works!')
+
+        self.assertEqual(depickled_class().some_staticmethod(), 'it works!')
+        self.assertEqual(depickled_instance.some_staticmethod(), 'it works!')
+
+        self.assertEqual(depickled_class().some_property, 'it works!')
+        self.assertEqual(depickled_instance.some_property, 'it works!')
+        self.assertRaises(TypeError, depickled_base)
+
+        class DepickledBaseSubclass(depickled_base):
+            def some_method(self):
+                return 'it works for realz!'
+
+            @classmethod
+            def some_classmethod(cls):
+                assert cls == DepickledBaseSubclass
+                return 'it works for realz!'
+
+            @staticmethod
+            def some_staticmethod():
+                return 'it works for realz!'
+
+            @property
+            def some_property(self):
                 return 'it works for realz!'
 
         self.assertEqual(DepickledBaseSubclass().some_method(),
