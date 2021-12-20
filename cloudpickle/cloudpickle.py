@@ -44,7 +44,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import builtins
 import dis
 import opcode
-import platform
 import sys
 import types
 import weakref
@@ -53,7 +52,7 @@ import threading
 import typing
 import warnings
 
-from .compat import pickle
+from .compat import pickle, PYPY
 from collections import OrderedDict
 from typing import ClassVar, Generic, Union, Tuple, Callable
 from pickle import _getattribute
@@ -91,8 +90,6 @@ _PICKLE_BY_VALUE_MODULES = set()
 _DYNAMIC_CLASS_TRACKER_BY_CLASS = weakref.WeakKeyDictionary()
 _DYNAMIC_CLASS_TRACKER_BY_ID = weakref.WeakValueDictionary()
 _DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
-
-PYPY = platform.python_implementation() == "PyPy"
 
 builtin_code_type = None
 if PYPY:

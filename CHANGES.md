@@ -5,6 +5,9 @@
   and `abc.abstractstaticmethod`.
   ([PR #450](https://github.com/cloudpipe/cloudpickle/pull/450))
 
+- Fix import of pickle module on PYPY 3.8.
+  ([issue #455](https://github.com/cloudpipe/cloudpickle/issues/455))
+
 2.0.0
 =====
 
