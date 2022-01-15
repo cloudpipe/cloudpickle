@@ -5,6 +5,9 @@
   and `abc.abstractstaticmethod`.
   ([PR #450](https://github.com/cloudpipe/cloudpickle/pull/450))
 
+- Support for pickling subclasses of generic classes.
+  ([PR #448](https://github.com/cloudpipe/cloudpickle/pull/448))
+
 2.0.0
 =====
 
