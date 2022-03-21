@@ -8,6 +8,9 @@
 - Support for pickling subclasses of generic classes.
   ([PR #448](https://github.com/cloudpipe/cloudpickle/pull/448))
 
+- Support and CI configuration for Python 3.11.
+  ([PR #467](https://github.com/cloudpipe/cloudpickle/pull/467))
+
 2.0.0
 =====
 

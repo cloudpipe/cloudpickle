@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python_version: [3.6, 3.7, 3.8, 3.9, "3.10-dev", "pypy3"]
+        python_version: [3.6, 3.7, 3.8, 3.9, "3.10", "3.11-dev", "pypy3"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
@@ -83,48 +83,6 @@ jobs:
           --show-source --statistics
     - name: Test with pytest
       shell: bash
-      run: |
-        COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
-          PYTHONPATH='.:tests' python -m pytest -r s
-        coverage combine --append
-        coverage xml -i
-    - name: Publish coverage results
-      uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        file: ./coverage.xml
-
-  python-nightly:
-    runs-on: ubuntu-18.04
-    # This entry is made optional for now, see https://github.com/cloudpipe/cloudpickle/pull/420
-    if: "contains(github.event.pull_request.labels.*.name, 'ci python-nightly')"
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install Python from ppa:deadsnakes/nightly
-      run: |
-        sudo add-apt-repository ppa:deadsnakes/nightly
-        sudo apt update
-        sudo apt install python3.11 python3.11-venv python3.11-dev
-        python3.11 -m venv nightly-venv
-        echo "$PWD/nightly-venv/bin" >> $GITHUB_PATH
-    - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
-    - name: Install project and dependencies
-      run: |
-        set -e
-        python -m pip install --upgrade pip
-        python -m pip install -r dev-requirements.txt
-        python -m pip install -e .
-        python ci/install_coverage_subprocess_pth.py
-    - name: Generate old pickles (backward compat)
-      shell: bash
-      run: |
-        git_head=$(git rev-parse HEAD)
-        cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
-        git checkout v1.4.1
-        python tests/_generate_old_pickles.py
-        git checkout ${git_head}
-    - name: Test with pytest
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
           PYTHONPATH='.:tests' python -m pytest -r s
