@@ -700,6 +700,67 @@ class _empty_cell_value:
         return cls.__name__
 
 
+def _noop(x):
+    """Identity function"""
+    return x
+
+
+class _FuncMetadataGlobals:
+    """Extracts the base metadata of func.__globals__
+
+    This wrapper makes it possible to customize the serialization of the
+    function globals by subclassing the pickler and overriding persistend_id /
+    persistent_load:
+
+    https://docs.python.org/3/library/pickle.html#persistence-of-external-objects
+    """
+
+    _common_func_keys = ("__package__", "__name__", "__path__", "__file__")
+
+    def __init__(self, func, shared_namespace):
+        self.func = func
+        func_globals = func.__globals__
+        if not shared_namespace:
+            # The shared name space is empty, meaning that it's the first time
+            # this function is pickled by the CloudPickler instance: let's
+            # populate it by the base globals of the function.
+            shared_namespace.update({
+                k: func_globals[k] for k in self._common_func_keys
+                if k in func_globals
+            })
+        self.func_metadata_globals = shared_namespace
+
+    def __reduce__(self):
+        # By default, only pickle the core meta-data information of the globals
+        # dict of the function. The actual symbols referenced in func.__code__
+        # are pickled separately in _FilteredFuncGlobals.
+        return _noop, (self.func_metadata_globals,)
+
+
+class _FuncCodeGlobals:
+    """Extracts entries of func.__globals__ actually referenced in func.__code__
+
+    This wrapper makes it possible to customize the serialization of the
+    globals by subclassing the pickler and overriding persistend_id /
+    persistent_load:
+
+    https://docs.python.org/3/library/pickle.html#persistence-of-external-objects
+    """
+
+    def __init__(self, func):
+        self.func = func
+        code_global_names = _extract_code_globals(func.__code__)
+        func_globals = func.__globals__
+        self.func_code_globals = {
+            k: func_globals[k] for k in code_global_names if k in func_globals
+        }
+
+    def __reduce__(self):
+        # By default, only pickle the Python ojects actually referenced by the
+        # code of the function.
+        return _noop, (self.func_code_globals,)
+
+
 def _fill_function(*args):
     """Fills in the rest of function data into the skeleton function object
 
