@@ -321,11 +321,10 @@ def _extract_code_globals(co):
     """
     out_names = _extract_code_globals_cache.get(co)
     if out_names is None:
-        names = co.co_names
         # We use a dict with None values instead of a set to get a
         # deterministic order (assuming Python 3.6+) and avoid introducing
         # non-deterministic pickle bytes as a results.
-        out_names = {names[oparg]: None for _, oparg in _walk_global_ops(co)}
+        out_names = {name: None for name in _walk_global_ops(co)}
 
         # Declaring a function inside another one using the "def ..."
         # syntax generates a constant code object corresponding to the one
@@ -511,13 +510,12 @@ def _builtin_type(name):
 
 def _walk_global_ops(code):
     """
-    Yield (opcode, argument number) tuples for all
-    global-referencing instructions in *code*.
+    Yield referenced name for all global-referencing instructions in *code*.
     """
     for instr in dis.get_instructions(code):
         op = instr.opcode
         if op in GLOBAL_OPS:
-            yield op, instr.arg
+            yield instr.argval
 
 
 def _extract_class_dict(cls):
@@ -763,6 +761,11 @@ def _fill_function(*args):
                 cell_set(cell, value)
 
     return func
+
+
+def _make_function(code, globals, name, argdefs, closure):
+    globals["__builtins__"] = __builtins__
+    return types.FunctionType(code, globals, name, argdefs, closure)
 
 
 def _make_empty_cell():

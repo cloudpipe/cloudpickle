@@ -2245,7 +2245,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_recursion_during_pickling(self):
         class A:
-            def __getattr__(self, name):
+            def __getattribute__(self, name):
                 return getattr(self, name)
 
         a = A()

@@ -35,7 +35,7 @@ from .cloudpickle import (
     _is_parametrized_type_hint, PYPY, cell_set,
     parametrized_type_hint_getinitargs, _create_parametrized_type_hint,
     builtin_code_type,
-    _make_dict_keys, _make_dict_values, _make_dict_items,
+    _make_dict_keys, _make_dict_values, _make_dict_items, _make_function,
 )
 
 
@@ -248,7 +248,7 @@ def _code_reduce(obj):
     # of the specific type from types, for example:
     # >>> from types import CodeType
     # >>> help(CodeType)
-    if hasattr(obj, "co_columntable"):  # pragma: no branch
+    if hasattr(obj, "co_exceptiontable"):  # pragma: no branch
         # Python 3.11 and later: there are some new attributes
         # related to the enhanced exceptions.
         args = (
@@ -256,9 +256,8 @@ def _code_reduce(obj):
             obj.co_kwonlyargcount, obj.co_nlocals, obj.co_stacksize,
             obj.co_flags, obj.co_code, obj.co_consts, obj.co_names,
             obj.co_varnames, obj.co_filename, obj.co_name, obj.co_qualname,
-            obj.co_firstlineno, obj.co_linetable, obj.co_endlinetable,
-            obj.co_columntable, obj.co_exceptiontable, obj.co_freevars,
-            obj.co_cellvars,
+            obj.co_firstlineno, obj.co_linetable, obj.co_exceptiontable,
+            obj.co_freevars, obj.co_cellvars,
         )
     elif hasattr(obj, "co_linetable"):  # pragma: no branch
         # Python 3.10 and later: obj.co_lnotab is deprecated and constructor
@@ -270,6 +269,18 @@ def _code_reduce(obj):
             obj.co_varnames, obj.co_filename, obj.co_name,
             obj.co_firstlineno, obj.co_linetable, obj.co_freevars,
             obj.co_cellvars
+        )
+    elif hasattr(obj, "co_nmeta"):  # pragma: no branch
+        # "nogil" Python: modified attributes from 3.9
+        args = (
+            obj.co_argcount, obj.co_posonlyargcount,
+            obj.co_kwonlyargcount, obj.co_nlocals, obj.co_framesize,
+            obj.co_ndefaultargs, obj.co_nmeta,
+            obj.co_flags, obj.co_code, obj.co_consts,
+            obj.co_varnames, obj.co_filename, obj.co_name,
+            obj.co_firstlineno, obj.co_lnotab, obj.co_exc_handlers,
+            obj.co_jump_table, obj.co_freevars, obj.co_cellvars,
+            obj.co_free2reg, obj.co_cell2reg
         )
     elif hasattr(obj, "co_posonlyargcount"):
         # Backward compat for 3.9 and older
@@ -564,7 +575,7 @@ class CloudPickler(Pickler):
         """Reduce a function that is not pickleable via attribute lookup."""
         newargs = self._function_getnewargs(func)
         state = _function_getstate(func)
-        return (types.FunctionType, newargs, state, None, None,
+        return (_make_function, newargs, state, None, None,
                 _function_setstate)
 
     def _function_reduce(self, obj):
