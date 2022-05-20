@@ -270,7 +270,7 @@ def _code_reduce(obj):
             obj.co_firstlineno, obj.co_linetable, obj.co_freevars,
             obj.co_cellvars
         )
-    elif hasattr(obj, "co_nmeta"):  # pragma: no branch
+    elif hasattr(obj, "co_nmeta"):  # pragma: no cover
         # "nogil" Python: modified attributes from 3.9
         args = (
             obj.co_argcount, obj.co_posonlyargcount,
