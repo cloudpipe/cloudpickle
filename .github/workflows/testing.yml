@@ -99,14 +99,14 @@ jobs:
     if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
-      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3
+      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3 aiohttp pyarrow
       PROJECT_URL: https://github.com/dask/distributed.git
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -135,10 +135,10 @@ jobs:
       PROJECT_URL: https://github.com/joblib/joblib.git
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -163,10 +163,10 @@ jobs:
       PROJECT_URL: https://github.com/joblib/loky.git
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -188,10 +188,10 @@ jobs:
       PROJECT: ray
     strategy:
       matrix:
-        python_version: [3.8]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.8
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -200,7 +200,7 @@ jobs:
         python -m pip install --upgrade -r dev-requirements.txt
         python -m pip install setproctitle psutil
         # from https://docs.ray.io/en/master/development.html#building-ray
-        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl
+        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp310-cp310-manylinux2014_x86_64.whl
         pushd ..
         git clone https://github.com/ray-project/ray.git
         pushd ray
