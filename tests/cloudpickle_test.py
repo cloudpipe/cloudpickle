@@ -978,6 +978,10 @@ class CloudPickleTest(unittest.TestCase):
         res = loop.run_sync(functools.partial(g2, 5))
         self.assertEqual(res, 7)
 
+    @pytest.mark.skipif(
+        (3, 11, 0, 'beta') <= sys.version_info < (3, 11, 0, 'beta', 2),
+        reason="https://github.com/python/cpython/issues/92932"
+    )
     def test_extended_arg(self):
         # Functions with more than 65535 global vars prefix some global
         # variable references with the EXTENDED_ARG opcode.
@@ -2245,7 +2249,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_recursion_during_pickling(self):
         class A:
-            def __getattr__(self, name):
+            def __getattribute__(self, name):
                 return getattr(self, name)
 
         a = A()

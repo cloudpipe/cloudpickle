@@ -11,6 +11,9 @@
 - Support and CI configuration for Python 3.11.
   ([PR #467](https://github.com/cloudpipe/cloudpickle/pull/467))
 
+- Support for the experimental `nogil` variant of CPython
+  ([PR #470](https://github.com/cloudpipe/cloudpickle/pull/470))
+
 2.0.0
 =====
 
