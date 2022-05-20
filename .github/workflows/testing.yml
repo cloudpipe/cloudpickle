@@ -99,7 +99,7 @@ jobs:
     if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
-      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3
+      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3 aiohttp
       PROJECT_URL: https://github.com/dask/distributed.git
     strategy:
       matrix:
