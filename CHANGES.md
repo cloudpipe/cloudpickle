@@ -1,5 +1,5 @@
-2.1.0 (in development)
-======================
+2.1.0
+=====
 
 - Support for pickling `abc.abstractproperty`, `abc.abstractclassmethod`,
   and `abc.abstractstaticmethod`.
