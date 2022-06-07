@@ -979,7 +979,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(res, 7)
 
     @pytest.mark.skipif(
-        (3, 11, 0, 'beta') <= sys.version_info < (3, 11, 0, 'beta', 2),
+        (3, 11, 0, 'beta') <= sys.version_info < (3, 11, 0, 'beta', 3),
         reason="https://github.com/python/cpython/issues/92932"
     )
     def test_extended_arg(self):
