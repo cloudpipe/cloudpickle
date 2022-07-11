@@ -5,4 +5,4 @@ from cloudpickle.cloudpickle_fast import CloudPickler, dumps, dump  # noqa
 # expose their Pickler subclass at top-level under the  "Pickler" name.
 Pickler = CloudPickler
 
-__version__ = '2.1.0.dev0'
+__version__ = '2.2.0.dev0'

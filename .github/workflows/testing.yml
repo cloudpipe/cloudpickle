@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python_version: [3.6, 3.7, 3.8, 3.9, "3.10-dev", "pypy-3.8"]
+        python_version: [3.6, 3.7, 3.8, 3.9, "3.10", "3.11-dev", "pypy-3.8"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
@@ -94,61 +94,19 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
 
-  python-nightly:
-    runs-on: ubuntu-18.04
-    # This entry is made optional for now, see https://github.com/cloudpipe/cloudpickle/pull/420
-    if: "contains(github.event.pull_request.labels.*.name, 'ci python-nightly')"
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install Python from ppa:deadsnakes/nightly
-      run: |
-        sudo add-apt-repository ppa:deadsnakes/nightly
-        sudo apt update
-        sudo apt install python3.11 python3.11-venv python3.11-dev
-        python3.11 -m venv nightly-venv
-        echo "$PWD/nightly-venv/bin" >> $GITHUB_PATH
-    - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
-    - name: Install project and dependencies
-      run: |
-        set -e
-        python -m pip install --upgrade pip
-        python -m pip install -r dev-requirements.txt
-        python -m pip install -e .
-        python ci/install_coverage_subprocess_pth.py
-    - name: Generate old pickles (backward compat)
-      shell: bash
-      run: |
-        git_head=$(git rev-parse HEAD)
-        cp tests/generate_old_pickles.py tests/_generate_old_pickles.py
-        git checkout v1.4.1
-        python tests/_generate_old_pickles.py
-        git checkout ${git_head}
-    - name: Test with pytest
-      run: |
-        COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
-          PYTHONPATH='.:tests' python -m pytest -r s
-        coverage combine --append
-        coverage xml -i
-    - name: Publish coverage results
-      uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        file: ./coverage.xml
-
   distributed-downstream-build:
     runs-on: ubuntu-latest
     if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
-      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3
+      TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures numpy pandas mock bokeh fsspec>=0.3.3 aiohttp pyarrow git+https://github.com/dask/dask
       PROJECT_URL: https://github.com/dask/distributed.git
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -177,10 +135,10 @@ jobs:
       PROJECT_URL: https://github.com/joblib/joblib.git
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -205,10 +163,10 @@ jobs:
       PROJECT_URL: https://github.com/joblib/loky.git
     strategy:
       matrix:
-        python_version: [3.7]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -230,10 +188,10 @@ jobs:
       PROJECT: ray
     strategy:
       matrix:
-        python_version: [3.8]
+        python_version: ["3.10"]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.8
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
@@ -242,7 +200,7 @@ jobs:
         python -m pip install --upgrade -r dev-requirements.txt
         python -m pip install setproctitle psutil
         # from https://docs.ray.io/en/master/development.html#building-ray
-        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl
+        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp310-cp310-manylinux2014_x86_64.whl
         pushd ..
         git clone https://github.com/ray-project/ray.git
         pushd ray

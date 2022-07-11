@@ -978,6 +978,10 @@ class CloudPickleTest(unittest.TestCase):
         res = loop.run_sync(functools.partial(g2, 5))
         self.assertEqual(res, 7)
 
+    @pytest.mark.skipif(
+        (3, 11, 0, 'beta') <= sys.version_info < (3, 11, 0, 'beta', 4),
+        reason="https://github.com/python/cpython/issues/92932"
+    )
     def test_extended_arg(self):
         # Functions with more than 65535 global vars prefix some global
         # variable references with the EXTENDED_ARG opcode.
@@ -2245,7 +2249,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_recursion_during_pickling(self):
         class A:
-            def __getattr__(self, name):
+            def __getattribute__(self, name):
                 return getattr(self, name)
 
         a = A()
@@ -2335,6 +2339,47 @@ class CloudPickleTest(unittest.TestCase):
             assert check_generic(C[int], C, int, use_args) == "ok"
             assert worker.run(check_generic, C[int], C, int, use_args) == "ok"
 
+    def test_generic_subclass(self):
+        T = typing.TypeVar('T')
+
+        class Base(typing.Generic[T]):
+            pass
+
+        class DerivedAny(Base):
+            pass
+
+        class LeafAny(DerivedAny):
+            pass
+
+        class DerivedInt(Base[int]):
+            pass
+
+        class LeafInt(DerivedInt):
+            pass
+
+        class DerivedT(Base[T]):
+            pass
+
+        class LeafT(DerivedT[T]):
+            pass
+
+        klasses = [
+            Base, DerivedAny, LeafAny, DerivedInt, LeafInt, DerivedT, LeafT
+        ]
+        for klass in klasses:
+            assert pickle_depickle(klass, protocol=self.protocol) is klass
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+
+            def check_mro(klass, expected_mro):
+                assert klass.mro() == expected_mro
+                return "ok"
+
+            for klass in klasses:
+                mro = klass.mro()
+                assert check_mro(klass, mro)
+                assert worker.run(check_mro, klass, mro) == "ok"
+
     def test_locally_defined_class_with_type_hints(self):
         with subprocess_worker(protocol=self.protocol) as worker:
             for type_ in _all_types_to_test():
@@ -2345,29 +2390,13 @@ class CloudPickleTest(unittest.TestCase):
 
                 def check_annotations(obj, expected_type, expected_type_str):
                     assert obj.__annotations__["attribute"] == expected_type
-                    if sys.version_info >= (3, 11):
-                        # In Python 3.11, type annotations are stored as strings.
-                        # See PEP 563 for more details:
-                        # https://www.python.org/dev/peps/pep-0563/
-                        # Originaly scheduled for 3.10, then postponed.
-                        # See this for more details:
-                        # https://mail.python.org/archives/list/python-dev@python.org/thread/CLVXXPQ2T2LQ5MP2Y53VVQFCXYWQJHKZ/
-                        assert (
-                            obj.method.__annotations__["arg"]
-                            == expected_type_str
-                        )
-                        assert (
-                            obj.method.__annotations__["return"]
-                            == expected_type_str
-                        )
-                    else:
-                        assert (
-                            obj.method.__annotations__["arg"] == expected_type
-                        )
-                        assert (
-                            obj.method.__annotations__["return"]
-                            == expected_type
-                        )
+                    assert (
+                        obj.method.__annotations__["arg"] == expected_type
+                    )
+                    assert (
+                        obj.method.__annotations__["return"]
+                        == expected_type
+                    )
                     return "ok"
 
                 obj = MyClass()

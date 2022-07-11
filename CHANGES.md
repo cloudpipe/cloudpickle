@@ -1,12 +1,24 @@
-2.1.0 (in development)
+2.2.0 (in development)
 ======================
+
+- Fix import of pickle module on PYPY 3.8.
+  ([issue #455](https://github.com/cloudpipe/cloudpickle/issues/455))
+
+2.1.0
+=====
 
 - Support for pickling `abc.abstractproperty`, `abc.abstractclassmethod`,
   and `abc.abstractstaticmethod`.
   ([PR #450](https://github.com/cloudpipe/cloudpickle/pull/450))
 
-- Fix import of pickle module on PYPY 3.8.
-  ([issue #455](https://github.com/cloudpipe/cloudpickle/issues/455))
+- Support for pickling subclasses of generic classes.
+  ([PR #448](https://github.com/cloudpipe/cloudpickle/pull/448))
+
+- Support and CI configuration for Python 3.11.
+  ([PR #467](https://github.com/cloudpipe/cloudpickle/pull/467))
+
+- Support for the experimental `nogil` variant of CPython
+  ([PR #470](https://github.com/cloudpipe/cloudpickle/pull/470))
 
 2.0.0
 =====

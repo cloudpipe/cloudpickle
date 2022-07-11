@@ -12,4 +12,4 @@ if sys.version_info < (3, 8) or PYPY:
         from pickle import _Pickler as Pickler  # noqa: F401
 else:
     import pickle  # noqa: F401
-    from _pickle import Pickler  # noqa: F401
+    from pickle import Pickler  # noqa: F401
