@@ -1,7 +1,8 @@
 2.2.0 (in development)
 ======================
 
-- TODO document changes here.
+- Fix support of PyPy 3.8 and later.
+  ([issue #455](https://github.com/cloudpipe/cloudpickle/issues/455))
 
 2.1.0
 =====
