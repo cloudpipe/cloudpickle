@@ -25,14 +25,14 @@ import typing
 from enum import Enum
 from collections import ChainMap, OrderedDict
 
-from .compat import pickle, Pickler, PYPY
+from .compat import pickle, Pickler
 from .cloudpickle import (
     _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _should_pickle_by_reference,
     _builtin_type, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
-    _is_parametrized_type_hint, cell_set,
+    _is_parametrized_type_hint, PYPY, cell_set,
     parametrized_type_hint_getinitargs, _create_parametrized_type_hint,
     builtin_code_type,
     _make_dict_keys, _make_dict_values, _make_dict_items, _make_function,
@@ -566,7 +566,6 @@ class CloudPickler(Pickler):
     _dispatch_table[abc.abstractstaticmethod] = _classmethod_reduce
     _dispatch_table[abc.abstractproperty] = _property_reduce
 
-
     dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
 
     # function reducers are defined as instance methods of CloudPickler
@@ -663,7 +662,6 @@ class CloudPickler(Pickler):
             # their global namespace at unpickling time.
             self.globals_ref = {}
             assert hasattr(self, 'proto')
-
 
     if pickle.HIGHEST_PROTOCOL >= 5 and not PYPY:
         # Pickler is the C implementation of the CPython pickler and therefore
