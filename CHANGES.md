@@ -1,7 +1,7 @@
 2.2.0 (in development)
 ======================
 
-- Fix import of pickle module on PYPY 3.8.
+- Fix support of PyPy 3.8 and later.
   ([issue #455](https://github.com/cloudpipe/cloudpickle/issues/455))
 
 2.1.0
