@@ -897,6 +897,17 @@ class CloudPickleTest(unittest.TestCase):
 
     )
     def test_builtin_classmethod_descriptor(self):
+        # `classmethod_descriptor` is the analogue `classmethod` (used for
+        # pure Python classes) for builtin types. Until CPython 3.10.8,
+        # `classmethod_descriptor` implemented an (incorrect) reducer. After
+        # https://github.com/python/cpython/issues/95196 revealed its
+        # incorrectness, this reducer was dropped (and not fixed), on the
+        # ground that pickling its Pythonic equivalent, `classmethod`,
+        # was never supported in the first place.
+        # Note that cloudpickle supports pickling `classmethod` objects,
+        # but never patched pickle's incorrect `classmethod_descriptor`
+        # reducer: pickling `classmethod_descriptor` objects using cloudpickle
+        # has always been broken.
         obj = 1.5  # float object
 
         clsdict_clsmethod = type(
