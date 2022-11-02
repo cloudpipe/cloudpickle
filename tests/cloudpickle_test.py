@@ -890,7 +890,11 @@ class CloudPickleTest(unittest.TestCase):
 
     @pytest.mark.skipif(
         sys.version_info >= (3, 10, 8),
-        reason="Disabled classmethod_descriptor pickle https://github.com/python/cpython/issues/95196"
+        reason=(
+            "CPython dropped support for pickling classmethod_descriptor,"
+            "https://github.com/python/cpython/issues/95196"
+        )
+
     )
     def test_builtin_classmethod_descriptor(self):
         obj = 1.5  # float object
