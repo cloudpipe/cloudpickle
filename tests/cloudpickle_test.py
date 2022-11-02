@@ -889,7 +889,11 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_unbound_meth(arg) == unbound_clsmethod(arg)
 
     @pytest.mark.skipif(
-        sys.version_info >= (3, 10, 8),
+        (
+            sys.version_info >= (3, 10, 8) and
+            platform.python_implementation() == 'CPython'
+        ),
+
         reason=(
             "CPython dropped support for pickling classmethod_descriptor,"
             "https://github.com/python/cpython/issues/95196"
