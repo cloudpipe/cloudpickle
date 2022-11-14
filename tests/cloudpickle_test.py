@@ -1469,10 +1469,8 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
-        import py
-
         def f():
-            s = py.builtin.set([1])
+            s = set([1])
             return s.pop()
 
         # some setup is required to allow pytest apimodules to be correctly
