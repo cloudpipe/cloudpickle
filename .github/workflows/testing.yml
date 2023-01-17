@@ -19,7 +19,10 @@ jobs:
       shell: bash
       run: |
         python -V
-        python -m pip install flake8
+        python -m pip install "flake8<6.0.0"
+    # XXX: flake8 --diff is deprecated, broken and was removed
+    # in flake8 6.0.0: we should instead black-ify the full repo
+    # and run a full flake8 check at each PR.
     - name: Run flake8 on diff with upstream/master
       shell: bash
       run: |
