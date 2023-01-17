@@ -868,21 +868,16 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_unbound_meth is unbound_classicmethod
         assert depickled_clsdict_meth is clsdict_classicmethod
 
-
     def test_builtin_classmethod(self):
         obj = 1.5  # float object
 
         bound_clsmethod = obj.fromhex  # builtin_function_or_method
         unbound_clsmethod = type(obj).fromhex  # builtin_function_or_method
-        clsdict_clsmethod = type(
-            obj).__dict__['fromhex']  # classmethod_descriptor
 
         depickled_bound_meth = pickle_depickle(
             bound_clsmethod, protocol=self.protocol)
         depickled_unbound_meth = pickle_depickle(
             unbound_clsmethod, protocol=self.protocol)
-        depickled_clsdict_meth = pickle_depickle(
-            clsdict_clsmethod, protocol=self.protocol)
 
         # float.fromhex takes a string as input.
         arg = "0x1"
@@ -893,6 +888,40 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_bound_meth(arg) == bound_clsmethod(arg)
         assert depickled_unbound_meth(arg) == unbound_clsmethod(arg)
 
+    @pytest.mark.skipif(
+        (
+            sys.version_info >= (3, 10, 8) and
+            platform.python_implementation() == 'CPython'
+        ),
+
+        reason=(
+            "CPython dropped support for pickling classmethod_descriptor,"
+            "https://github.com/python/cpython/issues/95196"
+        )
+
+    )
+    def test_builtin_classmethod_descriptor(self):
+        # `classmethod_descriptor` is the analogue `classmethod` (used for
+        # pure Python classes) for builtin types. Until CPython 3.10.8,
+        # `classmethod_descriptor` implemented an (incorrect) reducer. After
+        # https://github.com/python/cpython/issues/95196 revealed its
+        # incorrectness, this reducer was dropped (and not fixed), on the
+        # ground that pickling its Pythonic equivalent, `classmethod`,
+        # was never supported in the first place.
+        # Note that cloudpickle supports pickling `classmethod` objects,
+        # but never patched pickle's incorrect `classmethod_descriptor`
+        # reducer: pickling `classmethod_descriptor` objects using cloudpickle
+        # has always been broken.
+        obj = 1.5  # float object
+
+        clsdict_clsmethod = type(
+            obj).__dict__['fromhex']  # classmethod_descriptor
+
+        depickled_clsdict_meth = pickle_depickle(
+            clsdict_clsmethod, protocol=self.protocol)
+
+        # float.fromhex takes a string as input.
+        arg = "0x1"
         if platform.python_implementation() == 'CPython':
             # Roundtripping a classmethod_descriptor results in a
             # builtin_function_or_method (CPython upstream issue).
