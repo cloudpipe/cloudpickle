@@ -1498,7 +1498,11 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_dynamic_pytest_module(self):
         # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
-        import py
+
+        # This test does not longer make sense with pytest >= 7.2
+        py = pytest.importorskip("py")
+        if not hasattr(py, "builtin"):
+            pytest.skip("py.builtin is not available")
 
         def f():
             s = py.builtin.set([1])
