@@ -11,15 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python 3.11
       uses: actions/setup-python@v1
       with:
-        python-version: 3.7
+        python-version: 3.11
     - name: Install flake8
       shell: bash
       run: |
         python -V
-        python -m pip install flake8
+        python -m pip install "flake8<6.0.0"
+    # XXX: flake8 --diff is deprecated, broken and was removed
+    # in flake8 6.0.0: we should instead black-ify the full repo
+    # and run a full flake8 check at each PR.
     - name: Run flake8 on diff with upstream/master
       shell: bash
       run: |
@@ -29,12 +32,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python_version: [3.6, 3.7, 3.8, 3.9, "3.10", "3.11-dev", "pypy-3.9"]
+        # TODO: add "3.12-dev" to the list
+        python_version: [3.7, 3.8, 3.9, "3.10", "3.11", "pypy-3.9"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
-          - os: windows-latest
-            python_version: 3.6
           - os: windows-latest
             python_version: 3.7
           - os: windows-latest
@@ -42,8 +44,6 @@ jobs:
             # as of  4/02/2020, psutil won't build under PyPy + Windows
           - os: windows-latest
             python_version: "pypy-3.9"
-          - os: macos-latest
-            python_version: 3.6
           - os: macos-latest
             python_version: 3.7
           - os: macos-latest
@@ -69,10 +69,6 @@ jobs:
         python -m pip install -r dev-requirements.txt
         python ci/install_coverage_subprocess_pth.py
         export
-    - name: Install supported dependencies (only test in Python 3.6)
-      shell: bash
-      run: python -m pip install typing-extensions
-      if: matrix.python_version == '3.6'
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
