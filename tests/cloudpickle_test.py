@@ -1597,6 +1597,24 @@ class CloudPickleTest(unittest.TestCase):
         assert isinstance(depickled_t2, MyTuple)
         assert depickled_t2 == t2
 
+    def test_NamedTuple(self):
+        class MyTuple(typing.NamedTuple):
+            a: int
+            b: int
+            c: int
+
+        t1 = MyTuple(1, 2, 3)
+        t2 = MyTuple(3, 2, 1)
+
+        depickled_t1, depickled_MyTuple, depickled_t2 = pickle_depickle(
+            [t1, MyTuple, t2], protocol=self.protocol)
+
+        assert isinstance(depickled_t1, MyTuple)
+        assert depickled_t1 == t1
+        assert depickled_MyTuple is MyTuple
+        assert isinstance(depickled_t2, MyTuple)
+        assert depickled_t2 == t2
+
     def test_interactively_defined_function(self):
         # Check that callables defined in the __main__ module of a Python
         # script (or jupyter kernel) can be pickled / unpickled / executed.
@@ -2095,6 +2113,9 @@ class CloudPickleTest(unittest.TestCase):
             initial_obj = ClassWithSlots()
             depickled_obj = pickle_depickle(
                 initial_obj, protocol=self.protocol)
+
+            assert depickled_obj.__class__.__slots__ ==\
+                ClassWithSlots.__slots__
 
             for obj in [initial_obj, depickled_obj]:
                 self.assertEqual(obj.registered_attribute, 42)
