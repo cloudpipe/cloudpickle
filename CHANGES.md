@@ -1,5 +1,5 @@
-2.3.0 (in development)
-======================
+2.2.1
+=====
 
 - Fix pickling of NamedTuple in Python 3.9+.
   ([issue #460](https://github.com/cloudpipe/cloudpickle/issues/460))
