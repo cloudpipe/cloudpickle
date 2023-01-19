@@ -2114,8 +2114,7 @@ class CloudPickleTest(unittest.TestCase):
             depickled_obj = pickle_depickle(
                 initial_obj, protocol=self.protocol)
 
-            assert depickled_obj.__class__.__slots__ ==\
-                ClassWithSlots.__slots__
+            assert depickled_obj.__class__.__slots__ == slots
 
             for obj in [initial_obj, depickled_obj]:
                 self.assertEqual(obj.registered_attribute, 42)
