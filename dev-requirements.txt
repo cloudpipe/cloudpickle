@@ -15,3 +15,5 @@ codecov
 coverage
 # Utility package used when running the cloudpickle test suite
 ./tests/cloudpickle_testpkg
+pre-commit
+black

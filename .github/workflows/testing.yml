@@ -27,7 +27,8 @@ jobs:
       shell: bash
       run: |
         bash ./.github/scripts/flake8_diff.sh
-
+    - name: Black
+      uses: psf/black@stable
   build:
     strategy:
       matrix:

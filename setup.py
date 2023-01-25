@@ -12,43 +12,44 @@ except ImportError:
 # Function to parse __version__ in `cloudpickle/__init__.py`
 def find_version():
     here = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(here, 'cloudpickle', '__init__.py'), 'r') as fp:
+    with open(os.path.join(here, "cloudpickle", "__init__.py"), "r") as fp:
         version_file = fp.read()
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-                              version_file, re.M)
+    version_match = re.search(
+        r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M
+    )
     if version_match:
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
 
 
 dist = setup(
-    name='cloudpickle',
+    name="cloudpickle",
     version=find_version(),
-    description='Extended pickling support for Python objects',
-    author='Cloudpipe',
-    author_email='cloudpipe@googlegroups.com',
-    url='https://github.com/cloudpipe/cloudpickle',
-    license='BSD 3-Clause License',
-    packages=['cloudpickle'],
-    long_description=open('README.md').read(),
+    description="Extended pickling support for Python objects",
+    author="Cloudpipe",
+    author_email="cloudpipe@googlegroups.com",
+    url="https://github.com/cloudpipe/cloudpickle",
+    license="BSD 3-Clause License",
+    packages=["cloudpickle"],
+    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: BSD License',
-        'Operating System :: POSIX',
-        'Operating System :: Microsoft :: Windows',
-        'Operating System :: MacOS :: MacOS X',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: Implementation :: CPython',
-        'Programming Language :: Python :: Implementation :: PyPy',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: Scientific/Engineering',
-        'Topic :: System :: Distributed Computing',
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: BSD License",
+        "Operating System :: POSIX",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: MacOS :: MacOS X",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: Implementation :: CPython",
+        "Programming Language :: Python :: Implementation :: PyPy",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: Scientific/Engineering",
+        "Topic :: System :: Distributed Computing",
     ],
-    test_suite='tests',
-    python_requires='>=3.6',
+    test_suite="tests",
+    python_requires=">=3.6",
 )

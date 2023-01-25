@@ -20,7 +20,7 @@ import types
 # module.  The following lines emulate such a behavior without being a compiled
 # extension module.
 
-submodule_name = '_cloudpickle_testpkg.mod.dynamic_submodule'
+submodule_name = "_cloudpickle_testpkg.mod.dynamic_submodule"
 dynamic_submodule = types.ModuleType(submodule_name)
 
 # This line allows the dynamic_module to be imported using either one of:
@@ -32,7 +32,7 @@ sys.modules[submodule_name] = dynamic_submodule
 # so this dynamic module could be binded to another name. This behavior is
 # demonstrated with `dynamic_submodule_two`
 
-submodule_name_two = '_cloudpickle_testpkg.mod.dynamic_submodule_two'
+submodule_name_two = "_cloudpickle_testpkg.mod.dynamic_submodule_two"
 # Notice the inconsistent name binding, breaking attribute lookup-based import
 # attempts.
 another_submodule = types.ModuleType(submodule_name_two)
@@ -42,7 +42,7 @@ sys.modules[submodule_name_two] = another_submodule
 # In this third case, the module is not added to sys.modules, and can only be
 # imported using attribute lookup-based imports.
 submodule_three = types.ModuleType(
-    '_cloudpickle_testpkg.mod.dynamic_submodule_three'
+    "_cloudpickle_testpkg.mod.dynamic_submodule_three"
 )
 code = """
 def f(x):
@@ -54,7 +54,7 @@ exec(code, vars(submodule_three))
 # What about a dynamic submodule inside a dynamic submodule inside an
 # importable module?
 subsubmodule_name = (
-    '_cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule'
+    "_cloudpickle_testpkg.mod.dynamic_submodule.dynamic_subsubmodule"
 )
 dynamic_subsubmodule = types.ModuleType(subsubmodule_name)
 dynamic_submodule.dynamic_subsubmodule = dynamic_subsubmodule

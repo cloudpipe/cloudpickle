@@ -17,11 +17,11 @@ import pytest
 from .generate_old_pickles import PICKLE_DIRECTORY
 
 
-def load_obj(filename, check_deprecation_warning='auto'):
-    if check_deprecation_warning == 'auto':
+def load_obj(filename, check_deprecation_warning="auto"):
+    if check_deprecation_warning == "auto":
         # pickles files generated with cloudpickle_fast.py on old versions of
         # coudpickle with Python < 3.8 use non-deprecated reconstructors.
-        check_deprecation_warning = (sys.version_info < (3, 8))
+        check_deprecation_warning = sys.version_info < (3, 8)
     pickle_filepath = PICKLE_DIRECTORY / filename
     if not pickle_filepath.exists():
         pytest.skip(f"Could not find {str(pickle_filepath)}")
