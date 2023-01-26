@@ -478,7 +478,7 @@ def _make_cell_set_template_code():
         co.co_cellvars,  # co_freevars is initialized with co_cellvars
         (),  # co_cellvars is made empty
     )
-    return _cell_set_template_code
+    return int(_cell_set_template_code)
 
 
 if sys.version_info[:2] < (3, 7):
