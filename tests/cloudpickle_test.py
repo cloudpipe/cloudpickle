@@ -740,13 +740,13 @@ class CloudPickleTest(unittest.TestCase):
     def test_module_importability(self):
         from cloudpickle.compat import pickle
         import os.path
-        import distutils
-        import distutils.ccompiler
+        import collections
+        import collections.abc
 
         assert _should_pickle_by_reference(pickle)
         assert _should_pickle_by_reference(os.path)  # fake (aliased) module
-        assert _should_pickle_by_reference(distutils)  # package
-        assert _should_pickle_by_reference(distutils.ccompiler)  # module in package
+        assert _should_pickle_by_reference(collections)  # package
+        assert _should_pickle_by_reference(collections.abc)  # module in package
 
         dynamic_module = types.ModuleType('dynamic_module')
         assert not _should_pickle_by_reference(dynamic_module)
