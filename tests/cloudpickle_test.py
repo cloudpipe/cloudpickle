@@ -2,6 +2,7 @@ import _collections_abc
 import abc
 import collections
 import base64
+import dataclasses
 import functools
 import io
 import itertools
@@ -2769,6 +2770,33 @@ class CloudPickleTest(unittest.TestCase):
             pytest.fail(
                 "Expected a single deterministic payload, got %d/5" % len(vals)
             )
+
+    def test_dataclass_fields_are_preserved(self):
+
+        @dataclasses.dataclass
+        class SampleDataclass:
+            x: int
+            y: dataclasses.InitVar[int]
+            z: typing.ClassVar[int]
+
+        PickledSampleDataclass = pickle_depickle(
+            SampleDataclass, protocol=self.protocol
+        )
+
+        found_fields = list(PickledSampleDataclass.__dataclass_fields__.values())
+        assert set(f.name for f in found_fields) == {
+            "x", "y", "z"
+        }
+
+        expected_ftypes = {
+            "x": dataclasses._FIELD,
+            "y": dataclasses._FIELD_INITVAR,
+            "z": dataclasses._FIELD_CLASSVAR,
+        }
+
+
+        for f in found_fields:
+            assert f._field_type is expected_ftypes[f.name]
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):
