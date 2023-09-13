@@ -10,9 +10,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python 3.11
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.11
     - name: Install flake8
@@ -32,8 +32,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # TODO: add "3.12-dev" to the list
-        python_version: [3.7, 3.8, 3.9, "3.10", "3.11", "pypy-3.9"]
+        python_version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12", "pypy-3.9"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
@@ -56,11 +55,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
+        allow-prereleases: true
     - name: Install project and dependencies
       shell: bash
       run: |
@@ -85,7 +85,7 @@ jobs:
         coverage combine --append
         coverage xml -i
     - name: Publish coverage results
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
@@ -101,9 +101,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
@@ -133,9 +133,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
@@ -161,9 +161,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install downstream project and dependencies
@@ -186,9 +186,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies

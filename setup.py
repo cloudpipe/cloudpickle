@@ -21,7 +21,7 @@ def find_version():
     raise RuntimeError("Unable to find version string.")
 
 
-dist = setup(
+setup(
     name='cloudpickle',
     version=find_version(),
     description='Extended pickling support for Python objects',
@@ -43,6 +43,9 @@ dist = setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Software Development :: Libraries :: Python Modules',
