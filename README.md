@@ -133,11 +133,11 @@ Running the tests
       tox -e py37
 
 
-- With `py.test` to only run the tests for your current version of
+- With `pytest` to only run the tests for your current version of
   Python:
 
       pip install -r dev-requirements.txt
-      PYTHONPATH='.:tests' py.test
+      PYTHONPATH='.:tests' pytest
 
 History
 -------

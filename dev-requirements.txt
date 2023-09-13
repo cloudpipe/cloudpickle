@@ -1,4 +1,4 @@
-# Dependencies for running the tests with py.test
+# Dependencies for running the tests with pytest
 flake8
 pytest
 pytest-cov
