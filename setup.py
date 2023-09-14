@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 import os
 import re
 
@@ -12,7 +11,7 @@ except ImportError:
 # Function to parse __version__ in `cloudpickle/__init__.py`
 def find_version():
     here = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(here, 'cloudpickle', '__init__.py'), 'r') as fp:
+    with open(os.path.join(here, 'cloudpickle', '__init__.py')) as fp:
         version_file = fp.read()
     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
                               version_file, re.M)

@@ -475,8 +475,7 @@ class CloudPickleTest(unittest.TestCase):
     def test_generator(self):
 
         def some_generator(cnt):
-            for i in range(cnt):
-                yield i
+            yield from range(cnt)
 
         gen2 = pickle_depickle(some_generator, protocol=self.protocol)
 

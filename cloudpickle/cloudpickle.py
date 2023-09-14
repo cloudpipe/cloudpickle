@@ -62,7 +62,8 @@ from importlib._bootstrap import _find_spec
 
 try:  # pragma: no branch
     import typing_extensions as _typing_extensions
-    from typing_extensions import Literal, Final
+    from typing_extensions import Literal
+    from typing import Final
 except ImportError:
     _typing_extensions = Literal = Final = None
 

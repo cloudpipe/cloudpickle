@@ -25,7 +25,7 @@ class CloudPickleFileTests(unittest.TestCase):
     def test_empty_file(self):
         # Empty file
         open(self.tmpfilepath, 'w').close()
-        with open(self.tmpfilepath, 'r') as f:
+        with open(self.tmpfilepath) as f:
             self.assertEqual('', pickle.loads(cloudpickle.dumps(f)).read())
         os.remove(self.tmpfilepath)
 
@@ -43,7 +43,7 @@ class CloudPickleFileTests(unittest.TestCase):
         with open(self.tmpfilepath, 'w') as f:
             f.write(self.teststring)
         # Open for reading
-        with open(self.tmpfilepath, 'r') as f:
+        with open(self.tmpfilepath) as f:
             new_f = pickle.loads(cloudpickle.dumps(f))
             self.assertEqual(self.teststring, new_f.read())
         os.remove(self.tmpfilepath)

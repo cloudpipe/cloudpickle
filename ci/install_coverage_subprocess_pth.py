@@ -5,7 +5,7 @@
 import os.path as op
 from sysconfig import get_path
 
-FILE_CONTENT = u"""\
+FILE_CONTENT = """\
 import coverage; coverage.process_startup()
 """
 
