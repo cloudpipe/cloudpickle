@@ -32,8 +32,8 @@ from .cloudpickle import (
     _builtin_type, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
-    _is_parametrized_type_hint, PYPY, cell_set,
-    parametrized_type_hint_getinitargs, _create_parametrized_type_hint,
+    PYPY, cell_set,
+    parametrized_type_hint_getinitargs,
     builtin_code_type,
     _make_dict_keys, _make_dict_values, _make_dict_items, _make_function,
 )
@@ -188,7 +188,7 @@ def _class_getstate(obj):
         clsdict.pop('_abc_negative_cache_version', None)
         registry = clsdict.pop('_abc_registry', None)
         if registry is None:
-            # in Python3.7+, the abc caches and registered subclasses of a
+            # The abc caches and registered subclasses of a
             # class are bundled into the single _abc_impl attribute
             clsdict.pop('_abc_impl', None)
             (registry, _, _, _) = abc._get_dump(obj)
@@ -720,11 +720,6 @@ class CloudPickler(Pickler):
               reducers, such as Exceptions. See
               https://github.com/cloudpipe/cloudpickle/issues/248
             """
-            if sys.version_info[:2] < (3, 7) and _is_parametrized_type_hint(obj):  # noqa  # pragma: no branch
-                return (
-                    _create_parametrized_type_hint,
-                    parametrized_type_hint_getinitargs(obj)
-                )
             t = type(obj)
             try:
                 is_anyclass = issubclass(t, type)
@@ -785,18 +780,7 @@ class CloudPickler(Pickler):
                 return self.save_reduce(
                     _builtin_type, (_BUILTIN_TYPE_NAMES[obj],), obj=obj)
 
-            if sys.version_info[:2] < (3, 7) and _is_parametrized_type_hint(obj):  # noqa  # pragma: no branch
-                # Parametrized typing constructs in Python < 3.7 are not
-                # compatible with type checks and ``isinstance`` semantics. For
-                # this reason, it is easier to detect them using a
-                # duck-typing-based check (``_is_parametrized_type_hint``) than
-                # to populate the Pickler's dispatch with type-specific savers.
-                self.save_reduce(
-                    _create_parametrized_type_hint,
-                    parametrized_type_hint_getinitargs(obj),
-                    obj=obj
-                )
-            elif name is not None:
+            if name is not None:
                 Pickler.save_global(self, obj, name=name)
             elif not _should_pickle_by_reference(obj, name=name):
                 self._save_reduce_pickle5(*_dynamic_class_reduce(obj), obj=obj)

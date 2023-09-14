@@ -55,6 +55,7 @@ import warnings
 
 from .compat import pickle
 from collections import OrderedDict
+from types import CellType
 from typing import ClassVar, Generic, Union, Tuple, Callable
 from pickle import _getattribute
 from importlib._bootstrap import _find_spec
@@ -65,16 +66,6 @@ try:  # pragma: no branch
 except ImportError:
     _typing_extensions = Literal = Final = None
 
-if sys.version_info >= (3, 8):
-    from types import CellType
-else:
-    def f():
-        a = 1
-
-        def g():
-            return a
-        return g
-    CellType = type(f().__closure__[0])
 
 
 # cloudpickle is meant for inter process communication: we expect all
@@ -201,20 +192,7 @@ def _whichmodule(obj, name):
     - Errors arising during module introspection are ignored, as those errors
       are considered unwanted side effects.
     """
-    if sys.version_info[:2] < (3, 7) and isinstance(obj, typing.TypeVar):  # pragma: no branch  # noqa
-        # Workaround bug in old Python versions: prior to Python 3.7,
-        # T.__module__ would always be set to "typing" even when the TypeVar T
-        # would be defined in a different module.
-        if name is not None and getattr(typing, name, None) is obj:
-            # Built-in TypeVar defined in typing such as AnyStr
-            return 'typing'
-        else:
-            # User defined or third-party TypeVar: __module__ attribute is
-            # irrelevant, thus trigger a exhaustive search for obj in all
-            # modules.
-            module_name = None
-    else:
-        module_name = getattr(obj, '__module__', None)
+    module_name = getattr(obj, '__module__', None)
 
     if module_name is not None:
         return module_name
@@ -322,7 +300,7 @@ def _extract_code_globals(co):
     out_names = _extract_code_globals_cache.get(co)
     if out_names is None:
         # We use a dict with None values instead of a set to get a
-        # deterministic order (assuming Python 3.6+) and avoid introducing
+        # deterministic order and avoid introducing
         # non-deterministic pickle bytes as a results.
         out_names = {name: None for name in _walk_global_ops(co)}
 
@@ -399,7 +377,7 @@ def cell_set(cell, value):
     ``f = types.FunctionType(code, globals, name, argdefs, closure)``,
     closure will not be able to contain the yet-to-be-created f.
 
-    In Python3.7, cell_contents is writeable, so setting the contents of a cell
+    cell_contents is writeable, so setting the contents of a cell
     can be done simply using
     >>> cell.cell_contents = value
 
@@ -446,12 +424,7 @@ def cell_set(cell, value):
     test and checker libraries decide to parse the whole file.
     """
 
-    if sys.version_info[:2] >= (3, 7):  # pragma: no branch
-        cell.cell_contents = value
-    else:
-        _cell_set = types.FunctionType(
-            _cell_set_template_code, {}, '_cell_set', (), (cell,),)
-        _cell_set(value)
+    cell.cell_contents = value
 
 
 def _make_cell_set_template_code():
@@ -480,9 +453,6 @@ def _make_cell_set_template_code():
     )
     return _cell_set_template_code
 
-
-if sys.version_info[:2] < (3, 7):
-    _cell_set_template_code = _make_cell_set_template_code()
 
 # relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
@@ -538,51 +508,6 @@ def _extract_class_dict(cls):
     for name in to_remove:
         clsdict.pop(name)
     return clsdict
-
-
-if sys.version_info[:2] < (3, 7):  # pragma: no branch
-    def _is_parametrized_type_hint(obj):
-        # This is very cheap but might generate false positives. So try to
-        # narrow it down is good as possible.
-        type_module = getattr(type(obj), '__module__', None)
-        from_typing_extensions = type_module == 'typing_extensions'
-        from_typing = type_module == 'typing'
-
-        # general typing Constructs
-        is_typing = getattr(obj, '__origin__', None) is not None
-
-        # typing_extensions.Literal
-        is_literal = (
-            (getattr(obj, '__values__', None) is not None)
-            and from_typing_extensions
-        )
-
-        # typing_extensions.Final
-        is_final = (
-            (getattr(obj, '__type__', None) is not None)
-            and from_typing_extensions
-        )
-
-        # typing.ClassVar
-        is_classvar = (
-            (getattr(obj, '__type__', None) is not None) and from_typing
-        )
-
-        # typing.Union/Tuple for old Python 3.5
-        is_union = getattr(obj, '__union_params__', None) is not None
-        is_tuple = getattr(obj, '__tuple_params__', None) is not None
-        is_callable = (
-            getattr(obj, '__result__', None) is not None and
-            getattr(obj, '__args__', None) is not None
-        )
-        return any((is_typing, is_literal, is_final, is_classvar, is_union,
-                    is_tuple, is_callable))
-
-    def _create_parametrized_type_hint(origin, args):
-        return origin[args]
-else:
-    _is_parametrized_type_hint = None
-    _create_parametrized_type_hint = None
 
 
 def parametrized_type_hint_getinitargs(obj):

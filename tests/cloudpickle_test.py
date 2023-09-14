@@ -132,7 +132,7 @@ class CloudPickleTest(unittest.TestCase):
 
     @pytest.mark.skipif(
             platform.python_implementation() != "CPython" or
-            (sys.version_info >= (3, 8, 0) and sys.version_info < (3, 8, 2)),
+            sys.version_info < (3, 8, 2),
             reason="Underlying bug fixed upstream starting Python 3.8.2")
     def test_reducer_override_reference_cycle(self):
         # Early versions of Python 3.8 introduced a reference cycle between a
@@ -766,8 +766,6 @@ class CloudPickleTest(unittest.TestCase):
         # Check for similar behavior for a module that cannot be imported by
         # attribute lookup.
         from _cloudpickle_testpkg.mod import dynamic_submodule_two as m2
-        # Note: import _cloudpickle_testpkg.mod.dynamic_submodule_two as m2
-        # works only for Python 3.7+
         assert _should_pickle_by_reference(m2)
         assert pickle_depickle(m2, protocol=self.protocol) is m2
 
@@ -2744,10 +2742,6 @@ class CloudPickleTest(unittest.TestCase):
             if "_cloudpickle_testpkg" in list_registry_pickle_by_value():
                 unregister_pickle_by_value(_cloudpickle_testpkg)
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 7),
-        reason="Determinism can only be guaranteed for Python 3.7+"
-    )
     def test_deterministic_pickle_bytes_for_function(self):
         # Ensure that functions with references to several global names are
         # pickled to fixed bytes that do not depend on the PYTHONHASHSEED of

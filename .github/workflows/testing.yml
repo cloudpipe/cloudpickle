@@ -32,19 +32,15 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python_version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12", "pypy-3.9"]
+        python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy-3.9"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
-          - os: windows-latest
-            python_version: 3.7
           - os: windows-latest
             python_version: 3.8
             # as of  4/02/2020, psutil won't build under PyPy + Windows
           - os: windows-latest
             python_version: "pypy-3.9"
-          - os: macos-latest
-            python_version: 3.7
           - os: macos-latest
             python_version: 3.8
           - os: macos-latest

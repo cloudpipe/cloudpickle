@@ -130,7 +130,7 @@ Running the tests
 
   or alternatively for a specific environment:
 
-      tox -e py37
+      tox -e py312
 
 
 - With `pytest` to only run the tests for your current version of
