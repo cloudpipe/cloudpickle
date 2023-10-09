@@ -1,6 +1,9 @@
 2.3.0 (development)
 ===================
 
+- Officially support Python 3.12 and drop support for Python 3.6 and 3.7.
+  ([PR #515](https://github.com/cloudpipe/cloudpickle/pull/515))
+
 - Fix pickling of dataclasses and their instances.
   ([issue #386](https://github.com/cloudpipe/cloudpickle/issues/386),
    [PR #513](https://github.com/cloudpipe/cloudpickle/pull/513))
