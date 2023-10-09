@@ -2794,7 +2794,6 @@ class CloudPickleTest(unittest.TestCase):
             "z": dataclasses._FIELD_CLASSVAR,
         }
 
-
         for f in found_fields:
             assert f._field_type is expected_ftypes[f.name]
 
