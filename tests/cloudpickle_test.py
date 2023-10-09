@@ -2,6 +2,7 @@ import _collections_abc
 import abc
 import collections
 import base64
+import dataclasses
 import functools
 import io
 import itertools
@@ -2762,6 +2763,86 @@ class CloudPickleTest(unittest.TestCase):
             pytest.fail(
                 "Expected a single deterministic payload, got %d/5" % len(vals)
             )
+
+    def test_dataclass_fields_are_preserved(self):
+
+        @dataclasses.dataclass
+        class SampleDataclass:
+            x: int
+            y: dataclasses.InitVar[int]
+            z: typing.ClassVar[int]
+
+        PickledSampleDataclass = pickle_depickle(
+            SampleDataclass, protocol=self.protocol
+        )
+
+        found_fields = list(PickledSampleDataclass.__dataclass_fields__.values())
+        assert set(f.name for f in found_fields) == {
+            "x", "y", "z"
+        }
+
+        expected_ftypes = {
+            "x": dataclasses._FIELD,
+            "y": dataclasses._FIELD_INITVAR,
+            "z": dataclasses._FIELD_CLASSVAR,
+        }
+
+        for f in found_fields:
+            assert f._field_type is expected_ftypes[f.name]
+
+    def test_interactively_defined_dataclass_with_initvar_and_classvar(self):
+        code = """if __name__ == "__main__":
+        import dataclasses
+        from testutils import subprocess_worker
+        import typing
+
+        with subprocess_worker(protocol={protocol}) as w:
+
+            @dataclasses.dataclass
+            class SampleDataclass:
+                x: int
+                y: dataclasses.InitVar[int] = None
+                z: typing.ClassVar[int] = 42
+
+                def __post_init__(self, y=0):
+                    self.x += y
+
+                def large_enough(self):
+                    return self.x > self.z
+
+            value = SampleDataclass(2, y=2)
+
+            def check_dataclass_instance(value):
+                assert isinstance(value, SampleDataclass)
+                assert value.x == 4
+                assert value.z == 42
+                expected_dict = dict(x=4)
+                assert dataclasses.asdict(value) == expected_dict
+                assert not value.large_enough()
+                try:
+                    SampleDataclass.z = 0
+                    assert value.z == 0
+                    assert value.large_enough()
+                finally:
+                    SampleDataclass.z = 42
+                return "ok"
+
+            assert check_dataclass_instance(value) == "ok"
+
+            # Check that this instance of an interactively defined dataclass
+            # behavesconsistently in a remote worker process:
+            assert w.run(check_dataclass_instance, value) == "ok"
+
+            # Check class provenance tracking is not impacted by the
+            # @dataclass decorator:
+            def echo(*args):
+                return args
+
+            cloned_value, cloned_type = w.run(echo, value, SampleDataclass)
+            assert cloned_type is SampleDataclass
+            assert isinstance(cloned_value, SampleDataclass)
+        """.format(protocol=self.protocol)
+        assert_run_python_script(code)
 
 
 class Protocol2CloudPickleTest(CloudPickleTest):

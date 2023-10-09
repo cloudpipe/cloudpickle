@@ -13,6 +13,7 @@ are not present in cloudpickle_fast.py
 import _collections_abc
 import abc
 import copyreg
+import dataclasses
 import io
 import itertools
 import logging
@@ -482,6 +483,10 @@ def _odict_items_reduce(obj):
     return _make_dict_items, (dict(obj), True)
 
 
+def _dataclass_field_base_reduce(obj):
+    return _get_dataclass_field_type_sentinel, (obj.name,)
+
+
 # COLLECTIONS OF OBJECTS STATE SETTERS
 # ------------------------------------
 # state setters are called at unpickling time, once the object is created and
@@ -537,6 +542,24 @@ def _class_setstate(obj, state):
     return obj
 
 
+# COLLECTION OF DATACLASS UTILITIES
+# ---------------------------------
+# There are some internal sentinel values whose identity must be preserved when
+# unpickling dataclass fields. Each sentinel value has a unique name that we can
+# use to retrieve its identity at unpickling time.
+
+
+_DATACLASSE_FIELD_TYPE_SENTINELS = {
+    dataclasses._FIELD.name: dataclasses._FIELD,
+    dataclasses._FIELD_CLASSVAR.name: dataclasses._FIELD_CLASSVAR,
+    dataclasses._FIELD_INITVAR.name: dataclasses._FIELD_INITVAR,
+}
+
+
+def _get_dataclass_field_type_sentinel(name):
+    return _DATACLASSE_FIELD_TYPE_SENTINELS[name]
+
+
 class CloudPickler(Pickler):
     # set of reducers defined and used by cloudpickle (private)
     _dispatch_table = {}
@@ -565,6 +588,7 @@ class CloudPickler(Pickler):
     _dispatch_table[abc.abstractclassmethod] = _classmethod_reduce
     _dispatch_table[abc.abstractstaticmethod] = _classmethod_reduce
     _dispatch_table[abc.abstractproperty] = _property_reduce
+    _dispatch_table[dataclasses._FIELD_BASE] = _dataclass_field_base_reduce
 
     dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
 
