@@ -1,8 +1,9 @@
 2.3.0 (development)
 ===================
 
-TODO
-
+- Fix pickling of dataclasses and their instances.
+  ([issue #386](https://github.com/cloudpipe/cloudpickle/issues/386),
+   [PR #513](https://github.com/cloudpipe/cloudpickle/pull/513))
 
 2.2.1
 =====
