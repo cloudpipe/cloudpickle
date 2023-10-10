@@ -2354,28 +2354,21 @@ class CloudPickleTest(unittest.TestCase):
 
         with subprocess_worker(protocol=self.protocol) as worker:
 
-            def check_generic(generic, origin, type_value, use_args):
+            def check_generic(generic, origin, type_value):
                 assert generic.__origin__ is origin
 
                 assert len(origin.__orig_bases__) == 1
                 ob = origin.__orig_bases__[0]
                 assert ob.__origin__ is typing.Generic
 
-                if use_args:
-                    assert len(generic.__args__) == 1
-                    assert generic.__args__[0] is type_value
-                else:
-                    assert len(generic.__parameters__) == 1
-                    assert generic.__parameters__[0] is type_value
+                assert len(generic.__args__) == 1
+                assert generic.__args__[0] is type_value
                 assert len(ob.__parameters__) == 1
 
                 return "ok"
 
-            # backward-compat for old Python 3.5 versions that sometimes relies
-            # on __parameters__
-            use_args = getattr(C[int], '__args__', ()) != ()
-            assert check_generic(C[int], C, int, use_args) == "ok"
-            assert worker.run(check_generic, C[int], C, int, use_args) == "ok"
+            assert check_generic(C[int], C, int) == "ok"
+            assert worker.run(check_generic, C[int], C, int) == "ok"
 
     def test_generic_subclass(self):
         T = typing.TypeVar('T')
