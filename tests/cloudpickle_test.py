@@ -50,7 +50,7 @@ from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
 from cloudpickle import list_registry_pickle_by_value
 from cloudpickle.cloudpickle import _should_pickle_by_reference
-from cloudpickle.cloudpickle import _make_empty_cell, cell_set
+from cloudpickle.cloudpickle import _make_empty_cell
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
@@ -1133,11 +1133,8 @@ class CloudPickleTest(unittest.TestCase):
             cell.cell_contents
 
         ob = object()
-        cell_set(cell, ob)
-        self.assertTrue(
-            cell.cell_contents is ob,
-            msg='cell contents not set correctly',
-        )
+        cell.cell_contents = ob
+        assert cell.cell_contents is ob
 
     def check_logger(self, name):
         logger = logging.getLogger(name)

@@ -361,93 +361,6 @@ def _find_imported_submodules(code, top_level_dependencies):
     return subimports
 
 
-def cell_set(cell, value):
-    """Set the value of a closure cell.
-
-    The point of this function is to set the cell_contents attribute of a cell
-    after its creation. This operation is necessary in case the cell contains a
-    reference to the function the cell belongs to, as when calling the
-    function's constructor
-    ``f = types.FunctionType(code, globals, name, argdefs, closure)``,
-    closure will not be able to contain the yet-to-be-created f.
-
-    cell_contents is writeable, so setting the contents of a cell
-    can be done simply using
-    >>> cell.cell_contents = value
-
-    In earlier Python3 versions, the cell_contents attribute of a cell is read
-    only, but this limitation can be worked around by leveraging the Python 3
-    ``nonlocal`` keyword.
-
-    In Python2 however, this attribute is read only, and there is no
-    ``nonlocal`` keyword. For this reason, we need to come up with more
-    complicated hacks to set this attribute.
-
-    The chosen approach is to create a function with a STORE_DEREF opcode,
-    which sets the content of a closure variable. Typically:
-
-    >>> def inner(value):
-    ...     lambda: cell  # the lambda makes cell a closure
-    ...     cell = value  # cell is a closure, so this triggers a STORE_DEREF
-
-    (Note that in Python2, A STORE_DEREF can never be triggered from an inner
-    function. The function g for example here
-    >>> def f(var):
-    ...     def g():
-    ...         var += 1
-    ...     return g
-
-    will not modify the closure variable ``var```inplace, but instead try to
-    load a local variable var and increment it. As g does not assign the local
-    variable ``var`` any initial value, calling f(1)() will fail at runtime.)
-
-    Our objective is to set the value of a given cell ``cell``. So we need to
-    somewhat reference our ``cell`` object into the ``inner`` function so that
-    this object (and not the smoke cell of the lambda function) gets affected
-    by the STORE_DEREF operation.
-
-    In inner, ``cell`` is referenced as a cell variable (an enclosing variable
-    that is referenced by the inner function). If we create a new function
-    cell_set with the exact same code as ``inner``, but with ``cell`` marked as
-    a free variable instead, the STORE_DEREF will be applied on its closure -
-    ``cell``, which we can specify explicitly during construction! The new
-    cell_set variable thus actually sets the contents of a specified cell!
-
-    Note: we do not make use of the ``nonlocal`` keyword to set the contents of
-    a cell in early python3 versions to limit possible syntax errors in case
-    test and checker libraries decide to parse the whole file.
-    """
-
-    cell.cell_contents = value
-
-
-def _make_cell_set_template_code():
-    def _cell_set_factory(value):
-        lambda: cell
-        cell = value
-
-    co = _cell_set_factory.__code__
-
-    _cell_set_template_code = types.CodeType(
-        co.co_argcount,
-        co.co_kwonlyargcount,   # Python 3 only argument
-        co.co_nlocals,
-        co.co_stacksize,
-        co.co_flags,
-        co.co_code,
-        co.co_consts,
-        co.co_names,
-        co.co_varnames,
-        co.co_filename,
-        co.co_name,
-        co.co_firstlineno,
-        co.co_lnotab,
-        co.co_cellvars,  # co_freevars is initialized with co_cellvars
-        (),  # co_cellvars is made empty
-    )
-    return _cell_set_template_code
-
-
 # relevant opcodes
 STORE_GLOBAL = opcode.opmap['STORE_GLOBAL']
 DELETE_GLOBAL = opcode.opmap['DELETE_GLOBAL']
@@ -647,7 +560,7 @@ def _fill_function(*args):
     if cells is not None:
         for cell, value in zip(cells, state['closure_values']):
             if value is not _empty_cell_value:
-                cell_set(cell, value)
+                cell.cell_contents = value
 
     return func
 
@@ -670,7 +583,7 @@ def _make_empty_cell():
 def _make_cell(value=_empty_cell_value):
     cell = _make_empty_cell()
     if value is not _empty_cell_value:
-        cell_set(cell, value)
+        cell.cell_contents = value
     return cell
 
 

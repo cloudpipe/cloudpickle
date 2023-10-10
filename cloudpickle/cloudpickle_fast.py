@@ -33,8 +33,7 @@ from .cloudpickle import (
     _builtin_type, _get_or_create_tracker_id,  _make_skeleton_class,
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
-    PYPY, cell_set,
-    builtin_code_type,
+    PYPY, builtin_code_type,
     _make_dict_keys, _make_dict_values, _make_dict_items, _make_function,
 )
 
@@ -491,7 +490,7 @@ def _function_setstate(obj, state):
                 value = cell.cell_contents
             except ValueError:  # cell is empty
                 continue
-            cell_set(obj.__closure__[i], value)
+            obj.__closure__[i].cell_contents = value
 
     for k, v in slotstate.items():
         setattr(obj, k, v)
