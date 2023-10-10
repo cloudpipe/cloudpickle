@@ -2,7 +2,7 @@ name: Automated Tests
 
 on:
   push:
-    # branches: master
+    branches: master
   pull_request:
     branches: master
 
@@ -92,7 +92,7 @@ jobs:
 
   distributed-downstream-build:
     runs-on: ubuntu-latest
-    # if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
+    if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
       TEST_REQUIREMENTS: cryptography pytest pytest-asyncio<0.14.0 pytest-timeout pytest-rerunfailures pytest-cov numpy pandas mock bokeh fsspec>=0.3.3 aiohttp pyarrow git+https://github.com/dask/dask
