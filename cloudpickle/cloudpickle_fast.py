@@ -22,11 +22,12 @@ import struct
 import types
 import weakref
 import typing
+import pickle
+from pickle import Pickler
 
 from enum import Enum
 from collections import ChainMap, OrderedDict
 
-from .compat import pickle, Pickler
 from .cloudpickle import (
     _extract_code_globals, _BUILTIN_TYPE_NAMES, DEFAULT_PROTOCOL,
     _find_imported_submodules, _get_cell_contents, _should_pickle_by_reference,

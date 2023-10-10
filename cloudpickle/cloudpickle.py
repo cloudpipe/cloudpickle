@@ -49,10 +49,10 @@ import sys
 import types
 import weakref
 import uuid
+import pickle
 import threading
 import typing
 
-from .compat import pickle
 from collections import OrderedDict
 # The following import is required to be imported in the cloudpickle
 # namespace to be able to load pickle files generated with older versions of

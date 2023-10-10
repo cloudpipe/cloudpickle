@@ -26,6 +26,7 @@ import os
 import enum
 import typing
 from functools import wraps
+import pickle
 
 import pytest
 
@@ -45,7 +46,6 @@ except ImportError:
     tornado = None
 
 import cloudpickle
-from cloudpickle.compat import pickle
 from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
 from cloudpickle import list_registry_pickle_by_value
@@ -575,7 +575,7 @@ class CloudPickleTest(unittest.TestCase):
         pickled_func_path = os.path.join(self.tmpdir, 'local_func_g.pkl')
 
         child_process_script = '''
-        from cloudpickle.compat import pickle
+        import pickle
         import gc
         with open("{pickled_func_path}", 'rb') as f:
             func = pickle.load(f)
@@ -666,7 +666,7 @@ class CloudPickleTest(unittest.TestCase):
         child_process_module_file = os.path.join(
             self.tmpdir, 'dynamic_module_from_child_process.pkl')
         child_process_script = '''
-            from cloudpickle.compat import pickle
+            import pickle
             import textwrap
 
             import cloudpickle
@@ -686,7 +686,7 @@ class CloudPickleTest(unittest.TestCase):
 
         # The script ran by the process created by the child process
         child_of_child_process_script = """ '''
-                from cloudpickle.compat import pickle
+                import pickle
                 with open('{child_process_module_file}','rb') as fid:
                     mod = pickle.load(fid)
                 ''' """
@@ -741,7 +741,7 @@ class CloudPickleTest(unittest.TestCase):
         assert b'math' not in b
 
     def test_module_importability(self):
-        from cloudpickle.compat import pickle
+        import pickle
         import os.path
         import collections
         import collections.abc
@@ -1101,7 +1101,7 @@ class CloudPickleTest(unittest.TestCase):
         # choose "subprocess" rather than "multiprocessing" because the latter
         # library uses fork to preserve the parent environment.
         command = ("import base64; "
-                   "from cloudpickle.compat import pickle; "
+                   "import pickle; "
                    "pickle.loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
@@ -1125,8 +1125,8 @@ class CloudPickleTest(unittest.TestCase):
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
         command = ("import base64; "
-                   "from cloudpickle.compat import pickle; "
-                   "pickle.loads(base64.b32decode('" +
+                   "from pickle import loads; "
+                   "loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
         assert not subprocess.call([sys.executable, '-c', command])

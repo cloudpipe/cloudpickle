@@ -3,11 +3,11 @@ import shutil
 import sys
 import tempfile
 import unittest
+import pickle
 
 import pytest
 
 import cloudpickle
-from cloudpickle.compat import pickle
 
 
 class CloudPickleFileTests(unittest.TestCase):
