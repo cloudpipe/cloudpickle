@@ -128,10 +128,10 @@ def _function_getstate(func):
     f_globals = {k: func.__globals__[k] for k in f_globals_ref if k in
                  func.__globals__}
 
-    closure_values = (
-        list(map(_get_cell_contents, func.__closure__))
-        if func.__closure__ is not None else ()
-    )
+    if func.__closure__ is not None:
+        closure_values = list(map(_get_cell_contents, func.__closure__))
+    else:
+        closure_values = ()
 
     # Extract currently-imported submodules used by func. Storing these modules
     # in a smoke _cloudpickle_subimports attribute of the object's state will

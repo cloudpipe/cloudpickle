@@ -462,7 +462,7 @@ def _get_cell_contents(cell):
     try:
         return cell.cell_contents
     except ValueError:
-        # sentinel used by ``_fill_function`` which will leave the cell empty
+        # Handle empty cells explicitly with a sentinel value.
         return _empty_cell_value
 
 
@@ -489,71 +489,6 @@ class _empty_cell_value:
     @classmethod
     def __reduce__(cls):
         return cls.__name__
-
-
-def _fill_function(*args):
-    """Fills in the rest of function data into the skeleton function object
-
-    The skeleton itself is create by _make_skel_func().
-    """
-    if len(args) == 2:
-        func = args[0]
-        state = args[1]
-    elif len(args) == 5:
-        # Backwards compat for cloudpickle v0.4.0, after which the `module`
-        # argument was introduced
-        func = args[0]
-        keys = ['globals', 'defaults', 'dict', 'closure_values']
-        state = dict(zip(keys, args[1:]))
-    elif len(args) == 6:
-        # Backwards compat for cloudpickle v0.4.1, after which the function
-        # state was passed as a dict to the _fill_function it-self.
-        func = args[0]
-        keys = ['globals', 'defaults', 'dict', 'module', 'closure_values']
-        state = dict(zip(keys, args[1:]))
-    else:
-        raise ValueError(f'Unexpected _fill_value arguments: {args!r}')
-
-    # - At pickling time, any dynamic global variable used by func is
-    #   serialized by value (in state['globals']).
-    # - At unpickling time, func's __globals__ attribute is initialized by
-    #   first retrieving an empty isolated namespace that will be shared
-    #   with other functions pickled from the same original module
-    #   by the same CloudPickler instance and then updated with the
-    #   content of state['globals'] to populate the shared isolated
-    #   namespace with all the global variables that are specifically
-    #   referenced for this function.
-    func.__globals__.update(state['globals'])
-
-    func.__defaults__ = state['defaults']
-    func.__dict__ = state['dict']
-    if 'annotations' in state:
-        func.__annotations__ = state['annotations']
-    if 'doc' in state:
-        func.__doc__ = state['doc']
-    if 'name' in state:
-        func.__name__ = state['name']
-    if 'module' in state:
-        func.__module__ = state['module']
-    if 'qualname' in state:
-        func.__qualname__ = state['qualname']
-    if 'kwdefaults' in state:
-        func.__kwdefaults__ = state['kwdefaults']
-    # _cloudpickle_subimports is a set of submodules that must be loaded for
-    # the pickled function to work correctly at unpickling time. Now that these
-    # submodules are depickled (hence imported), they can be removed from the
-    # object's state (the object state only served as a reference holder to
-    # these submodules)
-    if '_cloudpickle_submodules' in state:
-        state.pop('_cloudpickle_submodules')
-
-    cells = func.__closure__
-    if cells is not None:
-        for cell, value in zip(cells, state['closure_values']):
-            if value is not _empty_cell_value:
-                cell.cell_contents = value
-
-    return func
 
 
 def _make_function(code, globals, name, argdefs, closure):
