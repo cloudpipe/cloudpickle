@@ -68,7 +68,6 @@ except ImportError:
     _typing_extensions = Literal = Final = None
 
 
-
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
@@ -509,36 +508,6 @@ def _extract_class_dict(cls):
     for name in to_remove:
         clsdict.pop(name)
     return clsdict
-
-
-def parametrized_type_hint_getinitargs(obj):
-    # The distorted type check sematic for typing construct becomes:
-    # ``type(obj) is type(TypeHint)``, which means "obj is a
-    # parametrized TypeHint"
-    if type(obj) is type(Literal):  # pragma: no branch
-        initargs = (Literal, obj.__values__)
-    elif type(obj) is type(Final):  # pragma: no branch
-        initargs = (Final, obj.__type__)
-    elif type(obj) is type(ClassVar):
-        initargs = (ClassVar, obj.__type__)
-    elif type(obj) is type(Generic):
-        initargs = (obj.__origin__, obj.__args__)
-    elif type(obj) is type(Union):
-        initargs = (Union, obj.__args__)
-    elif type(obj) is type(Tuple):
-        initargs = (Tuple, obj.__args__)
-    elif type(obj) is type(Callable):
-        (*args, result) = obj.__args__
-        if len(args) == 1 and args[0] is Ellipsis:
-            args = Ellipsis
-        else:
-            args = list(args)
-        initargs = (Callable, (args, result))
-    else:  # pragma: no cover
-        raise pickle.PicklingError(
-            f"Cloudpickle Error: Unknown type {type(obj)}"
-        )
-    return initargs
 
 
 # Tornado support

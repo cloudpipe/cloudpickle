@@ -34,74 +34,44 @@ from .cloudpickle import (
     _make_skeleton_enum, _extract_class_dict, dynamic_subimport, subimport,
     _typevar_reduce, _get_bases, _make_cell, _make_empty_cell, CellType,
     PYPY, cell_set,
-    parametrized_type_hint_getinitargs,
     builtin_code_type,
     _make_dict_keys, _make_dict_values, _make_dict_items, _make_function,
 )
 
 
-if pickle.HIGHEST_PROTOCOL >= 5:
-    # Shorthands similar to pickle.dump/pickle.dumps
+# Shorthands similar to pickle.dump/pickle.dumps
 
-    def dump(obj, file, protocol=None, buffer_callback=None):
-        """Serialize obj as bytes streamed into file
+def dump(obj, file, protocol=None, buffer_callback=None):
+    """Serialize obj as bytes streamed into file
 
-        protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
-        pickle.HIGHEST_PROTOCOL. This setting favors maximum communication
-        speed between processes running the same Python version.
+    protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
+    pickle.HIGHEST_PROTOCOL. This setting favors maximum communication
+    speed between processes running the same Python version.
 
-        Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
-        compatibility with older versions of Python.
-        """
-        CloudPickler(
+    Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
+    compatibility with older versions of Python.
+    """
+    CloudPickler(
+        file, protocol=protocol, buffer_callback=buffer_callback
+    ).dump(obj)
+
+
+def dumps(obj, protocol=None, buffer_callback=None):
+    """Serialize obj as a string of bytes allocated in memory
+
+    protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
+    pickle.HIGHEST_PROTOCOL. This setting favors maximum communication
+    speed between processes running the same Python version.
+
+    Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
+    compatibility with older versions of Python.
+    """
+    with io.BytesIO() as file:
+        cp = CloudPickler(
             file, protocol=protocol, buffer_callback=buffer_callback
-        ).dump(obj)
-
-    def dumps(obj, protocol=None, buffer_callback=None):
-        """Serialize obj as a string of bytes allocated in memory
-
-        protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
-        pickle.HIGHEST_PROTOCOL. This setting favors maximum communication
-        speed between processes running the same Python version.
-
-        Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
-        compatibility with older versions of Python.
-        """
-        with io.BytesIO() as file:
-            cp = CloudPickler(
-                file, protocol=protocol, buffer_callback=buffer_callback
-            )
-            cp.dump(obj)
-            return file.getvalue()
-
-else:
-    # Shorthands similar to pickle.dump/pickle.dumps
-    def dump(obj, file, protocol=None):
-        """Serialize obj as bytes streamed into file
-
-        protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
-        pickle.HIGHEST_PROTOCOL. This setting favors maximum communication
-        speed between processes running the same Python version.
-
-        Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
-        compatibility with older versions of Python.
-        """
-        CloudPickler(file, protocol=protocol).dump(obj)
-
-    def dumps(obj, protocol=None):
-        """Serialize obj as a string of bytes allocated in memory
-
-        protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
-        pickle.HIGHEST_PROTOCOL. This setting favors maximum communication
-        speed between processes running the same Python version.
-
-        Set protocol=pickle.DEFAULT_PROTOCOL instead if you need to ensure
-        compatibility with older versions of Python.
-        """
-        with io.BytesIO() as file:
-            cp = CloudPickler(file, protocol=protocol)
-            cp.dump(obj)
-            return file.getvalue()
+        )
+        cp.dump(obj)
+        return file.getvalue()
 
 
 load, loads = pickle.load, pickle.loads
@@ -664,30 +634,19 @@ class CloudPickler(Pickler):
             else:
                 raise
 
-    if pickle.HIGHEST_PROTOCOL >= 5:
-        def __init__(self, file, protocol=None, buffer_callback=None):
-            if protocol is None:
-                protocol = DEFAULT_PROTOCOL
-            Pickler.__init__(
-                self, file, protocol=protocol, buffer_callback=buffer_callback
-            )
-            # map functions __globals__ attribute ids, to ensure that functions
-            # sharing the same global namespace at pickling time also share
-            # their global namespace at unpickling time.
-            self.globals_ref = {}
-            self.proto = int(protocol)
-    else:
-        def __init__(self, file, protocol=None):
-            if protocol is None:
-                protocol = DEFAULT_PROTOCOL
-            Pickler.__init__(self, file, protocol=protocol)
-            # map functions __globals__ attribute ids, to ensure that functions
-            # sharing the same global namespace at pickling time also share
-            # their global namespace at unpickling time.
-            self.globals_ref = {}
-            assert hasattr(self, 'proto')
+    def __init__(self, file, protocol=None, buffer_callback=None):
+        if protocol is None:
+            protocol = DEFAULT_PROTOCOL
+        Pickler.__init__(
+            self, file, protocol=protocol, buffer_callback=buffer_callback
+        )
+        # map functions __globals__ attribute ids, to ensure that functions
+        # sharing the same global namespace at pickling time also share
+        # their global namespace at unpickling time.
+        self.globals_ref = {}
+        self.proto = int(protocol)
 
-    if pickle.HIGHEST_PROTOCOL >= 5 and not PYPY:
+    if not PYPY:
         # Pickler is the C implementation of the CPython pickler and therefore
         # we rely on reduce_override method to customize the pickler behavior.
 
