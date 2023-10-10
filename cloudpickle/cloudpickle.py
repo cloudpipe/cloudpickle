@@ -55,17 +55,11 @@ import warnings
 
 from .compat import pickle
 from collections import OrderedDict
-from types import CellType
-from typing import ClassVar, Generic, Union, Tuple, Callable
+# The following import is required to be imported in the cloudpickle
+# namespace to be able to load pickle files generated with older versions of
+# cloudpickle. See: tests/test_backward_compat.py
+from types import CellType  # noqa: F401
 from pickle import _getattribute
-from importlib._bootstrap import _find_spec
-
-try:  # pragma: no branch
-    import typing_extensions as _typing_extensions
-    from typing_extensions import Literal
-    from typing import Final
-except ImportError:
-    _typing_extensions = Literal = Final = None
 
 
 # cloudpickle is meant for inter process communication: we expect all

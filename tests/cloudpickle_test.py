@@ -2456,18 +2456,6 @@ class CloudPickleTest(unittest.TestCase):
                     worker.run(check_annotations, obj, type_, "type_") == "ok"
                 )
 
-    def test_generic_extensions_literal(self):
-        typing_extensions = pytest.importorskip('typing_extensions')
-        for obj in [typing_extensions.Literal, typing_extensions.Literal['a']]:
-            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            assert depickled_obj == obj
-
-    def test_generic_extensions_final(self):
-        typing_extensions = pytest.importorskip('typing_extensions')
-        for obj in [typing_extensions.Final, typing_extensions.Final[int]]:
-            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            assert depickled_obj == obj
-
     def test_class_annotations(self):
         class C:
             pass

@@ -10,7 +10,6 @@ few canonical use cases. Cloudpicke backward-compatitibility support remains a
 best-effort initiative.
 """
 import pickle
-import sys
 
 import pytest
 
