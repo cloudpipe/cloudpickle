@@ -207,17 +207,6 @@ class CloudPickleTest(unittest.TestCase):
         self.assertTrue("exit" in foo.__code__.co_names)
         cloudpickle.dumps(foo)
 
-    def test_buffer(self):
-        try:
-            buffer_obj = buffer("Hello")
-            buffer_clone = pickle_depickle(buffer_obj, protocol=self.protocol)
-            self.assertEqual(buffer_clone, str(buffer_obj))
-            buffer_obj = buffer("Hello", 2, 3)
-            buffer_clone = pickle_depickle(buffer_obj, protocol=self.protocol)
-            self.assertEqual(buffer_clone, str(buffer_obj))
-        except NameError:  # Python 3 does no longer support buffers
-            pass
-
     def test_memoryview(self):
         buffer_obj = memoryview(b"Hello")
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
@@ -245,19 +234,19 @@ class CloudPickleTest(unittest.TestCase):
         keys = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
         results = pickle_depickle(keys)
         self.assertEqual(results, keys)
-        assert type(keys) == type(results)
+        assert type(keys) is type(results)
 
     def test_odict_values(self):
         values = collections.OrderedDict([("a", 1), ("b", 2)]).values()
         results = pickle_depickle(values)
         self.assertEqual(list(results), list(values))
-        assert type(values) == type(results)
+        assert type(values) is type(results)
 
     def test_odict_items(self):
         items = collections.OrderedDict([("a", 1), ("b", 2)]).items()
         results = pickle_depickle(items)
         self.assertEqual(results, items)
-        assert type(items) == type(results)
+        assert type(items) is type(results)
 
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
@@ -298,8 +287,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_closure_none_is_preserved(self):
         def f():
-            """a function with no closure cells
-            """
+            """A function with no closure cells"""
 
         self.assertTrue(
             f.__closure__ is None,
@@ -490,6 +478,7 @@ class CloudPickleTest(unittest.TestCase):
             @staticmethod
             def test_sm():
                 return "sm"
+
             @classmethod
             def test_cm(cls):
                 return "cm"
@@ -944,7 +933,7 @@ class CloudPickleTest(unittest.TestCase):
             # __func__ attribute instead. We do not test the the identity of
             # the functions as __func__ attributes of classmethods are not
             # pickleable and must be reconstructed at depickling time.
-            assert type(depickled_clsdict_meth) == type(clsdict_clsmethod)
+            assert type(depickled_clsdict_meth) is type(clsdict_clsmethod)
             assert depickled_clsdict_meth.__func__(
                 float, arg) == clsdict_clsmethod.__func__(float, arg)
 
@@ -1556,8 +1545,6 @@ class CloudPickleTest(unittest.TestCase):
             def read_write_value(self, value):
                 self._read_write_value = value
 
-
-
         my_object = MyObject()
 
         assert my_object.read_only_value == 1
@@ -1580,7 +1567,6 @@ class CloudPickleTest(unittest.TestCase):
         depickled_obj.read_write_value = 3
         assert depickled_obj.read_write_value == 3
         type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
-
 
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
