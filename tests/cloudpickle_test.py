@@ -1515,9 +1515,12 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(1, result)
 
     def test_function_module_name(self):
-        func = lambda x: x
-        cloned = pickle_depickle(func, protocol=self.protocol)
-        self.assertEqual(cloned.__module__, func.__module__)
+        def local_func(x):
+            return x
+
+        for func in [local_func, lambda x: x]:
+            cloned = pickle_depickle(func, protocol=self.protocol)
+            self.assertEqual(cloned.__module__, func.__module__)
 
     def test_function_qualname(self):
         def func(x):

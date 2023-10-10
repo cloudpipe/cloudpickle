@@ -692,7 +692,6 @@ class CloudPickler(Pickler):
             reducer that will be called for any class, independently of its
             type.
 
-
             Notes:
 
             * reducer_override has the priority over dispatch_table-registered
