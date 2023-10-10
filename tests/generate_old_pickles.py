@@ -89,3 +89,7 @@ if __name__ == "__main__":
     # Locally defined closure
     nested_function = nested_function_factory()
     dump_obj(nested_function, "nested_function.pkl")
+
+    # Store the cloudpickle version used to generate the pickles
+    version_file = PICKLE_DIRECTORY / "cloudpickle_version.txt"
+    version_file.write_text(cloudpickle.__version__)
