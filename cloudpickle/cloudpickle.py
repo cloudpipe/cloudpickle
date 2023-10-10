@@ -416,27 +416,6 @@ def _extract_class_dict(cls):
     return clsdict
 
 
-# Tornado support
-
-def is_tornado_coroutine(func):
-    """
-    Return whether *func* is a Tornado coroutine function.
-    Running coroutines are not supported.
-    """
-    if 'tornado.gen' not in sys.modules:
-        return False
-    gen = sys.modules['tornado.gen']
-    if not hasattr(gen, "is_coroutine_function"):
-        # Tornado version is too old
-        return False
-    return gen.is_coroutine_function(func)
-
-
-def _rebuild_tornado_coroutine(func):
-    from tornado import gen
-    return gen.coroutine(func)
-
-
 # including pickles unloading functions in this namespace
 load = pickle.load
 loads = pickle.loads
@@ -532,24 +511,6 @@ def _make_skeleton_class(type_constructor, name, bases, type_kwargs,
     return _lookup_class_or_track(class_tracker_id, skeleton_class)
 
 
-def _rehydrate_skeleton_class(skeleton_class, class_dict):
-    """Put attributes from `class_dict` back on `skeleton_class`.
-
-    See CloudPickler.save_dynamic_class for more info.
-    """
-    registry = None
-    for attrname, attr in class_dict.items():
-        if attrname == "_abc_impl":
-            registry = attr
-        else:
-            setattr(skeleton_class, attrname, attr)
-    if registry is not None:
-        for subclass in registry:
-            skeleton_class.register(subclass)
-
-    return skeleton_class
-
-
 def _make_skeleton_enum(bases, name, qualname, members, module,
                         class_tracker_id, extra):
     """Build dynamic enum with an empty __dict__ to be filled once memoized
@@ -586,11 +547,7 @@ def _make_typevar(name, bound, constraints, covariant, contravariant,
         name, *constraints, bound=bound,
         covariant=covariant, contravariant=contravariant
     )
-    if class_tracker_id is not None:
-        return _lookup_class_or_track(class_tracker_id, tv)
-    else:  # pragma: nocover
-        # Only for Python 3.5.3 compat.
-        return tv
+    return _lookup_class_or_track(class_tracker_id, tv)
 
 
 def _decompose_typevar(obj):
