@@ -51,7 +51,6 @@ import weakref
 import uuid
 import threading
 import typing
-import warnings
 
 from .compat import pickle
 from collections import OrderedDict

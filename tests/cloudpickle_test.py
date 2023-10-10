@@ -275,8 +275,8 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_nested_lambdas(self):
         a, b = 1, 2
-        f1 = lambda x: x + a
-        f2 = lambda x: f1(x) // b
+        f1 = lambda x: x + a  # noqa: E731
+        f2 = lambda x: f1(x) // b  # noqa: E731
         self.assertEqual(pickle_depickle(f2, protocol=self.protocol)(1), 1)
 
     def test_recursive_closure(self):
@@ -397,10 +397,12 @@ class CloudPickleTest(unittest.TestCase):
             return (x + y) / LOCAL_CONSTANT
 
         # pickle the function definition
-        self.assertEqual(pickle_depickle(some_function, protocol=self.protocol)(41, 1), 1)
-        self.assertEqual(pickle_depickle(some_function, protocol=self.protocol)(81, 3), 2)
+        result = pickle_depickle(some_function, protocol=self.protocol)(41, 1)
+        assert result == 1
+        result = pickle_depickle(some_function, protocol=self.protocol)(81, 3)
+        assert result == 2
 
-        hidden_constant = lambda: LOCAL_CONSTANT
+        hidden_constant = lambda: LOCAL_CONSTANT  # noqa: E731
 
         class SomeClass:
             """Overly complicated class with nested references to symbols"""
@@ -480,7 +482,7 @@ class CloudPickleTest(unittest.TestCase):
 
         gen2 = pickle_depickle(some_generator, protocol=self.protocol)
 
-        assert type(gen2(3)) == type(some_generator(3))
+        assert isinstance(gen2(3), type(some_generator(3)))
         assert list(gen2(3)) == list(range(3))
 
     def test_classmethod(self):
@@ -1006,16 +1008,16 @@ class CloudPickleTest(unittest.TestCase):
 
         @gen.coroutine
         def g(y):
-            res = yield f(0.01, y)
+            res = yield f(0.01, y)  # noqa: F821
             raise gen.Return(res + 1)
 
         data = cloudpickle.dumps([g, g], protocol=self.protocol)
-        f = g = None
+        del f, g
         g2, g3 = pickle.loads(data)
-        self.assertTrue(g2 is g3)
+        assert g2 is g3
         loop = ioloop.IOLoop.current()
         res = loop.run_sync(functools.partial(g2, 5))
-        self.assertEqual(res, 7)
+        assert res == 7
 
     @pytest.mark.skipif(
         (3, 11, 0, 'beta') <= sys.version_info < (3, 11, 0, 'beta', 4),
@@ -1052,12 +1054,14 @@ class CloudPickleTest(unittest.TestCase):
 
         # Choose any module NOT imported by __init__ of its parent package
         # examples in standard library include:
-        # - http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
-
-        global xml # imitate performing this import at top of file
+        # http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
+        import xml
         import xml.etree.ElementTree
+
         def example():
-            x = xml.etree.ElementTree.Comment # potential AttributeError
+            _ = xml.etree.ElementTree.Comment  # noqa: F821
+
+        example()  # smoke test
 
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
@@ -1069,16 +1073,19 @@ class CloudPickleTest(unittest.TestCase):
 
         # deserialise
         f = pickle.loads(s)
-        f() # perform test for error
+        f()  # smoke test
 
     def test_submodule_closure(self):
-        # Same as test_submodule except the package is not a global
+        # Same as test_submodule except the xml package has not been imported
         def scope():
             import xml.etree.ElementTree
+
             def example():
-                x = xml.etree.ElementTree.Comment # potential AttributeError
+                _ = xml.etree.ElementTree.Comment  # potential AttributeError
             return example
+
         example = scope()
+        example()  # smoke test
 
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
@@ -1088,13 +1095,13 @@ class CloudPickleTest(unittest.TestCase):
                 del sys.modules[item]
 
         f = cloudpickle.loads(s)
-        f() # test
+        f()  # smoke test
 
     def test_multiprocess(self):
         # running a function pickled by another process (a la dask.distributed)
         def scope():
             def example():
-                x = xml.etree.ElementTree.Comment
+                _ = xml.etree.ElementTree.Comment
             return example
         global xml
         import xml.etree.ElementTree
@@ -1115,11 +1122,13 @@ class CloudPickleTest(unittest.TestCase):
         # like test_multiprocess except subpackage modules referenced directly
         # (unlike test_submodule)
         global etree
+
         def scope():
             import xml.etree as foobar
+
             def example():
-                x = etree.Comment
-                x = foobar.ElementTree
+                _ = etree.Comment
+                _ = foobar.ElementTree
             return example
         example = scope()
         import xml.etree.ElementTree as etree
@@ -1135,7 +1144,10 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_multiprocessing_lock_raises(self):
         lock = multiprocessing.Lock()
-        with pytest.raises(RuntimeError, match="only be shared between processes through inheritance"):
+        with pytest.raises(
+            RuntimeError,
+            match="only be shared between processes through inheritance"
+        ):
             cloudpickle.dumps(lock)
 
     def test_cell_manipulation(self):
