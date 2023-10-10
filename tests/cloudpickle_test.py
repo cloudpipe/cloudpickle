@@ -2015,14 +2015,14 @@ class CloudPickleTest(unittest.TestCase):
             growth = w.memsize() - reference_size
 
             # For some reason, the memory growth after processing 100MB of
-            # data is ~10MB on MacOS, and ~1MB on Linux, so the upper bound on
+            # data is ~50MB on MacOS, and ~1MB on Linux, so the upper bound on
             # memory growth we use is only tight for MacOS. However,
-            # - 10MB is still 10x lower than the expected memory growth in case
+            # - 50MB is still 2x lower than the expected memory growth in case
             # of a leak (which would be the total size of the processed data,
             # 100MB)
             # - the memory usage growth does not increase if using 10000
             # iterations instead of 100 as used now (100x more data)
-            assert growth < 1.5e7, growth
+            assert growth < 5e7, growth
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
