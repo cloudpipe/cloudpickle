@@ -527,7 +527,7 @@ class CloudPickleTest(unittest.TestCase):
         pickle_clone = pickle_depickle(pickle, protocol=self.protocol)
         self.assertEqual(pickle, pickle_clone)
 
-    def test_dynamic_module(self):
+    def _check_dynamic_module(self, mod):
         mod = types.ModuleType('mod')
         code = '''
         x = 1
@@ -563,6 +563,18 @@ class CloudPickleTest(unittest.TestCase):
             self.assertEqual(mod.f(5), depickled_f(5))
         finally:
             sys.modules.pop('mod', None)
+
+    def test_dynamic_module(self):
+        mod = types.ModuleType('mod')
+        assert mod.__package__ is None
+        self._check_dynamic_module(mod)
+
+    def test_dynamic_module_no_package(self):
+        # non-regression test for #116
+        mod = types.ModuleType('mod')
+        del mod.__package__
+        assert not hasattr(mod, '__package__')
+        self._check_dynamic_module(mod)
 
     def test_module_locals_behavior(self):
         # Makes sure that a local function defined in another module is
@@ -1490,29 +1502,6 @@ class CloudPickleTest(unittest.TestCase):
                     self.assertEqual(cloned(), "it works!")
                 finally:
                     sys.modules.pop("_faulty_module", None)
-
-    def test_dynamic_pytest_module(self):
-        # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
-
-        # This test does not longer make sense with pytest >= 7.2
-        py = pytest.importorskip("py")
-        if not hasattr(py, "builtin"):
-            pytest.skip("py.builtin is not available")
-
-        def f():
-            s = py.builtin.set([1])
-            return s.pop()
-
-        # some setup is required to allow pytest apimodules to be correctly
-        # serializable.
-        from cloudpickle import CloudPickler
-        from cloudpickle import cloudpickle_fast as cp_fast
-        CloudPickler.dispatch_table[type(py.builtin)] = cp_fast._module_reduce
-
-        g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
-
-        result = g()
-        self.assertEqual(1, result)
 
     def test_function_module_name(self):
         def local_func(x):
