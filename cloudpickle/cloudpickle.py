@@ -5,7 +5,7 @@ clusters (such as PySpark, Dask, Ray...) with interactively defined code
 (functions, classes, ...) written in notebooks or console.
 
 In particular this pickler adds the following features:
-- serialized interactively-defined or locally-defined functions, classes,
+- serialize interactively-defined or locally-defined functions, classes,
   enums, typevars, lambdas and nested functions to compiled byte code;
 - deal with some other non-serializable objects in an ad-hoc manner where
   applicable.
