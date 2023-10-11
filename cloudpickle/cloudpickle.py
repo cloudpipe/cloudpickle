@@ -305,9 +305,7 @@ def _lookup_module_and_qualname(obj, name=None):
 
 
 def _extract_code_globals(co):
-    """
-    Find all globals names read or written to by codeblock co
-    """
+    """Find all globals names read or written to by codeblock co."""
     out_names = _extract_code_globals_cache.get(co)
     if out_names is None:
         # We use a dict with None values instead of a set to get a
@@ -332,8 +330,7 @@ def _extract_code_globals(co):
 
 
 def _find_imported_submodules(code, top_level_dependencies):
-    """
-    Find currently imported submodules used by a function.
+    """Find currently imported submodules used by a function.
 
     Submodules used by a function need to be detected and referenced for the
     function to work correctly at depickling time. Because submodules can be
@@ -403,9 +400,7 @@ def _builtin_type(name):
 
 
 def _walk_global_ops(code):
-    """
-    Yield referenced name for all global-referencing instructions in *code*.
-    """
+    """Yield referenced name for global-referencing instructions in code."""
     for instr in dis.get_instructions(code):
         op = instr.opcode
         if op in GLOBAL_OPS:
@@ -413,7 +408,7 @@ def _walk_global_ops(code):
 
 
 def _extract_class_dict(cls):
-    """Retrieve a copy of the dict of a class without the inherited methods"""
+    """Retrieve a copy of the dict of a class without the inherited method."""
     clsdict = dict(cls.__dict__)  # copy dict proxy to a dict
     if len(cls.__bases__) == 1:
         inherited_dict = cls.__bases__[0].__dict__
@@ -476,7 +471,7 @@ def instance(cls):
 
 @instance
 class _empty_cell_value:
-    """Sentinel for empty closures"""
+    """Sentinel for empty closures."""
     @classmethod
     def __reduce__(cls):
         return cls.__name__
@@ -756,7 +751,7 @@ def _enum_getstate(obj):
 # these holes".
 
 def _code_reduce(obj):
-    """codeobject reducer"""
+    """code object reducer."""
     # If you are not sure about the order of arguments, take a look at help
     # of the specific type from types, for example:
     # >>> from types import CodeType
@@ -809,7 +804,7 @@ def _code_reduce(obj):
 
 
 def _cell_reduce(obj):
-    """Cell (containing values of a function's free variables) reducer"""
+    """Cell (containing values of a function's free variables) reducer."""
     try:
         obj.cell_contents
     except ValueError:  # cell is empty
@@ -824,7 +819,7 @@ def _classmethod_reduce(obj):
 
 
 def _file_reduce(obj):
-    """Save a file"""
+    """Save a file."""
     import io
 
     if not hasattr(obj, "name") or not hasattr(obj, "mode"):
@@ -916,12 +911,11 @@ def _weakset_reduce(obj):
 
 
 def _dynamic_class_reduce(obj):
-    """
-    Save a class that can't be stored as module global.
+    """Save a class that can't be referenced as a module attribute.
 
     This method is used to serialize classes that are defined inside
     functions, or that otherwise can't be serialized as attribute lookups
-    from global modules.
+    from importable modules.
     """
     if Enum is not None and issubclass(obj, Enum):
         return (
@@ -936,7 +930,7 @@ def _dynamic_class_reduce(obj):
 
 
 def _class_reduce(obj):
-    """Select the reducer depending on the dynamic nature of the class obj"""
+    """Select the reducer depending on the dynamic nature of the class obj."""
     if obj is type(None):  # noqa
         return type, (None,)
     elif obj is type(Ellipsis):
