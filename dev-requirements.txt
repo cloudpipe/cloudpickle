@@ -1,5 +1,5 @@
 # Dependencies for running the tests with pytest
-flake8
+ruff
 pytest
 pytest-cov
 psutil
