@@ -39,12 +39,6 @@ except (ImportError, RuntimeError):
     np = None
     spp = None
 
-try:
-    # Ditto for Tornado
-    import tornado
-except ImportError:
-    tornado = None
-
 import cloudpickle
 from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
@@ -984,11 +978,10 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_clsdict_meth.__func__ is clsdict_staticmethod.__func__
         type(depickled_clsdict_meth) is type(clsdict_staticmethod)
 
-    @pytest.mark.skipif(tornado is None,
-                        reason="test needs Tornado installed")
     def test_tornado_coroutine(self):
         # Pickling a locally defined coroutine function
-        from tornado import gen, ioloop
+        gen = pytest.importorskip('tornado.gen')
+        ioloop = pytest.importorskip('tornado.ioloop')
 
         @gen.coroutine
         def f(x, y):
@@ -1004,7 +997,7 @@ class CloudPickleTest(unittest.TestCase):
         del f, g
         g2, g3 = pickle.loads(data)
         assert g2 is g3
-        loop = ioloop.IOLoop.current()
+        loop = ioloop.IOLoop(make_current=False)
         res = loop.run_sync(functools.partial(g2, 5))
         assert res == 7
 
