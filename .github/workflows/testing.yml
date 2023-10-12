@@ -107,9 +107,11 @@ jobs:
         # FIXME ipv6-related failures on Ubuntu github actions CI
         # https://github.com/dask/distributed/issues/4514
         export DISABLE_IPV6=1
-        # test_decide_worker_coschedule_order_neighbors is skipped because of:
-        # https://github.com/dask/distributed/issues/8255
-        export PYTEST_ADDOPTS=("-m" "not avoid_ci" "-k" "not test_decide_worker_coschedule_order_neighbors")
+        # - test_decide_worker_coschedule_order_neighbors is skipped because of:
+        #   https://github.com/dask/distributed/issues/8255
+        # - test_client_worker is skipped because it's a time-related test that
+        #   randomly fails on CI but seems unrelated to cloudpickle.
+        export PYTEST_ADDOPTS=("-m" "not avoid_ci" "-k" "not test_decide_worker_coschedule_order_neighbors and not test_client_worker")
         source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
