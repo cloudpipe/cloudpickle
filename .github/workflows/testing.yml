@@ -121,7 +121,7 @@ jobs:
         export DISABLE_IPV6=1
         # test_decide_worker_coschedule_order_neighbors is skipped because of:
         # https://github.com/dask/distributed/issues/8255
-        export PYTEST_ADDOPTS=("-m" "not avoid_ci", -k "not test_decide_worker_coschedule_order_neighbors")
+        export PYTEST_ADDOPTS=("-m" "not avoid_ci" "-k" "not test_decide_worker_coschedule_order_neighbors")
         source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
