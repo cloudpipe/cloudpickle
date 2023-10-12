@@ -192,7 +192,7 @@ jobs:
       run: |
         RAY_PACKAGE_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         cp cloudpickle/cloudpickle.py $RAY_PACKAGE_DIR/cloudpickle/cloudpickle.py
-        cp cloudpickle/compat.py $RAY_PACKAGE_DIR/cloudpickle/compat.py
+        rm -rf $RAY_PACKAGE_DIR/cloudpickle/compat.py
         cp cloudpickle/cloudpickle_fast.py $RAY_PACKAGE_DIR/cloudpickle/cloudpickle_fast.py
     - name: Fetch the Ray test suite from github
       run: |
