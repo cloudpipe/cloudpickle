@@ -53,8 +53,6 @@ from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
 
-from _cloudpickle_testpkg import relative_imports_factory
-
 
 _TEST_GLOBAL_VARIABLE = "default_value"
 _TEST_GLOBAL_VARIABLE2 = "another_value"
@@ -756,7 +754,7 @@ class CloudPickleTest(unittest.TestCase):
         # their parent modules are considered importable by cloudpickle.
         # See the mod_with_dynamic_submodule documentation for more
         # details of this use case.
-        import _cloudpickle_testpkg.mod.dynamic_submodule as m
+        m = pytest.importorskip("_cloudpickle_testpkg.mod.dynamic_submodule")  # noqa F841
         assert _should_pickle_by_reference(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
 
@@ -2207,6 +2205,8 @@ class CloudPickleTest(unittest.TestCase):
         # Make sure relative imports inside round-tripped functions is not
         # broken. This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        relative_imports_factory = _cloudpickle_testpkg.relative_imports_factory
         f, g = relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
@@ -2256,7 +2256,8 @@ class CloudPickleTest(unittest.TestCase):
     def test___reduce___returns_string(self):
         # Non regression test for objects with a __reduce__ method returning a
         # string, meaning "save by attribute using save_global"
-        from _cloudpickle_testpkg import some_singleton
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        some_singleton = _cloudpickle_testpkg.some_singleton
         assert some_singleton.__reduce__() == "some_singleton"
         depickled_singleton = pickle_depickle(
             some_singleton, protocol=self.protocol)
@@ -2325,9 +2326,9 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_T1 is depickled_T2
 
     def test_pickle_importable_typevar(self):
-        from _cloudpickle_testpkg import T
-        T1 = pickle_depickle(T, protocol=self.protocol)
-        assert T1 is T
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        T1 = pickle_depickle(_cloudpickle_testpkg.T, protocol=self.protocol)
+        assert T1 is _cloudpickle_testpkg.T
 
         # Standard Library TypeVar
         from typing import AnyStr
@@ -2633,11 +2634,11 @@ class CloudPickleTest(unittest.TestCase):
     ):
         for package_or_module in ["package", "module"]:
             if package_or_module == "package":
-                import _cloudpickle_testpkg as m
+                m = pytest.importorskip("_cloudpickle_testpkg")
                 f = m.package_function_with_global
                 _original_global = m.global_variable
             elif package_or_module == "module":
-                import _cloudpickle_testpkg.mod as m
+                m = pytest.importorskip("_cloudpickle_testpkg.mod")
                 f = m.module_function_with_global
                 _original_global = m.global_variable
             try:
@@ -2665,8 +2666,8 @@ class CloudPickleTest(unittest.TestCase):
         # pickled in a different way - by value and/or by reference) can
         # peacefully co-exist (e.g. without globals interaction) in a remote
         # worker.
-        import _cloudpickle_testpkg
-        from _cloudpickle_testpkg import package_function_with_global as f
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        f = _cloudpickle_testpkg.package_function_with_global
         _original_global = _cloudpickle_testpkg.global_variable
 
         def _create_registry():
@@ -2818,7 +2819,7 @@ def test_lookup_module_and_qualname_dynamic_typevar():
 
 
 def test_lookup_module_and_qualname_importable_typevar():
-    import _cloudpickle_testpkg
+    _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
     T = _cloudpickle_testpkg.T
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
@@ -2837,8 +2838,8 @@ def test_lookup_module_and_qualname_stdlib_typevar():
 
 
 def test_register_pickle_by_value():
-    import _cloudpickle_testpkg as pkg
-    import _cloudpickle_testpkg.mod as mod
+    pkg = pytest.importorskip("_cloudpickle_testpkg")
+    mod = pytest.importorskip("_cloudpickle_testpkg.mod")
 
     assert list_registry_pickle_by_value() == set()
 
