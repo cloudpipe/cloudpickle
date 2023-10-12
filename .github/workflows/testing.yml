@@ -193,29 +193,29 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
-    - name: Install project and dependencies
+    - name: Install project and tests dependencies
       run: |
-        python -m pip install --upgrade -r dev-requirements.txt
-        python -m pip install setproctitle psutil
-        # from https://docs.ray.io/en/master/development.html#building-ray
-        pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl
+        python -m pip install --upgrade -r dev-requirements.txt setproctitle psutil catboost \
+           https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl
+    - name: Test cloudpickle itself
+      run: |
+        COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
+    - name: Patch Ray with the development version of cloudpickle
+      run: |
+        RAY_PACKAGE_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
+        cp cloudpickle/cloudpickle.py $RAY_PACKAGE_DIR/cloudpickle/cloudpickle.py
+        cp cloudpickle/compat.py $RAY_PACKAGE_DIR/cloudpickle/compat.py
+        cp cloudpickle/cloudpickle_fast.py $RAY_PACKAGE_DIR/cloudpickle/cloudpickle_fast.py
+    - name: Fetch the Ray test suite from github
+      run: |
         pushd ..
         git clone https://github.com/ray-project/ray.git
-        pushd ray
-        python python/ray/setup-dev.py --yes
         popd
-        popd
-        PROJECT_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
-        rm $PROJECT_DIR/cloudpickle/cloudpickle.py
-        cp cloudpickle/cloudpickle.py $PROJECT_DIR/cloudpickle/cloudpickle.py
-        cp cloudpickle/compat.py $PROJECT_DIR/cloudpickle/compat.py
-        cp cloudpickle/cloudpickle_fast.py $PROJECT_DIR/cloudpickle/cloudpickle_fast.py
-    - name: Test the downstream project
+    - name: Run some tests from Ray's test suite
       run: |
-        PROJECT_DIR="$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")"
-        COVERAGE_PROCESS_START="$TRAVIS_BUILD_DIR/.coveragerc" PYTHONPATH='.:tests' pytest -r s
-        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_simple_serialization
-        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_complex_serialization
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_ray_recursive_objects
-        pytest -vl $PROJECT_DIR/tests/test_serialization.py::test_serialization_final_fallback
-        pytest -vl $PROJECT_DIR/tests/test_basic.py::test_nested_functions
+        pushd ../ray/python/ray/tests
+        pytest -vl test_serialization.py::test_simple_serialization
+        pytest -vl test_serialization.py::test_complex_serialization
+        pytest -vl test_basic.py::test_ray_recursive_objects
+        pytest -vl test_serialization.py::test_serialization_final_fallback
+        pytest -vl test_basic.py::test_nested_functions
