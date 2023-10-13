@@ -16,22 +16,22 @@ class CloudPickleFileTests(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.tmpfilepath = os.path.join(self.tmpdir, 'testfile')
-        self.teststring = 'Hello world!'
+        self.tmpfilepath = os.path.join(self.tmpdir, "testfile")
+        self.teststring = "Hello world!"
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
     def test_empty_file(self):
         # Empty file
-        open(self.tmpfilepath, 'w').close()
+        open(self.tmpfilepath, "w").close()
         with open(self.tmpfilepath) as f:
-            self.assertEqual('', pickle.loads(cloudpickle.dumps(f)).read())
+            self.assertEqual("", pickle.loads(cloudpickle.dumps(f)).read())
         os.remove(self.tmpfilepath)
 
     def test_closed_file(self):
         # Write & close
-        with open(self.tmpfilepath, 'w') as f:
+        with open(self.tmpfilepath, "w") as f:
             f.write(self.teststring)
         with pytest.raises(pickle.PicklingError) as excinfo:
             cloudpickle.dumps(f)
@@ -40,7 +40,7 @@ class CloudPickleFileTests(unittest.TestCase):
 
     def test_r_mode(self):
         # Write & close
-        with open(self.tmpfilepath, 'w') as f:
+        with open(self.tmpfilepath, "w") as f:
             f.write(self.teststring)
         # Open for reading
         with open(self.tmpfilepath) as f:
@@ -49,16 +49,15 @@ class CloudPickleFileTests(unittest.TestCase):
         os.remove(self.tmpfilepath)
 
     def test_w_mode(self):
-        with open(self.tmpfilepath, 'w') as f:
+        with open(self.tmpfilepath, "w") as f:
             f.write(self.teststring)
             f.seek(0)
-            self.assertRaises(pickle.PicklingError,
-                              lambda: cloudpickle.dumps(f))
+            self.assertRaises(pickle.PicklingError, lambda: cloudpickle.dumps(f))
         os.remove(self.tmpfilepath)
 
     def test_plus_mode(self):
         # Write, then seek to 0
-        with open(self.tmpfilepath, 'w+') as f:
+        with open(self.tmpfilepath, "w+") as f:
             f.write(self.teststring)
             f.seek(0)
             new_f = pickle.loads(cloudpickle.dumps(f))
@@ -67,7 +66,7 @@ class CloudPickleFileTests(unittest.TestCase):
 
     def test_seek(self):
         # Write, then seek to arbitrary position
-        with open(self.tmpfilepath, 'w+') as f:
+        with open(self.tmpfilepath, "w+") as f:
             f.write(self.teststring)
             f.seek(4)
             unpickled = pickle.loads(cloudpickle.dumps(f))
@@ -83,9 +82,8 @@ class CloudPickleFileTests(unittest.TestCase):
         # Warning: if you want to run your tests with nose, add -s option
         for out in sys.stdout, sys.stderr:  # Regression test for SPARK-3415
             self.assertEqual(out, pickle.loads(cloudpickle.dumps(out)))
-        self.assertRaises(pickle.PicklingError,
-                          lambda: cloudpickle.dumps(sys.stdin))
+        self.assertRaises(pickle.PicklingError, lambda: cloudpickle.dumps(sys.stdin))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

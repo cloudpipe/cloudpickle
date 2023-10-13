@@ -1,4 +1,7 @@
-from cloudpickle.cloudpickle import *  # noqa
+from . import cloudpickle
+from .cloudpickle import *  # noqa
+
+__doc__ = cloudpickle.__doc__
 
 __version__ = "3.0.0.dev0"
 
