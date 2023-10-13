@@ -16,8 +16,8 @@ import pytest
 from .generate_old_pickles import PICKLE_DIRECTORY
 
 
-def load_obj(filename, check_deprecation_warning='auto'):
-    if check_deprecation_warning == 'auto':
+def load_obj(filename, check_deprecation_warning="auto"):
+    if check_deprecation_warning == "auto":
         check_deprecation_warning = False
     pickle_filepath = PICKLE_DIRECTORY / filename
     if not pickle_filepath.exists():
