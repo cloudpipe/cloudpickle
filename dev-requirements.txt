@@ -1,5 +1,7 @@
-# Dependencies for running the tests with pytest
+# Linting tools
 ruff
+pre-commit
+# Dependencies for running the tests with pytest
 pytest
 pytest-cov
 psutil
