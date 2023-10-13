@@ -1,5 +1,5 @@
-3.0.0 (development)
-===================
+3.0.0
+=====
 
 - Officially support Python 3.12 and drop support for Python 3.6 and 3.7.
   Dropping support for older Python versions made it possible to simplify the
