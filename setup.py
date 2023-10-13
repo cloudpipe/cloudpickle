@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 import os
 import re
 
@@ -12,7 +11,7 @@ except ImportError:
 # Function to parse __version__ in `cloudpickle/__init__.py`
 def find_version():
     here = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(here, 'cloudpickle', '__init__.py'), 'r') as fp:
+    with open(os.path.join(here, 'cloudpickle', '__init__.py')) as fp:
         version_file = fp.read()
     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
                               version_file, re.M)
@@ -21,7 +20,7 @@ def find_version():
     raise RuntimeError("Unable to find version string.")
 
 
-dist = setup(
+setup(
     name='cloudpickle',
     version=find_version(),
     description='Extended pickling support for Python objects',
@@ -39,10 +38,11 @@ dist = setup(
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: MacOS :: MacOS X',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -50,5 +50,5 @@ dist = setup(
         'Topic :: System :: Distributed Computing',
     ],
     test_suite='tests',
-    python_requires='>=3.6',
+    python_requires='>=3.8',
 )

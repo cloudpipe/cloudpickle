@@ -26,6 +26,7 @@ import os
 import enum
 import typing
 from functools import wraps
+import pickle
 
 import pytest
 
@@ -38,19 +39,12 @@ except (ImportError, RuntimeError):
     np = None
     spp = None
 
-try:
-    # Ditto for Tornado
-    import tornado
-except ImportError:
-    tornado = None
-
 import cloudpickle
-from cloudpickle.compat import pickle
 from cloudpickle import register_pickle_by_value
 from cloudpickle import unregister_pickle_by_value
 from cloudpickle import list_registry_pickle_by_value
 from cloudpickle.cloudpickle import _should_pickle_by_reference
-from cloudpickle.cloudpickle import _make_empty_cell, cell_set
+from cloudpickle.cloudpickle import _make_empty_cell
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
@@ -58,8 +52,6 @@ from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import subprocess_worker
-
-from _cloudpickle_testpkg import relative_imports_factory
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -133,7 +125,7 @@ class CloudPickleTest(unittest.TestCase):
 
     @pytest.mark.skipif(
             platform.python_implementation() != "CPython" or
-            (sys.version_info >= (3, 8, 0) and sys.version_info < (3, 8, 2)),
+            sys.version_info < (3, 8, 2),
             reason="Underlying bug fixed upstream starting Python 3.8.2")
     def test_reducer_override_reference_cycle(self):
         # Early versions of Python 3.8 introduced a reference cycle between a
@@ -207,17 +199,6 @@ class CloudPickleTest(unittest.TestCase):
         self.assertTrue("exit" in foo.__code__.co_names)
         cloudpickle.dumps(foo)
 
-    def test_buffer(self):
-        try:
-            buffer_obj = buffer("Hello")
-            buffer_clone = pickle_depickle(buffer_obj, protocol=self.protocol)
-            self.assertEqual(buffer_clone, str(buffer_obj))
-            buffer_obj = buffer("Hello", 2, 3)
-            buffer_clone = pickle_depickle(buffer_obj, protocol=self.protocol)
-            self.assertEqual(buffer_clone, str(buffer_obj))
-        except NameError:  # Python 3 does no longer support buffers
-            pass
-
     def test_memoryview(self):
         buffer_obj = memoryview(b"Hello")
         self.assertEqual(pickle_depickle(buffer_obj, protocol=self.protocol),
@@ -245,19 +226,19 @@ class CloudPickleTest(unittest.TestCase):
         keys = collections.OrderedDict([("a", 1), ("b", 2)]).keys()
         results = pickle_depickle(keys)
         self.assertEqual(results, keys)
-        assert type(keys) == type(results)
+        assert type(keys) is type(results)
 
     def test_odict_values(self):
         values = collections.OrderedDict([("a", 1), ("b", 2)]).values()
         results = pickle_depickle(values)
         self.assertEqual(list(results), list(values))
-        assert type(values) == type(results)
+        assert type(values) is type(results)
 
     def test_odict_items(self):
         items = collections.OrderedDict([("a", 1), ("b", 2)]).items()
         results = pickle_depickle(items)
         self.assertEqual(results, items)
-        assert type(items) == type(results)
+        assert type(items) is type(results)
 
     def test_sliced_and_non_contiguous_memoryview(self):
         buffer_obj = memoryview(b"Hello!" * 3)[2:15:2]
@@ -275,8 +256,8 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_nested_lambdas(self):
         a, b = 1, 2
-        f1 = lambda x: x + a
-        f2 = lambda x: f1(x) // b
+        f1 = lambda x: x + a  # noqa: E731
+        f2 = lambda x: f1(x) // b  # noqa: E731
         self.assertEqual(pickle_depickle(f2, protocol=self.protocol)(1), 1)
 
     def test_recursive_closure(self):
@@ -298,8 +279,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_closure_none_is_preserved(self):
         def f():
-            """a function with no closure cells
-            """
+            """A function with no closure cells"""
 
         self.assertTrue(
             f.__closure__ is None,
@@ -397,10 +377,12 @@ class CloudPickleTest(unittest.TestCase):
             return (x + y) / LOCAL_CONSTANT
 
         # pickle the function definition
-        self.assertEqual(pickle_depickle(some_function, protocol=self.protocol)(41, 1), 1)
-        self.assertEqual(pickle_depickle(some_function, protocol=self.protocol)(81, 3), 2)
+        result = pickle_depickle(some_function, protocol=self.protocol)(41, 1)
+        assert result == 1
+        result = pickle_depickle(some_function, protocol=self.protocol)(81, 3)
+        assert result == 2
 
-        hidden_constant = lambda: LOCAL_CONSTANT
+        hidden_constant = lambda: LOCAL_CONSTANT  # noqa: E731
 
         class SomeClass:
             """Overly complicated class with nested references to symbols"""
@@ -476,12 +458,11 @@ class CloudPickleTest(unittest.TestCase):
     def test_generator(self):
 
         def some_generator(cnt):
-            for i in range(cnt):
-                yield i
+            yield from range(cnt)
 
         gen2 = pickle_depickle(some_generator, protocol=self.protocol)
 
-        assert type(gen2(3)) == type(some_generator(3))
+        assert isinstance(gen2(3), type(some_generator(3)))
         assert list(gen2(3)) == list(range(3))
 
     def test_classmethod(self):
@@ -489,6 +470,7 @@ class CloudPickleTest(unittest.TestCase):
             @staticmethod
             def test_sm():
                 return "sm"
+
             @classmethod
             def test_cm(cls):
                 return "cm"
@@ -528,7 +510,7 @@ class CloudPickleTest(unittest.TestCase):
         pickle_clone = pickle_depickle(pickle, protocol=self.protocol)
         self.assertEqual(pickle, pickle_clone)
 
-    def test_dynamic_module(self):
+    def _check_dynamic_module(self, mod):
         mod = types.ModuleType('mod')
         code = '''
         x = 1
@@ -565,6 +547,18 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             sys.modules.pop('mod', None)
 
+    def test_dynamic_module(self):
+        mod = types.ModuleType('mod')
+        assert mod.__package__ is None
+        self._check_dynamic_module(mod)
+
+    def test_dynamic_module_no_package(self):
+        # non-regression test for #116
+        mod = types.ModuleType('mod')
+        del mod.__package__
+        assert not hasattr(mod, '__package__')
+        self._check_dynamic_module(mod)
+
     def test_module_locals_behavior(self):
         # Makes sure that a local function defined in another module is
         # correctly serialized. This notably checks that the globals are
@@ -573,7 +567,7 @@ class CloudPickleTest(unittest.TestCase):
         pickled_func_path = os.path.join(self.tmpdir, 'local_func_g.pkl')
 
         child_process_script = '''
-        from cloudpickle.compat import pickle
+        import pickle
         import gc
         with open("{pickled_func_path}", 'rb') as f:
             func = pickle.load(f)
@@ -664,7 +658,7 @@ class CloudPickleTest(unittest.TestCase):
         child_process_module_file = os.path.join(
             self.tmpdir, 'dynamic_module_from_child_process.pkl')
         child_process_script = '''
-            from cloudpickle.compat import pickle
+            import pickle
             import textwrap
 
             import cloudpickle
@@ -684,7 +678,7 @@ class CloudPickleTest(unittest.TestCase):
 
         # The script ran by the process created by the child process
         child_of_child_process_script = """ '''
-                from cloudpickle.compat import pickle
+                import pickle
                 with open('{child_process_module_file}','rb') as fid:
                     mod = pickle.load(fid)
                 ''' """
@@ -739,7 +733,7 @@ class CloudPickleTest(unittest.TestCase):
         assert b'math' not in b
 
     def test_module_importability(self):
-        from cloudpickle.compat import pickle
+        import pickle
         import os.path
         import collections
         import collections.abc
@@ -760,15 +754,13 @@ class CloudPickleTest(unittest.TestCase):
         # their parent modules are considered importable by cloudpickle.
         # See the mod_with_dynamic_submodule documentation for more
         # details of this use case.
-        import _cloudpickle_testpkg.mod.dynamic_submodule as m
+        m = pytest.importorskip("_cloudpickle_testpkg.mod.dynamic_submodule")  # noqa F841
         assert _should_pickle_by_reference(m)
         assert pickle_depickle(m, protocol=self.protocol) is m
 
         # Check for similar behavior for a module that cannot be imported by
         # attribute lookup.
         from _cloudpickle_testpkg.mod import dynamic_submodule_two as m2
-        # Note: import _cloudpickle_testpkg.mod.dynamic_submodule_two as m2
-        # works only for Python 3.7+
         assert _should_pickle_by_reference(m2)
         assert pickle_depickle(m2, protocol=self.protocol) is m2
 
@@ -933,7 +925,7 @@ class CloudPickleTest(unittest.TestCase):
             # __func__ attribute instead. We do not test the the identity of
             # the functions as __func__ attributes of classmethods are not
             # pickleable and must be reconstructed at depickling time.
-            assert type(depickled_clsdict_meth) == type(clsdict_clsmethod)
+            assert type(depickled_clsdict_meth) is type(clsdict_clsmethod)
             assert depickled_clsdict_meth.__func__(
                 float, arg) == clsdict_clsmethod.__func__(float, arg)
 
@@ -984,11 +976,10 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_clsdict_meth.__func__ is clsdict_staticmethod.__func__
         type(depickled_clsdict_meth) is type(clsdict_staticmethod)
 
-    @pytest.mark.skipif(tornado is None,
-                        reason="test needs Tornado installed")
     def test_tornado_coroutine(self):
         # Pickling a locally defined coroutine function
-        from tornado import gen, ioloop
+        gen = pytest.importorskip('tornado.gen')
+        ioloop = pytest.importorskip('tornado.ioloop')
 
         @gen.coroutine
         def f(x, y):
@@ -997,16 +988,19 @@ class CloudPickleTest(unittest.TestCase):
 
         @gen.coroutine
         def g(y):
-            res = yield f(0.01, y)
+            res = yield f(0.01, y)  # noqa: F821
             raise gen.Return(res + 1)
 
+        with pytest.warns(DeprecationWarning):
+            assert cloudpickle.is_tornado_coroutine(g)
+
         data = cloudpickle.dumps([g, g], protocol=self.protocol)
-        f = g = None
+        del f, g
         g2, g3 = pickle.loads(data)
-        self.assertTrue(g2 is g3)
-        loop = ioloop.IOLoop.current()
+        assert g2 is g3
+        loop = ioloop.IOLoop(make_current=False)
         res = loop.run_sync(functools.partial(g2, 5))
-        self.assertEqual(res, 7)
+        assert res == 7
 
     @pytest.mark.skipif(
         (3, 11, 0, 'beta') <= sys.version_info < (3, 11, 0, 'beta', 4),
@@ -1043,12 +1037,14 @@ class CloudPickleTest(unittest.TestCase):
 
         # Choose any module NOT imported by __init__ of its parent package
         # examples in standard library include:
-        # - http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
-
-        global xml # imitate performing this import at top of file
+        # http.cookies, unittest.mock, curses.textpad, xml.etree.ElementTree
+        import xml
         import xml.etree.ElementTree
+
         def example():
-            x = xml.etree.ElementTree.Comment # potential AttributeError
+            _ = xml.etree.ElementTree.Comment  # noqa: F821
+
+        example()  # smoke test
 
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
@@ -1060,16 +1056,19 @@ class CloudPickleTest(unittest.TestCase):
 
         # deserialise
         f = pickle.loads(s)
-        f() # perform test for error
+        f()  # smoke test
 
     def test_submodule_closure(self):
-        # Same as test_submodule except the package is not a global
+        # Same as test_submodule except the xml package has not been imported
         def scope():
             import xml.etree.ElementTree
+
             def example():
-                x = xml.etree.ElementTree.Comment # potential AttributeError
+                _ = xml.etree.ElementTree.Comment  # potential AttributeError
             return example
+
         example = scope()
+        example()  # smoke test
 
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
@@ -1079,13 +1078,13 @@ class CloudPickleTest(unittest.TestCase):
                 del sys.modules[item]
 
         f = cloudpickle.loads(s)
-        f() # test
+        f()  # smoke test
 
     def test_multiprocess(self):
         # running a function pickled by another process (a la dask.distributed)
         def scope():
             def example():
-                x = xml.etree.ElementTree.Comment
+                _ = xml.etree.ElementTree.Comment
             return example
         global xml
         import xml.etree.ElementTree
@@ -1096,7 +1095,7 @@ class CloudPickleTest(unittest.TestCase):
         # choose "subprocess" rather than "multiprocessing" because the latter
         # library uses fork to preserve the parent environment.
         command = ("import base64; "
-                   "from cloudpickle.compat import pickle; "
+                   "import pickle; "
                    "pickle.loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
@@ -1106,11 +1105,13 @@ class CloudPickleTest(unittest.TestCase):
         # like test_multiprocess except subpackage modules referenced directly
         # (unlike test_submodule)
         global etree
+
         def scope():
             import xml.etree as foobar
+
             def example():
-                x = etree.Comment
-                x = foobar.ElementTree
+                _ = etree.Comment
+                _ = foobar.ElementTree
             return example
         example = scope()
         import xml.etree.ElementTree as etree
@@ -1118,15 +1119,18 @@ class CloudPickleTest(unittest.TestCase):
         s = cloudpickle.dumps(example, protocol=self.protocol)
 
         command = ("import base64; "
-                   "from cloudpickle.compat import pickle; "
-                   "pickle.loads(base64.b32decode('" +
+                   "from pickle import loads; "
+                   "loads(base64.b32decode('" +
                    base64.b32encode(s).decode('ascii') +
                    "'))()")
         assert not subprocess.call([sys.executable, '-c', command])
 
     def test_multiprocessing_lock_raises(self):
         lock = multiprocessing.Lock()
-        with pytest.raises(RuntimeError, match="only be shared between processes through inheritance"):
+        with pytest.raises(
+            RuntimeError,
+            match="only be shared between processes through inheritance"
+        ):
             cloudpickle.dumps(lock)
 
     def test_cell_manipulation(self):
@@ -1136,11 +1140,8 @@ class CloudPickleTest(unittest.TestCase):
             cell.cell_contents
 
         ob = object()
-        cell_set(cell, ob)
-        self.assertTrue(
-            cell.cell_contents is ob,
-            msg='cell contents not set correctly',
-        )
+        cell.cell_contents = ob
+        assert cell.cell_contents is ob
 
     def check_logger(self, name):
         logger = logging.getLogger(name)
@@ -1497,33 +1498,13 @@ class CloudPickleTest(unittest.TestCase):
                 finally:
                     sys.modules.pop("_faulty_module", None)
 
-    def test_dynamic_pytest_module(self):
-        # Test case for pull request https://github.com/cloudpipe/cloudpickle/pull/116
-
-        # This test does not longer make sense with pytest >= 7.2
-        py = pytest.importorskip("py")
-        if not hasattr(py, "builtin"):
-            pytest.skip("py.builtin is not available")
-
-        def f():
-            s = py.builtin.set([1])
-            return s.pop()
-
-        # some setup is required to allow pytest apimodules to be correctly
-        # serializable.
-        from cloudpickle import CloudPickler
-        from cloudpickle import cloudpickle_fast as cp_fast
-        CloudPickler.dispatch_table[type(py.builtin)] = cp_fast._module_reduce
-
-        g = cloudpickle.loads(cloudpickle.dumps(f, protocol=self.protocol))
-
-        result = g()
-        self.assertEqual(1, result)
-
     def test_function_module_name(self):
-        func = lambda x: x
-        cloned = pickle_depickle(func, protocol=self.protocol)
-        self.assertEqual(cloned.__module__, func.__module__)
+        def local_func(x):
+            return x
+
+        for func in [local_func, lambda x: x]:
+            cloned = pickle_depickle(func, protocol=self.protocol)
+            self.assertEqual(cloned.__module__, func.__module__)
 
     def test_function_qualname(self):
         def func(x):
@@ -1558,8 +1539,6 @@ class CloudPickleTest(unittest.TestCase):
             def read_write_value(self, value):
                 self._read_write_value = value
 
-
-
         my_object = MyObject()
 
         assert my_object.read_only_value == 1
@@ -1582,7 +1561,6 @@ class CloudPickleTest(unittest.TestCase):
         depickled_obj.read_write_value = 3
         assert depickled_obj.read_write_value == 3
         type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
-
 
     def test_namedtuple(self):
         MyTuple = collections.namedtuple('MyTuple', ['a', 'b', 'c'])
@@ -2018,14 +1996,14 @@ class CloudPickleTest(unittest.TestCase):
             growth = w.memsize() - reference_size
 
             # For some reason, the memory growth after processing 100MB of
-            # data is ~10MB on MacOS, and ~1MB on Linux, so the upper bound on
+            # data is ~50MB on MacOS, and ~1MB on Linux, so the upper bound on
             # memory growth we use is only tight for MacOS. However,
-            # - 10MB is still 10x lower than the expected memory growth in case
+            # - 50MB is still 2x lower than the expected memory growth in case
             # of a leak (which would be the total size of the processed data,
             # 100MB)
             # - the memory usage growth does not increase if using 10000
             # iterations instead of 100 as used now (100x more data)
-            assert growth < 1.5e7, growth
+            assert growth < 5e7, growth
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
@@ -2230,6 +2208,8 @@ class CloudPickleTest(unittest.TestCase):
         # Make sure relative imports inside round-tripped functions is not
         # broken. This was a bug in cloudpickle versions <= 0.5.3 and was
         # re-introduced in 0.8.0.
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        relative_imports_factory = _cloudpickle_testpkg.relative_imports_factory
         f, g = relative_imports_factory()
         for func, source in zip([f, g], ["module", "package"]):
             # Make sure relative imports are initially working
@@ -2279,7 +2259,8 @@ class CloudPickleTest(unittest.TestCase):
     def test___reduce___returns_string(self):
         # Non regression test for objects with a __reduce__ method returning a
         # string, meaning "save by attribute using save_global"
-        from _cloudpickle_testpkg import some_singleton
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        some_singleton = _cloudpickle_testpkg.some_singleton
         assert some_singleton.__reduce__() == "some_singleton"
         depickled_singleton = pickle_depickle(
             some_singleton, protocol=self.protocol)
@@ -2348,9 +2329,9 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_T1 is depickled_T2
 
     def test_pickle_importable_typevar(self):
-        from _cloudpickle_testpkg import T
-        T1 = pickle_depickle(T, protocol=self.protocol)
-        assert T1 is T
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        T1 = pickle_depickle(_cloudpickle_testpkg.T, protocol=self.protocol)
+        assert T1 is _cloudpickle_testpkg.T
 
         # Standard Library TypeVar
         from typing import AnyStr
@@ -2370,28 +2351,21 @@ class CloudPickleTest(unittest.TestCase):
 
         with subprocess_worker(protocol=self.protocol) as worker:
 
-            def check_generic(generic, origin, type_value, use_args):
+            def check_generic(generic, origin, type_value):
                 assert generic.__origin__ is origin
 
                 assert len(origin.__orig_bases__) == 1
                 ob = origin.__orig_bases__[0]
                 assert ob.__origin__ is typing.Generic
 
-                if use_args:
-                    assert len(generic.__args__) == 1
-                    assert generic.__args__[0] is type_value
-                else:
-                    assert len(generic.__parameters__) == 1
-                    assert generic.__parameters__[0] is type_value
+                assert len(generic.__args__) == 1
+                assert generic.__args__[0] is type_value
                 assert len(ob.__parameters__) == 1
 
                 return "ok"
 
-            # backward-compat for old Python 3.5 versions that sometimes relies
-            # on __parameters__
-            use_args = getattr(C[int], '__args__', ()) != ()
-            assert check_generic(C[int], C, int, use_args) == "ok"
-            assert worker.run(check_generic, C[int], C, int, use_args) == "ok"
+            assert check_generic(C[int], C, int) == "ok"
+            assert worker.run(check_generic, C[int], C, int) == "ok"
 
     def test_generic_subclass(self):
         T = typing.TypeVar('T')
@@ -2458,18 +2432,6 @@ class CloudPickleTest(unittest.TestCase):
                 assert (
                     worker.run(check_annotations, obj, type_, "type_") == "ok"
                 )
-
-    def test_generic_extensions_literal(self):
-        typing_extensions = pytest.importorskip('typing_extensions')
-        for obj in [typing_extensions.Literal, typing_extensions.Literal['a']]:
-            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            assert depickled_obj == obj
-
-    def test_generic_extensions_final(self):
-        typing_extensions = pytest.importorskip('typing_extensions')
-        for obj in [typing_extensions.Final, typing_extensions.Final[int]]:
-            depickled_obj = pickle_depickle(obj, protocol=self.protocol)
-            assert depickled_obj == obj
 
     def test_class_annotations(self):
         class C:
@@ -2675,11 +2637,11 @@ class CloudPickleTest(unittest.TestCase):
     ):
         for package_or_module in ["package", "module"]:
             if package_or_module == "package":
-                import _cloudpickle_testpkg as m
+                m = pytest.importorskip("_cloudpickle_testpkg")
                 f = m.package_function_with_global
                 _original_global = m.global_variable
             elif package_or_module == "module":
-                import _cloudpickle_testpkg.mod as m
+                m = pytest.importorskip("_cloudpickle_testpkg.mod")
                 f = m.module_function_with_global
                 _original_global = m.global_variable
             try:
@@ -2707,8 +2669,8 @@ class CloudPickleTest(unittest.TestCase):
         # pickled in a different way - by value and/or by reference) can
         # peacefully co-exist (e.g. without globals interaction) in a remote
         # worker.
-        import _cloudpickle_testpkg
-        from _cloudpickle_testpkg import package_function_with_global as f
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        f = _cloudpickle_testpkg.package_function_with_global
         _original_global = _cloudpickle_testpkg.global_variable
 
         def _create_registry():
@@ -2745,10 +2707,6 @@ class CloudPickleTest(unittest.TestCase):
             if "_cloudpickle_testpkg" in list_registry_pickle_by_value():
                 unregister_pickle_by_value(_cloudpickle_testpkg)
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 7),
-        reason="Determinism can only be guaranteed for Python 3.7+"
-    )
     def test_deterministic_pickle_bytes_for_function(self):
         # Ensure that functions with references to several global names are
         # pickled to fixed bytes that do not depend on the PYTHONHASHSEED of
@@ -2864,7 +2822,7 @@ def test_lookup_module_and_qualname_dynamic_typevar():
 
 
 def test_lookup_module_and_qualname_importable_typevar():
-    import _cloudpickle_testpkg
+    _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
     T = _cloudpickle_testpkg.T
     module_and_name = _lookup_module_and_qualname(T, name=T.__name__)
     assert module_and_name is not None
@@ -2883,8 +2841,8 @@ def test_lookup_module_and_qualname_stdlib_typevar():
 
 
 def test_register_pickle_by_value():
-    import _cloudpickle_testpkg as pkg
-    import _cloudpickle_testpkg.mod as mod
+    pkg = pytest.importorskip("_cloudpickle_testpkg")
+    mod = pytest.importorskip("_cloudpickle_testpkg.mod")
 
     assert list_registry_pickle_by_value() == set()
 

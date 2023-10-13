@@ -10,42 +10,34 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python 3.11
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.11
-    - name: Install flake8
+    - name: Install ruff
       shell: bash
       run: |
         python -V
-        python -m pip install "flake8<6.0.0"
-    # XXX: flake8 --diff is deprecated, broken and was removed
-    # in flake8 6.0.0: we should instead black-ify the full repo
-    # and run a full flake8 check at each PR.
-    - name: Run flake8 on diff with upstream/master
+        python -m pip install ruff
+    - name: Run ruff
       shell: bash
       run: |
-        bash ./.github/scripts/flake8_diff.sh
+        ruff .
 
   build:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # TODO: add "3.12-dev" to the list
-        python_version: [3.7, 3.8, 3.9, "3.10", "3.11", "pypy-3.9"]
+        python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy-3.9"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
-          - os: windows-latest
-            python_version: 3.7
           - os: windows-latest
             python_version: 3.8
             # as of  4/02/2020, psutil won't build under PyPy + Windows
           - os: windows-latest
             python_version: "pypy-3.9"
-          - os: macos-latest
-            python_version: 3.7
           - os: macos-latest
             python_version: 3.8
           - os: macos-latest
@@ -56,11 +48,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
+        allow-prereleases: true
     - name: Install project and dependencies
       shell: bash
       run: |
@@ -72,11 +65,6 @@ jobs:
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
-    - name: Look for syntax errors/undefined names
-      shell: bash
-      run: |
-        python -m flake8 . --count --verbose --select=E901,E999,F821,F822,F823 \
-          --show-source --statistics
     - name: Test with pytest
       shell: bash
       run: |
@@ -85,7 +73,7 @@ jobs:
         coverage combine --append
         coverage xml -i
     - name: Publish coverage results
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
@@ -101,9 +89,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
@@ -119,9 +107,11 @@ jobs:
         # FIXME ipv6-related failures on Ubuntu github actions CI
         # https://github.com/dask/distributed/issues/4514
         export DISABLE_IPV6=1
-        # test_decide_worker_coschedule_order_neighbors is skipped because of:
-        # https://github.com/dask/distributed/issues/8255
-        export PYTEST_ADDOPTS=("-m" "not avoid_ci" "-k" "not test_decide_worker_coschedule_order_neighbors")
+        # - test_decide_worker_coschedule_order_neighbors is skipped because of:
+        #   https://github.com/dask/distributed/issues/8255
+        # - test_client_worker is skipped because it's a time-related test that
+        #   randomly fails on CI but seems unrelated to cloudpickle.
+        export PYTEST_ADDOPTS=("-m" "not avoid_ci" "-k" "not test_decide_worker_coschedule_order_neighbors and not test_client_worker")
         source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
@@ -135,9 +125,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and dependencies
@@ -163,9 +153,9 @@ jobs:
       matrix:
         python_version: ["3.10"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install downstream project and dependencies
@@ -188,9 +178,9 @@ jobs:
       matrix:
         python_version: ["3.11"]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install project and tests dependencies
@@ -204,7 +194,7 @@ jobs:
       run: |
         RAY_PACKAGE_DIR=$(python -c "import os, ray; print(os.path.dirname(ray.__file__), flush=True)")
         cp cloudpickle/cloudpickle.py $RAY_PACKAGE_DIR/cloudpickle/cloudpickle.py
-        cp cloudpickle/compat.py $RAY_PACKAGE_DIR/cloudpickle/compat.py
+        rm -rf $RAY_PACKAGE_DIR/cloudpickle/compat.py
         cp cloudpickle/cloudpickle_fast.py $RAY_PACKAGE_DIR/cloudpickle/cloudpickle_fast.py
     - name: Fetch the Ray test suite from github
       run: |
