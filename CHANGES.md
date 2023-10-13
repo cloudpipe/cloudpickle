@@ -11,6 +11,12 @@
   ([issue #386](https://github.com/cloudpipe/cloudpickle/issues/386),
    [PR #513](https://github.com/cloudpipe/cloudpickle/pull/513))
 
+- Any color you like as long as it's black.
+  ([PR #521](https://github.com/cloudpipe/cloudpickle/pull/521))
+
+- Drop `setup.py` and `setuptools` in favor of `pyproject.toml` and `flit`.
+  ([PR #521](https://github.com/cloudpipe/cloudpickle/pull/521))
+
 2.2.1
 =====
 
