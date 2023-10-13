@@ -15,15 +15,15 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: 3.11
-    - name: Install ruff
+    - name: Install pre-commit
       shell: bash
       run: |
         python -V
-        python -m pip install ruff
-    - name: Run ruff
+        python -m pip install pre-commit
+    - name: Run pre-commit linters
       shell: bash
       run: |
-        ruff .
+        pre-commit run --files *
 
   build:
     strategy:

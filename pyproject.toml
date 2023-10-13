@@ -1,0 +1,39 @@
+[build-system]
+requires = ["flit_core"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "cloudpickle"
+author = "The cloudpickle developer team"
+author-email='cloudpipe@googlegroups.com'
+home-page = "https://github.com/cloudpipe/cloudpickle"
+description-file = "README.md"
+requires-python = ">=3.8"
+license = "BSD-3-Clause"
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: BSD License',
+    'Operating System :: POSIX',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: MacOS :: MacOS X',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: PyPy',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Scientific/Engineering',
+    'Topic :: System :: Distributed Computing',
+]
+
+[tool.black]
+line-length = 88
+target_version = ['py38', 'py39', 'py310', 'py311', 'py312']
+preview = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
