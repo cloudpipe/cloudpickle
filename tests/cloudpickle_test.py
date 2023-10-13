@@ -991,6 +991,9 @@ class CloudPickleTest(unittest.TestCase):
             res = yield f(0.01, y)  # noqa: F821
             raise gen.Return(res + 1)
 
+        with pytest.warns(DeprecationWarning):
+            assert cloudpickle.is_tornado_coroutine(g)
+
         data = cloudpickle.dumps([g, g], protocol=self.protocol)
         del f, g
         g2, g3 = pickle.loads(data)
