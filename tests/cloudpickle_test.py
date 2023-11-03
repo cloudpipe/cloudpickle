@@ -48,10 +48,11 @@ from cloudpickle.cloudpickle import _make_empty_cell
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
+from .testutils import subprocess_worker
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
-from .testutils import subprocess_worker
+from .testutils import check_determinist_pickle
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -108,7 +109,7 @@ def test_extract_class_dict():
             return "c"
 
     clsdict = _extract_class_dict(C)
-    assert sorted(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
+    assert list(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
     assert clsdict["C_CONSTANT"] == 43
     assert clsdict["__doc__"] is None
     assert clsdict["method_c"](C()) == C().method_c()
@@ -1951,7 +1952,6 @@ class CloudPickleTest(unittest.TestCase):
 
             class A:
                 '''Updated class definition'''
-                pass
 
             assert not w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
             retrieved1 = w.run(lookup, id1)
@@ -1982,6 +1982,72 @@ class CloudPickleTest(unittest.TestCase):
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
+
+    def test_dynamic_class_determinist_subworker_order(self):
+        # Check that the pickle produced by the unpickled instance is the same.
+        # This checks that the order of the class attributes is deterministic.
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            class A:
+                '''Simple class definition'''
+                pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_determinist_pickle(A_dump, cloudpickle.dumps(A))
+
+            # If the doc is defined after some class variables, this can cause ordering changes
+            # due to the way we reconstruct the class with _make_class_skeleton, which create
+            # the class and thus `__doc__` before populating it.
+            class A:
+                name = "A"
+                __doc__ = '''Updated class definition'''
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_determinist_pickle(A_dump, cloudpickle.dumps(A))
+
+            # If the doc is defined in `__init__`, this can cause ordering changes due to the way
+            # we reconstruct the class with _make_class_skeleton. Make sure the order is deterministic
+            class A:
+
+                def __init__(self):
+                    '''Class definition with explicit __init__'''
+                    pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_determinist_pickle(A_dump, cloudpickle.dumps(A))
+
+    def test_dynamic_class_determinist_subworker_str_interning(self):
+        # Check that the pickle produced by the unpickled instance is the same.
+        # This checks that there is no issue due to string interning.
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            # Due to interning of class attributes, check that this does not create issues
+            # with dynamic function definition.
+            class A:
+                '''Class with potential string interning issues.'''
+                arg_1 = "class_value"
+
+                def join(self):
+                    pass
+
+                def test_method(self, arg_1, join):
+                    pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_determinist_pickle(A_dump, cloudpickle.dumps(A))
+
+            # XXX - this does not seem to work, and I am not sure there is an easy fix.
+            class A:
+                '''Class with potential string interning issues.'''
+                arg_1 = "join"
+
+                def test_method(self, arg_1, join):
+                    pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            with pytest.raises(AssertionError):
+                check_determinist_pickle(A_dump, cloudpickle.dumps(A))
+            pytest.xfail("This test is expected to fail due to string interning errors.")
 
     @pytest.mark.skipif(
         platform.python_implementation() == "PyPy",

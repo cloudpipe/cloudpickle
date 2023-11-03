@@ -1,9 +1,11 @@
 import sys
 import os
+import io
 import os.path as op
 import tempfile
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 import pickle
+import pickletools
 from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor
 
@@ -211,6 +213,24 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
             ) from e
     finally:
         os.unlink(source_file)
+
+
+def check_determinist_pickle(a, b):
+    """Check that two pickle output are the same.
+
+    If it is not the case, print the diff between the disaembled pickle.
+    This helper is useful to investigate non-determinist pickle.
+    """
+    if a != b:
+        with io.StringIO() as out:
+            pickletools.dis(pickletools.optimize(a), out)
+            a_out = out.getvalue()
+            a_out = '\n'.join(ll[11:] for ll in a_out.splitlines())
+        with io.StringIO() as out:
+            pickletools.dis(pickletools.optimize(b), out)
+            b_out = out.getvalue()
+            b_out = '\n'.join(ll[11:] for ll in b_out.splitlines())
+        assert a_out == b_out
 
 
 if __name__ == "__main__":
