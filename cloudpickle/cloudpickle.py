@@ -126,7 +126,7 @@ def _lookup_class_or_track(class_tracker_id, class_def):
 
 
 def register_pickle_by_value(module):
-    """Register a module to make it functions and classes picklable by value.
+    """Register a module to make its functions and classes picklable by value.
 
     By default, functions and classes that are attributes of an importable
     module are to be pickled by reference, that is relying on re-importing
@@ -369,7 +369,7 @@ def _find_imported_submodules(code, top_level_dependencies):
                 # sys.modules.
                 if name is not None and name.startswith(prefix):
                     # check whether the function can address the sub-module
-                    tokens = set(name[len(prefix) :].split("."))
+                    tokens = set(name[len(prefix):].split("."))
                     if not tokens - set(code.co_names):
                         subimports.append(sys.modules[name])
     return subimports
@@ -409,7 +409,9 @@ def _walk_global_ops(code):
 
 def _extract_class_dict(cls):
     """Retrieve a copy of the dict of a class without the inherited method."""
-    clsdict = dict(cls.__dict__)  # copy dict proxy to a dict
+    # copy dict proxy to a dict. Sort the keys to make the pickle deterministic
+    clsdict = {k: cls.__dict__[k] for k in sorted(cls.__dict__)}
+
     if len(cls.__bases__) == 1:
         inherited_dict = cls.__bases__[0].__dict__
     else:
@@ -533,9 +535,14 @@ def _make_skeleton_class(
     The "extra" variable is meant to be a dict (or None) that can be used for
     forward compatibility shall the need arise.
     """
+    # We need to intern the keys of the type_kwargs dict to avoid having
+    # different pickles for the same dynamic class depending on whether it was
+    # dynamically created or reconstructed from a pickled stream.
     skeleton_class = types.new_class(
-        name, bases, {"metaclass": type_constructor}, lambda ns: ns.update(type_kwargs)
+        name, bases, {"metaclass": type_constructor},
+        lambda ns: ns.update({sys.intern(k): v for k, v in type_kwargs.items()})
     )
+
     return _lookup_class_or_track(class_tracker_id, skeleton_class)
 
 
@@ -694,7 +701,9 @@ def _function_getstate(func):
     #   unpickling time by iterating over slotstate and calling setattr(func,
     #   slotname, slotvalue)
     slotstate = {
-        "__name__": func.__name__,
+        # Intern the function names to be consistent with the method names that are
+        # interned automatically with `setattr`.
+        "__name__": sys.intern(func.__name__),
         "__qualname__": func.__qualname__,
         "__annotations__": func.__annotations__,
         "__kwdefaults__": func.__kwdefaults__,
@@ -802,6 +811,10 @@ def _code_reduce(obj):
     # of the specific type from types, for example:
     # >>> from types import CodeType
     # >>> help(CodeType)
+
+    # We need to intern the function names to be consistent with the method name,
+    # which are interned automatically with `setattr`
+    co_name = sys.intern(obj.co_name)
     if hasattr(obj, "co_exceptiontable"):
         # Python 3.11 and later: there are some new attributes
         # related to the enhanced exceptions.
@@ -817,7 +830,7 @@ def _code_reduce(obj):
             obj.co_names,
             obj.co_varnames,
             obj.co_filename,
-            obj.co_name,
+            co_name,
             obj.co_qualname,
             obj.co_firstlineno,
             obj.co_linetable,
@@ -840,7 +853,7 @@ def _code_reduce(obj):
             obj.co_names,
             obj.co_varnames,
             obj.co_filename,
-            obj.co_name,
+            co_name,
             obj.co_firstlineno,
             obj.co_linetable,
             obj.co_freevars,
@@ -861,7 +874,7 @@ def _code_reduce(obj):
             obj.co_consts,
             obj.co_varnames,
             obj.co_filename,
-            obj.co_name,
+            co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
             obj.co_exc_handlers,
@@ -885,7 +898,7 @@ def _code_reduce(obj):
             obj.co_names,
             obj.co_varnames,
             obj.co_filename,
-            obj.co_name,
+            co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
             obj.co_freevars,
@@ -1127,6 +1140,10 @@ def _class_setstate(obj, state):
         if attrname == "_abc_impl":
             registry = attr
         else:
+            # Note: attribute names are automatically interned in cpython. This means that to get
+            # determinist pickling in subprocess, we need to make sure that the dynamic function names
+            # are also interned.
+            # https://github.com/python/cpython/blob/main/Objects/object.c#L1060
             setattr(obj, attrname, attr)
     if registry is not None:
         for subclass in registry:
