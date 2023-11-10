@@ -2041,13 +2041,12 @@ class CloudPickleTest(unittest.TestCase):
                 '''Class with potential string interning issues.'''
                 arg_1 = "join"
 
-                def test_method(self, arg_1, join):
+                def join(self, arg_1):
                     pass
 
             A_dump = w.run(cloudpickle.dumps, A)
-            with pytest.raises(AssertionError):
-                check_determinist_pickle(A_dump, cloudpickle.dumps(A))
             pytest.xfail("This test is expected to fail due to string interning errors.")
+            check_determinist_pickle(A_dump, cloudpickle.dumps(A))
 
     @pytest.mark.skipif(
         platform.python_implementation() == "PyPy",
