@@ -225,11 +225,11 @@ def check_determinist_pickle(a, b):
         with io.StringIO() as out:
             pickletools.dis(pickletools.optimize(a), out)
             a_out = out.getvalue()
-            a_out = '\n'.join(ll[11:] for ll in a_out.splitlines())
+            a_out = "\n".join(ll[11:] for ll in a_out.splitlines())
         with io.StringIO() as out:
             pickletools.dis(pickletools.optimize(b), out)
             b_out = out.getvalue()
-            b_out = '\n'.join(ll[11:] for ll in b_out.splitlines())
+            b_out = "\n".join(ll[11:] for ll in b_out.splitlines())
         assert a_out == b_out
 
 

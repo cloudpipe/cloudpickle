@@ -1988,8 +1988,10 @@ class CloudPickleTest(unittest.TestCase):
         # This checks that the order of the class attributes is deterministic.
 
         with subprocess_worker(protocol=self.protocol) as w:
+
             class A:
-                '''Simple class definition'''
+                """Simple class definition"""
+
                 pass
 
             A_dump = w.run(cloudpickle.dumps, A)
@@ -2000,7 +2002,7 @@ class CloudPickleTest(unittest.TestCase):
             # the class and thus `__doc__` before populating it.
             class A:
                 name = "A"
-                __doc__ = '''Updated class definition'''
+                __doc__ = "Updated class definition"
 
             A_dump = w.run(cloudpickle.dumps, A)
             check_determinist_pickle(A_dump, cloudpickle.dumps(A))
@@ -2008,9 +2010,8 @@ class CloudPickleTest(unittest.TestCase):
             # If the doc is defined in `__init__`, this can cause ordering changes due to the way
             # we reconstruct the class with _make_class_skeleton. Make sure the order is deterministic
             class A:
-
                 def __init__(self):
-                    '''Class definition with explicit __init__'''
+                    """Class definition with explicit __init__"""
                     pass
 
             A_dump = w.run(cloudpickle.dumps, A)
@@ -2024,7 +2025,8 @@ class CloudPickleTest(unittest.TestCase):
             # Due to interning of class attributes, check that this does not create issues
             # with dynamic function definition.
             class A:
-                '''Class with potential string interning issues.'''
+                """Class with potential string interning issues."""
+
                 arg_1 = "class_value"
 
                 def join(self):
@@ -2038,14 +2040,17 @@ class CloudPickleTest(unittest.TestCase):
 
             # XXX - this does not seem to work, and I am not sure there is an easy fix.
             class A:
-                '''Class with potential string interning issues.'''
+                """Class with potential string interning issues."""
+
                 arg_1 = "join"
 
                 def join(self, arg_1):
                     pass
 
             A_dump = w.run(cloudpickle.dumps, A)
-            pytest.xfail("This test is expected to fail due to string interning errors.")
+            pytest.xfail(
+                "This test is expected to fail due to string interning errors."
+            )
             check_determinist_pickle(A_dump, cloudpickle.dumps(A))
 
     @pytest.mark.skipif(
