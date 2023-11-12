@@ -538,9 +538,10 @@ def _make_skeleton_class(
     # We need to intern the keys of the type_kwargs dict to avoid having
     # different pickles for the same dynamic class depending on whether it was
     # dynamically created or reconstructed from a pickled stream.
+    type_kwargs = {sys.intern(k): v for k, v in type_kwargs.items()}
+
     skeleton_class = types.new_class(
-        name, bases, {"metaclass": type_constructor},
-        lambda ns: ns.update({sys.intern(k): v for k, v in type_kwargs.items()})
+        name, bases, {"metaclass": type_constructor}, lambda ns: ns.update(type_kwargs)
     )
 
     return _lookup_class_or_track(class_tracker_id, skeleton_class)
@@ -702,8 +703,8 @@ def _function_getstate(func):
     #   slotname, slotvalue)
     slotstate = {
         # Intern the function names to be consistent with the method names that are
-        # interned automatically with `setattr`.
-        "__name__": sys.intern(func.__name__),
+        # automatically interned with `setattr`. This is only the case for cpython.
+        "__name__": sys.intern(func.__name__) if not PYPY else func.__name__,
         "__qualname__": func.__qualname__,
         "__annotations__": func.__annotations__,
         "__kwdefaults__": func.__kwdefaults__,
@@ -813,8 +814,8 @@ def _code_reduce(obj):
     # >>> help(CodeType)
 
     # We need to intern the function names to be consistent with the method name,
-    # which are interned automatically with `setattr`
-    co_name = sys.intern(obj.co_name)
+    # which are interned automatically with `setattr`. This is only the case for cpython.
+    co_name = sys.intern(obj.co_name) if not PYPY else obj.co_name
     if hasattr(obj, "co_exceptiontable"):
         # Python 3.11 and later: there are some new attributes
         # related to the enhanced exceptions.
