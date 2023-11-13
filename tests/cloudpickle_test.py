@@ -1983,6 +1983,43 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
+    def test_dynamic_func_determinist(self):
+        # Check that the pickle serialization for a dynamic func is the same
+        # in two processes.
+
+        def get_dynamic_func_pickle():
+            def test_method(arg_1, arg_2):
+                pass
+            return cloudpickle.dumps(test_method)
+
+        with subprocess_worker(protocol=self.protocol) as w:
+
+            A_dump = w.run(get_dynamic_func_pickle)
+            check_determinist_pickle(A_dump, get_dynamic_func_pickle())
+
+    def test_dynamic_class_determinist(self):
+        # Check that the pickle serialization for a dynamic class is the same
+        # in two processes.
+        pytest.xfail("This test fails due to different tracker_id.")
+
+        def get_dynamic_class_pickle():
+            class A:
+                """Class with potential string interning issues."""
+
+                arg_1 = "class_value"
+
+                def join(self):
+                    pass
+
+                def test_method(self, arg_1, join):
+                    pass
+            return cloudpickle.dumps(A)
+
+        with subprocess_worker(protocol=self.protocol) as w:
+
+            A_dump = w.run(get_dynamic_class_pickle)
+            check_determinist_pickle(A_dump, get_dynamic_class_pickle())
+
     def test_dynamic_class_determinist_subworker_order(self):
         # Check that the pickle produced by the unpickled instance is the same.
         # This checks that the order of the class attributes is deterministic.
