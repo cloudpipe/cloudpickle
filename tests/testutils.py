@@ -227,6 +227,9 @@ def check_determinist_pickle(a, b):
         with io.StringIO() as out:
             pickletools.dis(pickletools.optimize(a), out)
             a_out = out.getvalue()
+            # Remove the 11 first characters of each line to remove the bytecode offset
+            # of each object, which is different on each line for very small differences,
+            # making the diff very hard to read.
             a_out = "\n".join(ll[11:] for ll in a_out.splitlines())
         with io.StringIO() as out:
             pickletools.dis(pickletools.optimize(b), out)
