@@ -1143,7 +1143,9 @@ def _class_setstate(obj, state):
         else:
             # Note: attribute names are automatically interned in cpython. This means that to get
             # determinist pickling in subprocess, we need to make sure that the dynamic function names
-            # are also interned.
+            # are also interned since the Pickler's memoizer relies on physical object
+            # identity to break cycles in the reference graph of the object being
+            # serialized.
             # https://github.com/python/cpython/blob/main/Objects/object.c#L1060
             setattr(obj, attrname, attr)
     if registry is not None:

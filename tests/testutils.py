@@ -218,8 +218,10 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
 def check_determinist_pickle(a, b):
     """Check that two pickle output are the same.
 
-    If it is not the case, print the diff between the disaembled pickle.
-    This helper is useful to investigate non-determinist pickle.
+    If it is not the case, print the diff between the disassembled pickle
+    payloads.
+
+    This helper is useful to investigate non-deterministic pickling.
     """
     if a != b:
         with io.StringIO() as out:
