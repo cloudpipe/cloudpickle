@@ -2108,18 +2108,8 @@ class CloudPickleTest(unittest.TestCase):
                 def func2(self,):
                     pass
 
-            def print_tuple_id(obj, where):
-                print(f"In {where}, tuple ('self',) as id:")
-                print(f"Func1 args id: {id(obj.func1.__code__.co_varnames)}")
-                print(f"Func2 args id: {id(obj.func2.__code__.co_varnames)}")
-                return cloudpickle.dumps(obj)
-
-            A_dump = print_tuple_id(A, "main process")
-            A_dump_sub = w.run(print_tuple_id, A, "sub-process")
-            pytest.xfail(
-                "This test is expected to fail due to string interning errors."
-            )
-            check_determinist_pickle(A_dump_sub, A_dump)
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_determinist_pickle(A_dump, cloudpickle.dumps(A))
 
     @pytest.mark.skipif(
         platform.python_implementation() == "PyPy",

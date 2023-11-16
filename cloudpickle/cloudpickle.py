@@ -816,6 +816,15 @@ def _code_reduce(obj):
     # We need to intern the function names to be consistent with the method name,
     # which are interned automatically with `setattr`. This is only the case for cpython.
     co_name = sys.intern(obj.co_name) if not PYPY else obj.co_name
+
+    # Create copies of these tuple to make cloudpickle payload deterministic.
+    # When creating a code object during load, copies of these four tuples are
+    # created, while in the main process, these tuples can be shared.
+    # By always creating copies, we make sure the resulting payload is deterministic.
+    co_names = tuple(name for name in obj.co_names)
+    co_varnames = tuple(name for name in obj.co_varnames)
+    co_freevars = tuple(name for name in obj.co_freevars)
+    co_cellvars = tuple(name for name in obj.co_cellvars)
     if hasattr(obj, "co_exceptiontable"):
         # Python 3.11 and later: there are some new attributes
         # related to the enhanced exceptions.
@@ -828,16 +837,16 @@ def _code_reduce(obj):
             obj.co_flags,
             obj.co_code,
             obj.co_consts,
-            obj.co_names,
-            obj.co_varnames,
+            co_names,
+            co_varnames,
             obj.co_filename,
             co_name,
             obj.co_qualname,
             obj.co_firstlineno,
             obj.co_linetable,
             obj.co_exceptiontable,
-            obj.co_freevars,
-            obj.co_cellvars,
+            co_freevars,
+            co_cellvars,
         )
     elif hasattr(obj, "co_linetable"):
         # Python 3.10 and later: obj.co_lnotab is deprecated and constructor
@@ -851,14 +860,14 @@ def _code_reduce(obj):
             obj.co_flags,
             obj.co_code,
             obj.co_consts,
-            obj.co_names,
-            obj.co_varnames,
+            co_names,
+            co_varnames,
             obj.co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_linetable,
-            obj.co_freevars,
-            obj.co_cellvars,
+            co_freevars,
+            co_cellvars,
         )
     elif hasattr(obj, "co_nmeta"):  # pragma: no cover
         # "nogil" Python: modified attributes from 3.9
@@ -873,15 +882,15 @@ def _code_reduce(obj):
             obj.co_flags,
             obj.co_code,
             obj.co_consts,
-            obj.co_varnames,
+            co_varnames,
             obj.co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
             obj.co_exc_handlers,
             obj.co_jump_table,
-            obj.co_freevars,
-            obj.co_cellvars,
+            co_freevars,
+            co_cellvars,
             obj.co_free2reg,
             obj.co_cell2reg,
         )
@@ -896,14 +905,14 @@ def _code_reduce(obj):
             obj.co_flags,
             obj.co_code,
             obj.co_consts,
-            obj.co_names,
-            obj.co_varnames,
+            co_names,
+            co_varnames,
             obj.co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
-            obj.co_freevars,
-            obj.co_cellvars,
+            co_freevars,
+            co_cellvars,
         )
     return types.CodeType, args
 
