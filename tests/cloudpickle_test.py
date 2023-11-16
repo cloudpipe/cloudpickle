@@ -2090,6 +2090,37 @@ class CloudPickleTest(unittest.TestCase):
             )
             check_determinist_pickle(A_dump, cloudpickle.dumps(A))
 
+    def test_dynamic_class_determinist_subworker_tuple_memoization(self):
+        # Check that the pickle produced by the unpickled instance is the same.
+        # This highlights some issues with tuple memoization.
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            # Arguments' tuple is memoized in the main process but not in the subprocess
+            # as the tuples do not share the same id in the loaded class.
+
+            # XXX - this does not seem to work, and I am not sure there is an easy fix.
+            class A:
+                """Class with potential tuple memoization issues."""
+
+                def func1(self,):
+                    pass
+
+                def func2(self,):
+                    pass
+
+            def print_tuple_id(obj, where):
+                print(f"In {where}, tuple ('self',) as id:")
+                print(f"Func1 args id: {id(obj.func1.__code__.co_varnames)}")
+                print(f"Func2 args id: {id(obj.func2.__code__.co_varnames)}")
+                return cloudpickle.dumps(obj)
+
+            A_dump = print_tuple_id(A, "main process")
+            A_dump_sub = w.run(print_tuple_id, A, "sub-process")
+            pytest.xfail(
+                "This test is expected to fail due to string interning errors."
+            )
+            check_determinist_pickle(A_dump_sub, A_dump)
+
     @pytest.mark.skipif(
         platform.python_implementation() == "PyPy",
         reason="Skip PyPy because memory grows too much",
