@@ -1,8 +1,9 @@
 import sys
 import os
 import io
-import os.path as op
+import difflib
 import tempfile
+import os.path as op
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 import pickle
 import pickletools
