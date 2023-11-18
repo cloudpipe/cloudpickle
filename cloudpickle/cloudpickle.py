@@ -410,7 +410,10 @@ def _walk_global_ops(code):
 def _extract_class_dict(cls):
     """Retrieve a copy of the dict of a class without the inherited method."""
     # copy dict proxy to a dict. Sort the keys to make the pickle deterministic
-    clsdict = {k: cls.__dict__[k] for k in sorted(cls.__dict__)}
+    # Also create a copy of the dict's keys, to avoid its memoization.
+    # This is necessary as memoization happens only if all string are interned,
+    # which is not the case in reconstructed dynamic classes.
+    clsdict = {"".join(k): cls.__dict__[k] for k in sorted(cls.__dict__)}
 
     if len(cls.__bases__) == 1:
         inherited_dict = cls.__bases__[0].__dict__
@@ -702,9 +705,11 @@ def _function_getstate(func):
     #   unpickling time by iterating over slotstate and calling setattr(func,
     #   slotname, slotvalue)
     slotstate = {
-        # Intern the function names to be consistent with the method names that are
-        # automatically interned with `setattr`. This is only the case for cpython.
-        "__name__": sys.intern(func.__name__) if not PYPY else func.__name__,
+        # Create a copy of the function name, to avoid memoization. This is necessary
+        # to ensure deterministic pickles, that depends wheter the name is interned
+        # or not. This is not guaranteed for reconstructed dynamic function, so we make
+        # sure it is never interned.
+        "__name__": "".join(func.__name__),
         "__qualname__": func.__qualname__,
         "__annotations__": func.__annotations__,
         "__kwdefaults__": func.__kwdefaults__,
@@ -813,9 +818,11 @@ def _code_reduce(obj):
     # >>> from types import CodeType
     # >>> help(CodeType)
 
-    # We need to intern the function names to be consistent with the method name,
-    # which are interned automatically with `setattr`. This is only the case for cpython.
-    co_name = sys.intern(obj.co_name) if not PYPY else obj.co_name
+    # Create a copy of the object name, to avoid memoization. This is necessary
+    # to ensure deterministic pickles, that depends wheter the name is interned
+    # or not. This is not guaranteed for reconstructed dynamic classes, so we make
+    # sure it is never interned.
+    co_name = "".join(obj.co_name)
 
     # Create copies of these tuple to make cloudpickle payload deterministic.
     # When creating a code object during load, copies of these four tuples are
@@ -1151,7 +1158,7 @@ def _class_setstate(obj, state):
             registry = attr
         else:
             # Note: setting attribute names on a class automatically triggers their
-            # interning in CPython: 
+            # interning in CPython:
             # https://github.com/python/cpython/blob/v3.12.0/Objects/object.c#L957
             #
             # This means that to get deterministic pickling for a dynamic class that

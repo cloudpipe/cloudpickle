@@ -236,12 +236,13 @@ def check_deterministic_pickle(a, b):
             pickletools.dis(pickletools.optimize(b), out)
             b_out = out.getvalue()
             b_out = "\n".join(ll[11:] for ll in b_out.splitlines())
+        assert a_out == b_out
         full_diff = difflib.context_diff(
             a_out.splitlines(keepends=True), b_out.splitlines(keepends=True)
         )
         full_diff = "".join(full_diff)
-        if len(full_diff) > 1000:
-            full_diff = full_diff[:994] + " [...]"
+        if len(full_diff) > 1500:
+            full_diff = full_diff[:1494] + " [...]"
         raise AssertionError(
            "Pickle payloads are not bitwise equal:\n"
            + full_diff
