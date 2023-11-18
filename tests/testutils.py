@@ -215,8 +215,8 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
         os.unlink(source_file)
 
 
-def check_determinist_pickle(a, b):
-    """Check that two pickle output are the same.
+def check_deterministic_pickle(a, b):
+    """Check that two pickle output are bitwise equal.
 
     If it is not the case, print the diff between the disassembled pickle
     payloads.
@@ -235,7 +235,16 @@ def check_determinist_pickle(a, b):
             pickletools.dis(pickletools.optimize(b), out)
             b_out = out.getvalue()
             b_out = "\n".join(ll[11:] for ll in b_out.splitlines())
-        assert a_out == b_out
+        full_diff = difflib.context_diff(
+            a_out.splitlines(keepends=True), b_out.splitlines(keepends=True)
+        )
+        full_diff = "".join(full_diff)
+        if len(full_diff) > 1000:
+            full_diff = full_diff[:994] + " [...]"
+        raise AssertionError(
+           "Pickle payloads are not bitwise equal:\n"
+           + full_diff
+        )
 
 
 if __name__ == "__main__":

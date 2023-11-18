@@ -1150,12 +1150,16 @@ def _class_setstate(obj, state):
         if attrname == "_abc_impl":
             registry = attr
         else:
-            # Note: attribute names are automatically interned in cpython. This means that to get
-            # determinist pickling in subprocess, we need to make sure that the dynamic function names
-            # are also interned since the Pickler's memoizer relies on physical object
-            # identity to break cycles in the reference graph of the object being
-            # serialized.
-            # https://github.com/python/cpython/blob/main/Objects/object.c#L1060
+            # Note: setting attribute names on a class automatically triggers their
+            # interning in CPython: 
+            # https://github.com/python/cpython/blob/v3.12.0/Objects/object.c#L957
+            #
+            # This means that to get deterministic pickling for a dynamic class that
+            # was initially defined in remote Python process, we need to make sure that
+            # the dynamic function names are also interned.
+            #
+            # Indeed the Pickler's memoizer relies on physical object identity to break
+            # cycles in the reference graph of the object being serialized.
             setattr(obj, attrname, attr)
     if registry is not None:
         for subclass in registry:
