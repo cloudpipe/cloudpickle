@@ -1990,10 +1990,10 @@ class CloudPickleTest(unittest.TestCase):
         def get_dynamic_func_pickle():
             def test_method(arg_1, arg_2):
                 pass
+
             return cloudpickle.dumps(test_method)
 
         with subprocess_worker(protocol=self.protocol) as w:
-
             A_dump = w.run(get_dynamic_func_pickle)
             check_deterministic_pickle(A_dump, get_dynamic_func_pickle())
 
@@ -2013,10 +2013,10 @@ class CloudPickleTest(unittest.TestCase):
 
                 def test_method(self, arg_1, join):
                     pass
+
             return cloudpickle.dumps(A)
 
         with subprocess_worker(protocol=self.protocol) as w:
-
             A_dump = w.run(get_dynamic_class_pickle)
             check_deterministic_pickle(A_dump, get_dynamic_class_pickle())
 
@@ -2037,10 +2037,11 @@ class CloudPickleTest(unittest.TestCase):
             A_dump = w.run(cloudpickle.dumps, A)
             check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
 
-            # If the `__doc__` attribute is defined after some other class attribute,
-            # this can cause class attribute ordering changes due to the way we reconstruct
-            # the class definition in `_make_class_skeleton`, which creates the class
-            # and thus its `__doc__` attribute before populating the class attributes.
+            # If the `__doc__` attribute is defined after some other class
+            # attribute, this can cause class attribute ordering changes due to
+            # the way we reconstruct the class definition in
+            # `_make_class_skeleton`, which creates the class and thus its
+            # `__doc__` attribute before populating the class attributes.
             class A:
                 name = "A"
                 __doc__ = "Updated class definition"
@@ -2048,8 +2049,9 @@ class CloudPickleTest(unittest.TestCase):
             A_dump = w.run(cloudpickle.dumps, A)
             check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
 
-            # If a `__doc__` is defined on the `__init__` method, this can cause ordering
-            # changes due to the way we reconstruct the class with `_make_class_skeleton`.
+            # If a `__doc__` is defined on the `__init__` method, this can
+            # cause ordering changes due to the way we reconstruct the class
+            # with `_make_class_skeleton`.
             class A:
                 def __init__(self):
                     """Class definition with explicit __init__"""
@@ -2060,13 +2062,13 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_deterministic_str_interning_for_chained_dynamic_class_pickling(self):
         # Check that the pickle produced by the unpickled instance is the same.
-        # This checks that there is no issue related to the string interning of the
-        # names of attributes of class definitions and names of attributes of the
-        # `__code__` objects of the methods.
+        # This checks that there is no issue related to the string interning of
+        # the names of attributes of class definitions and names of attributes
+        # of the `__code__` objects of the methods.
 
         with subprocess_worker(protocol=self.protocol) as w:
-            # Due to interning of class attributes, check that this does not create issues
-            # with dynamic function definition.
+            # Due to interning of class attributes, check that this does not
+            # create issues with dynamic function definition.
             class A:
                 """Class with potential string interning issues."""
 
@@ -2081,8 +2083,8 @@ class CloudPickleTest(unittest.TestCase):
             A_dump = w.run(cloudpickle.dumps, A)
             check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
 
-            # Also check that memoization of string value inside the class does not cause
-            # non-deterministic pickle with interned method names.
+            # Also check that memoization of string value inside the class does
+            # not cause non-deterministic pickle with interned method names.
             class A:
                 """Class with potential string interning issues."""
 
@@ -2090,6 +2092,11 @@ class CloudPickleTest(unittest.TestCase):
 
                 def join(self, arg_1):
                     pass
+
+            # Set a custom method attribute that can potentially trigger
+            # undeterministic memoization depending on the interning state of
+            # the string used for the attribute name.
+            A.join.arg_1 = "join"
 
             A_dump = w.run(cloudpickle.dumps, A)
             check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
@@ -2099,17 +2106,18 @@ class CloudPickleTest(unittest.TestCase):
         # This highlights some issues with tuple memoization.
 
         with subprocess_worker(protocol=self.protocol) as w:
-            # Arguments' tuple is memoized in the main process but not in the subprocess
-            # as the tuples do not share the same id in the loaded class.
+            # Arguments' tuple is memoized in the main process but not in the
+            # subprocess as the tuples do not share the same id in the loaded
+            # class.
 
             # XXX - this does not seem to work, and I am not sure there is an easy fix.
             class A:
                 """Class with potential tuple memoization issues."""
 
-                def func1(self,):
+                def func1(self):
                     pass
 
-                def func2(self,):
+                def func2(self):
                     pass
 
             A_dump = w.run(cloudpickle.dumps, A)
