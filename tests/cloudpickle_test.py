@@ -1983,7 +1983,7 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
-    def test_dynamic_func_determinist(self):
+    def test_dynamic_func_deterministic_roundtrip(self):
         # Check that the pickle serialization for a dynamic func is the same
         # in two processes.
 
@@ -1997,7 +1997,7 @@ class CloudPickleTest(unittest.TestCase):
             A_dump = w.run(get_dynamic_func_pickle)
             check_deterministic_pickle(A_dump, get_dynamic_func_pickle())
 
-    def test_dynamic_class_determinist(self):
+    def test_dynamic_class_deterministic_roundtrip(self):
         # Check that the pickle serialization for a dynamic class is the same
         # in two processes.
         pytest.xfail("This test fails due to different tracker_id.")

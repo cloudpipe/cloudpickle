@@ -706,9 +706,11 @@ def _function_getstate(func):
     #   slotname, slotvalue)
     slotstate = {
         # Create a copy of the function name, to avoid memoization. This is necessary
-        # to ensure deterministic pickles, that depends wheter the name is interned
-        # or not. This is not guaranteed for reconstructed dynamic function, so we make
-        # sure it is never interned.
+        # to ensure deterministic pickles (when doing rountrips with a remote Python
+        # process): the behavior of the pickler's memoizer depends on the string
+        # physical identity and therefore on whether the name is interned or not
+        # The name of reconstructed dynamic function is typically not interned, so
+        # we make sure it is not interned prior to pickling as well.
         "__name__": "".join(func.__name__),
         "__qualname__": func.__qualname__,
         "__annotations__": func.__annotations__,
@@ -820,11 +822,12 @@ def _code_reduce(obj):
 
     # Create a copy of the object name, to avoid memoization. This is necessary
     # to ensure deterministic pickles, that depends wheter the name is interned
-    # or not. This is not guaranteed for reconstructed dynamic classes, so we make
-    # sure it is never interned.
+    # or not. The name of code objects of reconstructed dynamic functions or
+    # methods is typically not interned, so we make sure it is not interned
+    # either prior to pickling.
     co_name = "".join(obj.co_name)
 
-    # Create copies of these tuple to make cloudpickle payload deterministic.
+    # Create shallow copies of these tuple to make cloudpickle payload deterministic.
     # When creating a code object during load, copies of these four tuples are
     # created, while in the main process, these tuples can be shared.
     # By always creating copies, we make sure the resulting payload is deterministic.
@@ -1162,8 +1165,10 @@ def _class_setstate(obj, state):
             # https://github.com/python/cpython/blob/v3.12.0/Objects/object.c#L957
             #
             # This means that to get deterministic pickling for a dynamic class that
-            # was initially defined in remote Python process, we need to make sure that
-            # the dynamic function names are also interned.
+            # was initially defined in a different Python process, the pickler
+            # needs to ensure that dynamic class and function attribute names are
+            # systematically copied into a non-interned version to avoid
+            # unpredictable pickle payloads.
             #
             # Indeed the Pickler's memoizer relies on physical object identity to break
             # cycles in the reference graph of the object being serialized.
