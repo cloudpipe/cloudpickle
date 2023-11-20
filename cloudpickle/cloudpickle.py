@@ -738,6 +738,9 @@ def _function_getstate(func):
     )
     slotstate["__globals__"] = f_globals
 
+    # copy dict proxy to a dict. Create a copy of the dict's keys, to avoid their
+    # memoization. This is necessary as memoization happens only if all string
+    # are interned, which is not the case in reconstructed dynamic functions.
     state = {"".join(k): v for k, v in func.__dict__.items()}
     return state, slotstate
 
