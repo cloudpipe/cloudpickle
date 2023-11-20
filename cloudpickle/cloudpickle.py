@@ -738,7 +738,7 @@ def _function_getstate(func):
     )
     slotstate["__globals__"] = f_globals
 
-    state = func.__dict__
+    state = {"".join(k): v for k, v in func.__dict__.items()}
     return state, slotstate
 
 
