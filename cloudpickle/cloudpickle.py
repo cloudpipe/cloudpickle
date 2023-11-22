@@ -409,10 +409,8 @@ def _walk_global_ops(code):
 
 def _extract_class_dict(cls):
     """Retrieve a copy of the dict of a class without the inherited method."""
-    # copy dict proxy to a dict. Sort the keys to make the pickle deterministic
-    # Also create a copy of the dict's keys, to avoid its memoization.
-    # This is necessary as memoization happens only if all string are interned,
-    # which is not the case in reconstructed dynamic classes.
+    # Hack to circumvent non-predictable memoization caused by string interning.
+    # See the inline comment in _class_setstate for details.
     clsdict = {"".join(k): cls.__dict__[k] for k in sorted(cls.__dict__)}
 
     if len(cls.__bases__) == 1:
@@ -705,12 +703,8 @@ def _function_getstate(func):
     #   unpickling time by iterating over slotstate and calling setattr(func,
     #   slotname, slotvalue)
     slotstate = {
-        # Create a copy of the function name, to avoid memoization. This is necessary
-        # to ensure deterministic pickles (when doing rountrips with a remote Python
-        # process): the behavior of the pickler's memoizer depends on the string
-        # physical identity and therefore on whether the name is interned or not
-        # The name of reconstructed dynamic function is typically not interned, so
-        # we make sure it is not interned prior to pickling as well.
+        # Hack to circumvent non-predictable memoization caused by string interning.
+        # See the inline comment in _class_setstate for details.
         "__name__": "".join(func.__name__),
         "__qualname__": func.__qualname__,
         "__annotations__": func.__annotations__,
@@ -738,9 +732,8 @@ def _function_getstate(func):
     )
     slotstate["__globals__"] = f_globals
 
-    # copy dict proxy to a dict. Create a copy of the dict's keys, to avoid their
-    # memoization. This is necessary as memoization happens only if all string
-    # are interned, which is not the case in reconstructed dynamic functions.
+    # Hack to circumvent non-predictable memoization caused by string interning.
+    # See the inline comment in _class_setstate for details.
     state = {"".join(k): v for k, v in func.__dict__.items()}
     return state, slotstate
 
@@ -823,11 +816,8 @@ def _code_reduce(obj):
     # >>> from types import CodeType
     # >>> help(CodeType)
 
-    # Create a copy of the object name, to avoid memoization. This is necessary
-    # to ensure deterministic pickles, that depends wheter the name is interned
-    # or not. The name of code objects of reconstructed dynamic functions or
-    # methods is typically not interned, so we make sure it is not interned
-    # either prior to pickling.
+    # Hack to circumvent non-predictable memoization caused by string interning.
+    # See the inline comment in _class_setstate for details.
     co_name = "".join(obj.co_name)
 
     # Create shallow copies of these tuple to make cloudpickle payload deterministic.
