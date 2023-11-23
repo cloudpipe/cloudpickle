@@ -1,9 +1,12 @@
 import sys
 import os
-import os.path as op
+import io
+import difflib
 import tempfile
+import os.path as op
 from subprocess import Popen, check_output, PIPE, STDOUT, CalledProcessError
 import pickle
+import pickletools
 from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor
 
@@ -211,6 +214,39 @@ def assert_run_python_script(source_code, timeout=TIMEOUT):
             ) from e
     finally:
         os.unlink(source_file)
+
+
+def check_deterministic_pickle(a, b):
+    """Check that two pickle output are bitwise equal.
+
+    If it is not the case, print the diff between the disassembled pickle
+    payloads.
+
+    This helper is useful to investigate non-deterministic pickling.
+    """
+    if a != b:
+        with io.StringIO() as out:
+            pickletools.dis(pickletools.optimize(a), out)
+            a_out = out.getvalue()
+            # Remove the 11 first characters of each line to remove the bytecode offset
+            # of each object, which is different on each line for very small differences,
+            # making the diff very hard to read.
+            a_out = "\n".join(ll[11:] for ll in a_out.splitlines())
+        with io.StringIO() as out:
+            pickletools.dis(pickletools.optimize(b), out)
+            b_out = out.getvalue()
+            b_out = "\n".join(ll[11:] for ll in b_out.splitlines())
+        assert a_out == b_out
+        full_diff = difflib.context_diff(
+            a_out.splitlines(keepends=True), b_out.splitlines(keepends=True)
+        )
+        full_diff = "".join(full_diff)
+        if len(full_diff) > 1500:
+            full_diff = full_diff[:1494] + " [...]"
+        raise AssertionError(
+           "Pickle payloads are not bitwise equal:\n"
+           + full_diff
+        )
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ cloudpickle. When testing, the generated pickle files are depickled using the
 active cloudpickle branch to make sure that cloudpickle is able to depickle old
 cloudpickle files.
 """
+
 import sys
 
 from pathlib import Path

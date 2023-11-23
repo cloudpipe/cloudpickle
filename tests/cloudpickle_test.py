@@ -48,10 +48,11 @@ from cloudpickle.cloudpickle import _make_empty_cell
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
 
+from .testutils import subprocess_worker
 from .testutils import subprocess_pickle_echo
 from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
-from .testutils import subprocess_worker
+from .testutils import check_deterministic_pickle
 
 
 _TEST_GLOBAL_VARIABLE = "default_value"
@@ -108,7 +109,7 @@ def test_extract_class_dict():
             return "c"
 
     clsdict = _extract_class_dict(C)
-    assert sorted(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
+    assert list(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
     assert clsdict["C_CONSTANT"] == 43
     assert clsdict["__doc__"] is None
     assert clsdict["method_c"](C()) == C().method_c()
@@ -1951,7 +1952,6 @@ class CloudPickleTest(unittest.TestCase):
 
             class A:
                 '''Updated class definition'''
-                pass
 
             assert not w.run(lambda obj_id: isinstance(lookup(obj_id), A), id1)
             retrieved1 = w.run(lookup, id1)
@@ -1982,6 +1982,146 @@ class CloudPickleTest(unittest.TestCase):
 
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
+
+    def test_dynamic_func_deterministic_roundtrip(self):
+        # Check that the pickle serialization for a dynamic func is the same
+        # in two processes.
+
+        def get_dynamic_func_pickle():
+            def test_method(arg_1, arg_2):
+                pass
+
+            return cloudpickle.dumps(test_method)
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            A_dump = w.run(get_dynamic_func_pickle)
+            check_deterministic_pickle(A_dump, get_dynamic_func_pickle())
+
+    def test_dynamic_class_deterministic_roundtrip(self):
+        # Check that the pickle serialization for a dynamic class is the same
+        # in two processes.
+        pytest.xfail("This test fails due to different tracker_id.")
+
+        def get_dynamic_class_pickle():
+            class A:
+                """Class with potential string interning issues."""
+
+                arg_1 = "class_value"
+
+                def join(self):
+                    pass
+
+                def test_method(self, arg_1, join):
+                    pass
+
+            return cloudpickle.dumps(A)
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            A_dump = w.run(get_dynamic_class_pickle)
+            check_deterministic_pickle(A_dump, get_dynamic_class_pickle())
+
+    def test_deterministic_dynamic_class_attr_ordering_for_chained_pickling(self):
+        # Check that the pickle produced by pickling a reconstructed class definition
+        # in a remote process matches the pickle produced by pickling the original
+        # class definition.
+        # In particular, this test checks that the order of the class attributes is
+        # deterministic.
+
+        with subprocess_worker(protocol=self.protocol) as w:
+
+            class A:
+                """Simple class definition"""
+
+                pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
+
+            # If the `__doc__` attribute is defined after some other class
+            # attribute, this can cause class attribute ordering changes due to
+            # the way we reconstruct the class definition in
+            # `_make_class_skeleton`, which creates the class and thus its
+            # `__doc__` attribute before populating the class attributes.
+            class A:
+                name = "A"
+                __doc__ = "Updated class definition"
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
+
+            # If a `__doc__` is defined on the `__init__` method, this can
+            # cause ordering changes due to the way we reconstruct the class
+            # with `_make_class_skeleton`.
+            class A:
+                def __init__(self):
+                    """Class definition with explicit __init__"""
+                    pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
+
+    def test_deterministic_str_interning_for_chained_dynamic_class_pickling(self):
+        # Check that the pickle produced by the unpickled instance is the same.
+        # This checks that there is no issue related to the string interning of
+        # the names of attributes of class definitions and names of attributes
+        # of the `__code__` objects of the methods.
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            # Due to interning of class attributes, check that this does not
+            # create issues with dynamic function definition.
+            class A:
+                """Class with potential string interning issues."""
+
+                arg_1 = "class_value"
+
+                def join(self):
+                    pass
+
+                def test_method(self, arg_1, join):
+                    pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
+
+            # Also check that memoization of string value inside the class does
+            # not cause non-deterministic pickle with interned method names.
+            class A:
+                """Class with potential string interning issues."""
+
+                arg_1 = "join"
+
+                def join(self, arg_1):
+                    pass
+
+            # Set a custom method attribute that can potentially trigger
+            # undeterministic memoization depending on the interning state of
+            # the string used for the attribute name.
+            A.join.arg_1 = "join"
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
+
+    def test_dynamic_class_determinist_subworker_tuple_memoization(self):
+        # Check that the pickle produced by the unpickled instance is the same.
+        # This highlights some issues with tuple memoization.
+
+        with subprocess_worker(protocol=self.protocol) as w:
+            # Arguments' tuple is memoized in the main process but not in the
+            # subprocess as the tuples do not share the same id in the loaded
+            # class.
+
+            # XXX - this does not seem to work, and I am not sure there is an easy fix.
+            class A:
+                """Class with potential tuple memoization issues."""
+
+                def func1(self):
+                    pass
+
+                def func2(self):
+                    pass
+
+            A_dump = w.run(cloudpickle.dumps, A)
+            check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
 
     @pytest.mark.skipif(
         platform.python_implementation() == "PyPy",

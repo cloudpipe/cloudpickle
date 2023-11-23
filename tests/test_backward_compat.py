@@ -9,6 +9,7 @@ As a compromise, this script make sure cloudpickle is backward compatible for a
 few canonical use cases. Cloudpicke backward-compatitibility support remains a
 best-effort initiative.
 """
+
 import pickle
 
 import pytest

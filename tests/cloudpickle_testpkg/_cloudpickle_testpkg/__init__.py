@@ -27,19 +27,22 @@ def relative_imports_factory():
     Relative import of functions living both inside modules and packages are
     tested.
     """
+
     def f():
         # module_function belongs to _cloudpickle_testpkg.mod, which is a
         # module
         from .mod import module_function
+
         return module_function()
 
     def g():
         # package_function belongs to _cloudpickle_testpkg, which is a package
         from . import package_function
+
         return package_function()
 
     return f, g
 
 
 some_singleton = _SingletonClass()
-T = typing.TypeVar('T')
+T = typing.TypeVar("T")
