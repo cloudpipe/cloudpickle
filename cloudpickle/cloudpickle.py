@@ -213,6 +213,7 @@ def _whichmodule(obj, name):
         # sys.modules
         if (
             module_name == "__main__"
+            or module_name == "__mp_main__"
             or module is None
             or not isinstance(module, types.ModuleType)
         ):
