@@ -1479,6 +1479,30 @@ class CloudPickleTest(unittest.TestCase):
         finally:
             sys.modules.pop("NonModuleObject")
 
+    def test_importing_multiprocessing_does_not_impact_whichmodule(self):
+        # non-regression test for #528
+        np = pytest.importorskip("numpy")
+        script = """
+import multiprocessing
+import cloudpickle
+from numpy import exp
+
+print(cloudpickle.cloudpickle._whichmodule(exp, exp.__name__))
+"""
+        script_path = os.path.join(self.tmpdir, "script.py")
+        with open(script_path, mode="w") as f:
+            f.write(script)
+        
+        proc = subprocess.Popen(
+            [sys.executable, str(script_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        out, _ = proc.communicate()
+        self.assertEqual(proc.wait(), 0)
+        self.assertEqual(out, b"numpy.core._multiarray_umath\n")
+    
+
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
         # fail when introspecting the currently loaded modules in sys.modules
