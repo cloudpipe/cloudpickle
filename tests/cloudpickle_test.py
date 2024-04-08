@@ -29,6 +29,7 @@ from functools import wraps
 import pickle
 
 import pytest
+from pathlib import Path
 
 try:
     # try importing numpy and scipy. These are not hard dependencies and
@@ -1481,18 +1482,18 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_importing_multiprocessing_does_not_impact_whichmodule(self):
         # non-regression test for #528
-        np = pytest.importorskip("numpy")
-        script = """
-import multiprocessing
-import cloudpickle
-from numpy import exp
+        pytest.importorskip("numpy")
+        script = textwrap.dedent("""
+        import multiprocessing
+        import cloudpickle
+        from numpy import exp
 
-print(cloudpickle.cloudpickle._whichmodule(exp, exp.__name__))
-"""
-        script_path = os.path.join(self.tmpdir, "script.py")
+        print(cloudpickle.cloudpickle._whichmodule(exp, exp.__name__))
+        """)
+        script_path = Path(self.tmpdir) / "whichmodule_and_multiprocessing.py"
         with open(script_path, mode="w") as f:
             f.write(script)
-        
+
         proc = subprocess.Popen(
             [sys.executable, str(script_path)],
             stdout=subprocess.PIPE,
@@ -1501,7 +1502,6 @@ print(cloudpickle.cloudpickle._whichmodule(exp, exp.__name__))
         out, _ = proc.communicate()
         self.assertEqual(proc.wait(), 0)
         self.assertEqual(out, b"numpy.core._multiarray_umath\n")
-    
 
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
