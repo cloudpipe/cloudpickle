@@ -5,6 +5,9 @@
   dynamic functions and classes.
   ([PR #524](https://github.com/cloudpipe/cloudpickle/pull/524))
 
+- Fix a problem with the joint usage of cloudpickle's `_whichmodule` and
+  `multiprocessing`.
+  ([PR #529](https://github.com/cloudpipe/cloudpickle/pull/529))
 
 3.0.0
 =====
