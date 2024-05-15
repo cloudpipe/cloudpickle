@@ -110,7 +110,12 @@ def test_extract_class_dict():
             return "c"
 
     clsdict = _extract_class_dict(C)
-    assert list(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
+    expected_keys = ["C_CONSTANT", "__doc__", "method_c"]
+    # New attribute in Python 3.13 beta 1
+    # https://github.com/python/cpython/pull/118475
+    if sys.version_info >= (3, 13):
+        expected_keys.insert(2, "__firstlineno__")
+    assert list(clsdict.keys()) == expected_keys
     assert clsdict["C_CONSTANT"] == 43
     assert clsdict["__doc__"] is None
     assert clsdict["method_c"](C()) == C().method_c()
