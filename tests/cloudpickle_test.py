@@ -1501,7 +1501,10 @@ class CloudPickleTest(unittest.TestCase):
         )
         out, _ = proc.communicate()
         self.assertEqual(proc.wait(), 0)
-        self.assertEqual(out, b"numpy.core._multiarray_umath\n")
+        assert out.strip() in (
+            b"numpy.core._multiarray_umath",  # numpy 1
+            b"numpy._core._multiarray_umath",  # numpy 2
+        )
 
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
