@@ -2479,7 +2479,7 @@ class CloudPickleTest(unittest.TestCase):
         inner_func = depickled_factory()
         assert inner_func() == _TEST_GLOBAL_VARIABLE
 
-    @pytest.mark.xfailif(
+    @pytest.mark.skipif(
         sys.version_info < (3, 9),
         reason="Can cause CPython 3.8 to segfault",
     )
