@@ -9,7 +9,7 @@ psutil
 tornado
 # To be able to test numpy specific things
 # but do not build numpy from source on Python nightly
-numpy >=1.18.5; python_version <= '3.8'
+numpy >=1.18.5; python_version <= '3.12'
 # Code coverage uploader for Travis:
 codecov
 coverage
