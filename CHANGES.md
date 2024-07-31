@@ -3,7 +3,8 @@
 
 - Some improvements to make cloudpickle more deterministic when pickling
   dynamic functions and classes.
-  ([PR #524](https://github.com/cloudpipe/cloudpickle/pull/524))
+  ([PR #524](https://github.com/cloudpipe/cloudpickle/pull/524) and
+   [PR #534](https://github.com/cloudpipe/cloudpickle/pull/534))
 
 - Fix a problem with the joint usage of cloudpickle's `_whichmodule` and
   `multiprocessing`.
