@@ -2072,7 +2072,7 @@ class CloudPickleTest(unittest.TestCase):
             # If the `__doc__` attribute is defined after some other class
             # attribute, this can cause class attribute ordering changes due to
             # the way we reconstruct the class definition in
-            # `_make_class_skeleton`, which creates the class and thus its
+            # `_make_skeleton_class`, which creates the class and thus its
             # `__doc__` attribute before populating the class attributes.
             class A:
                 name = "A"
@@ -2083,7 +2083,7 @@ class CloudPickleTest(unittest.TestCase):
 
             # If a `__doc__` is defined on the `__init__` method, this can
             # cause ordering changes due to the way we reconstruct the class
-            # with `_make_class_skeleton`.
+            # with `_make_skeleton_class`.
             class A:
                 def __init__(self):
                     """Class definition with explicit __init__"""
