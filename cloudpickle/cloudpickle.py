@@ -370,7 +370,7 @@ def _find_imported_submodules(code, top_level_dependencies):
                 # sys.modules.
                 if name is not None and name.startswith(prefix):
                     # check whether the function can address the sub-module
-                    tokens = set(name[len(prefix):].split("."))
+                    tokens = set(name[len(prefix) :].split("."))
                     if not tokens - set(code.co_names):
                         subimports.append(sys.modules[name])
     return subimports
@@ -707,7 +707,7 @@ def _function_getstate(func):
         # Hack to circumvent non-predictable memoization caused by string interning.
         # See the inline comment in _class_setstate for details.
         "__name__": "".join(func.__name__),
-        "__qualname__": func.__qualname__,
+        "__qualname__": "".join(func.__qualname__),
         "__annotations__": func.__annotations__,
         "__kwdefaults__": func.__kwdefaults__,
         "__defaults__": func.__defaults__,
