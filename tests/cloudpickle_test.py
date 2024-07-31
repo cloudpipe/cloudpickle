@@ -2141,8 +2141,6 @@ class CloudPickleTest(unittest.TestCase):
             # Arguments' tuple is memoized in the main process but not in the
             # subprocess as the tuples do not share the same id in the loaded
             # class.
-
-            # XXX - this does not seem to work, and I am not sure there is an easy fix.
             class A:
                 """Class with potential tuple memoization issues."""
 
