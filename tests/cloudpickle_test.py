@@ -1506,7 +1506,10 @@ class CloudPickleTest(unittest.TestCase):
         )
         out, _ = proc.communicate()
         self.assertEqual(proc.wait(), 0)
-        self.assertEqual(out, b"numpy.core._multiarray_umath\n")
+        assert out.strip() in (
+            b"numpy.core._multiarray_umath",  # numpy 1
+            b"numpy._core._multiarray_umath",  # numpy 2
+        )
 
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
@@ -2484,6 +2487,12 @@ class CloudPickleTest(unittest.TestCase):
         inner_func = depickled_factory()
         assert inner_func() == _TEST_GLOBAL_VARIABLE
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 9),
+        reason="Can cause CPython 3.8 to segfault",
+    )
+    # TODO: remove this xfail when we drop support for Python 3.8. We don't
+    # plan to fix it because Python 3.8 is EOL.
     def test_recursion_during_pickling(self):
         class A:
             def __getattribute__(self, name):
