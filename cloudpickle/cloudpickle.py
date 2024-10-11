@@ -1171,7 +1171,11 @@ def _class_setstate(obj, state):
     if sys.version_info >= (3, 13) and "__firstlineno__" in state:
         # Set the Python 3.13+ only __firstlineno__  attribute one more time, as it
         # will be automatically deleted by the `setattr(obj, attrname, attr)` call
-        # above when `attrname` is "__firstlineno__".
+        # above when `attrname` is "__firstlineno__". We assume that preserving this
+        # information might be important for some users and that it not stale in the
+        # context of cloudpickle usage, hence legitimate to propagate. Furthermore it
+        # is necessary to do so to keep deterministic chained pickling as tested in
+        # test_deterministic_str_interning_for_chained_dynamic_class_pickling.
         obj.__firstlineno__ = state["__firstlineno__"]
 
     if registry is not None:
