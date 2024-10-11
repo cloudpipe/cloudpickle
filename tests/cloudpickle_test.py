@@ -336,6 +336,25 @@ class CloudPickleTest(unittest.TestCase):
         g = pickle_depickle(f(), protocol=self.protocol)
         self.assertEqual(g(), 2)
 
+    def test_class_no_firstlineno_deletion_(self):
+        # `__firstlineno__` is a new attribute of classes introduced in Python 3.13.
+        # This attribute used to be automatically deleted when unpickling a class as a
+        # consequence of cloudpickle setting a class's `__module__` attribute at
+        # unpickling time (see https://github.com/python/cpython/blob/73c152b346a18ed8308e469bdd232698e6cd3a63/Objects/typeobject.c#L1353-L1356).
+        # This deletion would cause tests like
+        # `test_deterministic_dynamic_class_attr_ordering_for_chained_pickling` to fail.
+        # This test makes sure that the attribute `__firstlineno__` is preserved
+        # across a cloudpickle roundtrip.
+
+        class A:
+            pass
+
+        if hasattr(A, "__firstlineno__"):
+            A_roundtrip = pickle_depickle(A, protocol=self.protocol)
+            assert hasattr(A_roundtrip, "__firstlineno__")
+            assert A_roundtrip.__firstlineno__ == A.__firstlineno__
+
+
     def test_dynamically_generated_class_that_uses_super(self):
         class Base:
             def method(self):
