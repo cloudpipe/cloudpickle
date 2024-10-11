@@ -1,5 +1,5 @@
-3.1.0 (in development)
-======================
+3.1.0
+=====
 
 - Some improvements to make cloudpickle more deterministic when pickling
   dynamic functions and classes, in particular with CPython 3.13.
