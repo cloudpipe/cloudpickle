@@ -2,7 +2,7 @@
 ======================
 
 - Some improvements to make cloudpickle more deterministic when pickling
-  dynamic functions and classes.
+  dynamic functions and classes, in particular with CPython 3.13.
   ([PR #524](https://github.com/cloudpipe/cloudpickle/pull/524) and
    [PR #534](https://github.com/cloudpipe/cloudpickle/pull/534))
 
