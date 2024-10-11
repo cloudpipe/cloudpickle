@@ -110,7 +110,12 @@ def test_extract_class_dict():
             return "c"
 
     clsdict = _extract_class_dict(C)
-    assert list(clsdict.keys()) == ["C_CONSTANT", "__doc__", "method_c"]
+    expected_keys = ["C_CONSTANT", "__doc__", "method_c"]
+    # New attribute in Python 3.13 beta 1
+    # https://github.com/python/cpython/pull/118475
+    if sys.version_info >= (3, 13):
+        expected_keys.insert(2, "__firstlineno__")
+    assert list(clsdict.keys()) == expected_keys
     assert clsdict["C_CONSTANT"] == 43
     assert clsdict["__doc__"] is None
     assert clsdict["method_c"](C()) == C().method_c()
@@ -330,6 +335,25 @@ class CloudPickleTest(unittest.TestCase):
 
         g = pickle_depickle(f(), protocol=self.protocol)
         self.assertEqual(g(), 2)
+
+    def test_class_no_firstlineno_deletion_(self):
+        # `__firstlineno__` is a new attribute of classes introduced in Python 3.13.
+        # This attribute used to be automatically deleted when unpickling a class as a
+        # consequence of cloudpickle setting a class's `__module__` attribute at
+        # unpickling time (see https://github.com/python/cpython/blob/73c152b346a18ed8308e469bdd232698e6cd3a63/Objects/typeobject.c#L1353-L1356).
+        # This deletion would cause tests like
+        # `test_deterministic_dynamic_class_attr_ordering_for_chained_pickling` to fail.
+        # This test makes sure that the attribute `__firstlineno__` is preserved
+        # across a cloudpickle roundtrip.
+
+        class A:
+            pass
+
+        if hasattr(A, "__firstlineno__"):
+            A_roundtrip = pickle_depickle(A, protocol=self.protocol)
+            assert hasattr(A_roundtrip, "__firstlineno__")
+            assert A_roundtrip.__firstlineno__ == A.__firstlineno__
+
 
     def test_dynamically_generated_class_that_uses_super(self):
         class Base:
@@ -2067,7 +2091,7 @@ class CloudPickleTest(unittest.TestCase):
             # If the `__doc__` attribute is defined after some other class
             # attribute, this can cause class attribute ordering changes due to
             # the way we reconstruct the class definition in
-            # `_make_class_skeleton`, which creates the class and thus its
+            # `_make_skeleton_class`, which creates the class and thus its
             # `__doc__` attribute before populating the class attributes.
             class A:
                 name = "A"
@@ -2078,7 +2102,7 @@ class CloudPickleTest(unittest.TestCase):
 
             # If a `__doc__` is defined on the `__init__` method, this can
             # cause ordering changes due to the way we reconstruct the class
-            # with `_make_class_skeleton`.
+            # with `_make_skeleton_class`.
             class A:
                 def __init__(self):
                     """Class definition with explicit __init__"""
@@ -2136,8 +2160,6 @@ class CloudPickleTest(unittest.TestCase):
             # Arguments' tuple is memoized in the main process but not in the
             # subprocess as the tuples do not share the same id in the loaded
             # class.
-
-            # XXX - this does not seem to work, and I am not sure there is an easy fix.
             class A:
                 """Class with potential tuple memoization issues."""
 

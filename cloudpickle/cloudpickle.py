@@ -370,7 +370,7 @@ def _find_imported_submodules(code, top_level_dependencies):
                 # sys.modules.
                 if name is not None and name.startswith(prefix):
                     # check whether the function can address the sub-module
-                    tokens = set(name[len(prefix):].split("."))
+                    tokens = set(name[len(prefix) :].split("."))
                     if not tokens - set(code.co_names):
                         subimports.append(sys.modules[name])
     return subimports
@@ -707,7 +707,7 @@ def _function_getstate(func):
         # Hack to circumvent non-predictable memoization caused by string interning.
         # See the inline comment in _class_setstate for details.
         "__name__": "".join(func.__name__),
-        "__qualname__": func.__qualname__,
+        "__qualname__": "".join(func.__qualname__),
         "__annotations__": func.__annotations__,
         "__kwdefaults__": func.__kwdefaults__,
         "__defaults__": func.__defaults__,
@@ -1167,6 +1167,17 @@ def _class_setstate(obj, state):
             # Indeed the Pickler's memoizer relies on physical object identity to break
             # cycles in the reference graph of the object being serialized.
             setattr(obj, attrname, attr)
+
+    if sys.version_info >= (3, 13) and "__firstlineno__" in state:
+        # Set the Python 3.13+ only __firstlineno__  attribute one more time, as it
+        # will be automatically deleted by the `setattr(obj, attrname, attr)` call
+        # above when `attrname` is "__firstlineno__". We assume that preserving this
+        # information might be important for some users and that it not stale in the
+        # context of cloudpickle usage, hence legitimate to propagate. Furthermore it
+        # is necessary to do so to keep deterministic chained pickling as tested in
+        # test_deterministic_str_interning_for_chained_dynamic_class_pickling.
+        obj.__firstlineno__ = state["__firstlineno__"]
+
     if registry is not None:
         for subclass in registry:
             obj.register(subclass)
