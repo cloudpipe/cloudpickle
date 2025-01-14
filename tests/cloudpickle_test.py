@@ -1494,7 +1494,7 @@ class CloudPickleTest(unittest.TestCase):
         try:
             sys.modules["NonModuleObject"] = non_module_object
 
-            func_module_name = _whichmodule(func, None)
+            func_module_name = _whichmodule(func, "func")
             assert func_module_name != "NonModuleObject"
             assert func_module_name is None
 
@@ -1506,13 +1506,16 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_importing_multiprocessing_does_not_impact_whichmodule(self):
         # non-regression test for #528
-        pytest.importorskip("numpy")
         script = textwrap.dedent("""
         import multiprocessing
         import cloudpickle
-        from numpy import exp
+        from cloudpickle.cloudpickle import dumps
 
-        print(cloudpickle.cloudpickle._whichmodule(exp, exp.__name__))
+        # Trigger a loop during the execution of whichmodule() by
+        # explicitly setting the function's module to None
+        dumps.__module__ = None
+
+        print(cloudpickle.cloudpickle._whichmodule(dumps, dumps.__name__))
         """)
         script_path = Path(self.tmpdir) / "whichmodule_and_multiprocessing.py"
         with open(script_path, mode="w") as f:
@@ -1524,12 +1527,9 @@ class CloudPickleTest(unittest.TestCase):
             stderr=subprocess.STDOUT,
         )
         out, _ = proc.communicate()
-        self.assertEqual(proc.wait(), 0)
-        assert out.strip() in (
-            b"numpy.core._multiarray_umath",  # numpy 1
-            b"numpy._core._multiarray_umath",  # older numpy 2
-            b"numpy",  # more recent numpy 2
-        )
+        self.assertEqual(proc.wait(), 0, msg="Stdout: " + str(out))
+        self.assertEqual(out.strip(), b"cloudpickle.cloudpickle")
+
 
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
