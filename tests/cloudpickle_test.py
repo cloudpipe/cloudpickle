@@ -1530,6 +1530,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(proc.wait(), 0, msg="Stdout: " + str(out))
         self.assertEqual(out.strip(), b"cloudpickle.cloudpickle")
 
+
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
         # fail when introspecting the currently loaded modules in sys.modules
@@ -2234,6 +2235,10 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(depickled_method("a"), 1)
         self.assertEqual(depickled_method("b"), None)
 
+    @unittest.skipIf(
+        sys.version_info >= (3, 14),
+        "itertools.count() doesn't support pickle on Python 3.14+",
+    )
     def test_itertools_count(self):
         counter = itertools.count(1, step=2)
 
@@ -2278,10 +2283,8 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(f2.__doc__, f.__doc__)
 
     def test_wraps_preserves_function_annotations(self):
-        def f(x):
+        def f(x: int) -> float:
             pass
-
-        f.__annotations__ = {"x": 1, "return": float}
 
         @wraps(f)
         def g(x):
