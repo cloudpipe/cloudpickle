@@ -1,6 +1,8 @@
 In development
 ==============
 
+- Various fixes to support for Python 3.14 ([PR #545](
+  https://github.com/cloudpipe/cloudpickle/pull/545)).
 
 3.1.0
 =====
