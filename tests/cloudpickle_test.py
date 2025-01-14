@@ -1527,7 +1527,8 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(proc.wait(), 0)
         assert out.strip() in (
             b"numpy.core._multiarray_umath",  # numpy 1
-            b"numpy._core._multiarray_umath",  # numpy 2
+            b"numpy._core._multiarray_umath",  # older numpy 2
+            b"numpy",  # more recent numpy 2
         )
 
     def test_unrelated_faulty_module(self):
