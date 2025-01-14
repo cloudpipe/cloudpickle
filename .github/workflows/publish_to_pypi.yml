@@ -119,4 +119,7 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         verbose: true
+        # skip-existing is required for .dev0 versions with fixed names but
+        # different contents. See also: https://github.com/pypa/flit/issues/257
+        skip-existing: true
         repository-url: https://test.pypi.org/legacy/
