@@ -13,4 +13,4 @@ repos:
     rev: v0.0.292
     hooks:
     -   id: ruff
-        args: ["--fix", "--show-source"]
+        args: #["--fix", "--show-source"]
