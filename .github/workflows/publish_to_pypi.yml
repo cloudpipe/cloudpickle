@@ -1,4 +1,4 @@
-name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+name: Publish cloudpickle 🥒 distribution 📦 to PyPI and TestPyPI
 # Taken from:
 # https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
 
@@ -7,6 +7,8 @@ on: push
 jobs:
   build:
     name: Build distribution 📦
+    # Don't run on forked repositories
+    if: github.event.repository.fork != true
     runs-on: ubuntu-latest
 
     steps:
@@ -30,10 +32,11 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
+        retention-days: 1
 
   publish-to-pypi:
     name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
+      Publish cloudpickle 🥒 distribution 📦 to PyPI
     if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
     needs:
     - build
@@ -55,7 +58,7 @@ jobs:
 
   github-release:
     name: >-
-      Sign the Python 🐍 distribution 📦 with Sigstore
+      Sign the cloudpickle 🥒 distribution 📦 with Sigstore
       and upload them to GitHub Release
     needs:
     - publish-to-pypi
@@ -97,7 +100,7 @@ jobs:
         --repo "$GITHUB_REPOSITORY"
 
   publish-to-testpypi:
-    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    name: Publish cloudpickle 🥒 distribution 📦 to TestPyPI
     needs:
     - build
     runs-on: ubuntu-latest
