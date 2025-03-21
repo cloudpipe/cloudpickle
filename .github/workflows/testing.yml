@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14.0-alpha.5", "pypy-3.9"]
+        python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14-dev", "pypy-3.9"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
           # are not the oldest/newest supported versions
@@ -61,11 +61,13 @@ jobs:
         python -m pip install -e .
         python -m pip install -r dev-requirements.txt
         python ci/install_coverage_subprocess_pth.py
-        python test_recursion_error.py
         export
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
+    - name: Test Python recursion limit
+      shell: bash
+      run: python test_recursion_error.py
     - name: Test with pytest
       shell: bash
       run: |
