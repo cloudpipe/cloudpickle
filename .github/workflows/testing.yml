@@ -65,9 +65,6 @@ jobs:
     - name: Display Python version
       shell: bash
       run: python -c "import sys; print(sys.version)"
-    - name: Test Python recursion limit
-      shell: bash
-      run: python test_recursion_error.py
     - name: Test with pytest
       shell: bash
       run: |

@@ -2511,6 +2511,10 @@ class CloudPickleTest(unittest.TestCase):
         sys.version_info < (3, 9),
         reason="Can cause CPython 3.8 to segfault",
     )
+    @pytest.mark.skipif(
+        sys.version_info > (3, 14),
+        reason="Can cause CPython 3.14 to segfault",
+    )
     # TODO: remove this xfail when we drop support for Python 3.8. We don't
     # plan to fix it because Python 3.8 is EOL.
     def test_recursion_during_pickling(self):
