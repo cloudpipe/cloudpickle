@@ -2519,6 +2519,8 @@ class CloudPickleTest(unittest.TestCase):
                 return getattr(self, name)
 
         a = A()
+        with pytest.raises(RecursionError):
+            a.test
         with pytest.raises(pickle.PicklingError, match="recursion"):
             cloudpickle.dumps(a)
 
