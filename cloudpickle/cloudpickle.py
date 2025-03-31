@@ -1218,7 +1218,7 @@ class BaseCloudPickler:
     the CPython pickler and another extending the pure-Python pickler.
     FastPickler and PurePythonPickler inherit from BaseCloudPickler and provide
     BaseCloudPickler access to either the C or pure-Python pickler by
-    implementing the super_pickler() method.
+    implementing the _super_pickler() method.
     """
 
     # set of reducers defined and used by cloudpickle (private)
@@ -1309,7 +1309,7 @@ class BaseCloudPickler:
 
     def dump(self, obj):
         try:
-            return self.super_pickler().dump(obj)
+            return self._super_pickler().dump(obj)
         except RuntimeError as e:
             if len(e.args) > 0 and "recursion" in e.args[0]:
                 msg = "Could not pickle object as excessively deep recursion required."
@@ -1325,12 +1325,12 @@ class BaseCloudPickler:
         # their global namespace at unpickling time.
         self.globals_ref = {}
         self.proto = int(protocol)
-        self.super_pickler().__init__(
+        self._super_pickler().__init__(
             file, protocol=protocol, buffer_callback=buffer_callback
         )
 
-    def super_pickler(self):
-      """Returns which pickler class for cloudpickle to extend."""
+    def _super_pickler(self):
+      """Returns a proxy object for an instance of the pickler being extended."""
       raise NotImplemented
 
 if not PYPY:
@@ -1342,9 +1342,9 @@ if not PYPY:
         """
 
         def __init__(self, file, protocol=None, buffer_callback=None):
-            super(FastPickler, self).__init__(file, protocol, buffer_callback)
+            super().__init__(file, protocol, buffer_callback)
 
-        def super_pickler(self):
+        def _super_pickler(self):
             return super(BaseCloudPickler, self)
 
         # pickle.Pickler is the C implementation of the CPython pickler and
@@ -1425,9 +1425,9 @@ class PurePythonPickler(BaseCloudPickler, pickle._Pickler):
     This picker supports overriding how built-in types are pickled.
     """
     def __init__(self, file, protocol=None, buffer_callback=None):
-        super(PurePythonPickler, self).__init__(file, protocol, buffer_callback)
+        super().__init__(file, protocol, buffer_callback)
 
-    def super_pickler(self):
+    def _super_pickler(self):
         return super(BaseCloudPickler, self)
 
     # When reducer_override is not available, hack the pure-Python
