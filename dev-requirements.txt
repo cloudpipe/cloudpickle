@@ -7,7 +7,7 @@ pytest-cov
 psutil
 # To be able to test tornado coroutines
 tornado
-# To be able to test behavior in jupyter-notbooks
+# To be able to test behavior in jupyter-notebooks
 ipykernel
 # To be able to test numpy specific things
 # but do not build numpy from source on Python nightly
