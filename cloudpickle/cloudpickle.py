@@ -118,11 +118,11 @@ if PYPY:
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
 
-def _get_or_create_tracker_id(class_def, config):
+def _get_or_create_tracker_id(class_def, id_generator):
     with _DYNAMIC_CLASS_TRACKER_LOCK:
         class_tracker_id = _DYNAMIC_CLASS_TRACKER_BY_CLASS.get(class_def)
-        if class_tracker_id is None and config.id_generator is not None:
-            class_tracker_id = config.id_generator(class_def)
+        if class_tracker_id is None and id_generator is not None:
+            class_tracker_id = id_generator(class_def)
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
             _DYNAMIC_CLASS_TRACKER_BY_ID[class_tracker_id] = class_def
     return class_tracker_id
@@ -619,7 +619,7 @@ def _decompose_typevar(obj, config):
         obj.__constraints__,
         obj.__covariant__,
         obj.__contravariant__,
-        _get_or_create_tracker_id(obj, config),
+        _get_or_create_tracker_id(obj, config.id_generator),
     )
 
 
@@ -689,7 +689,7 @@ def _class_getnewargs(obj, config):
         obj.__name__,
         _get_bases(obj),
         type_kwargs,
-        _get_or_create_tracker_id(obj, config),
+        _get_or_create_tracker_id(obj, config.id_generator),
         None,
     )
 
@@ -702,7 +702,7 @@ def _enum_getnewargs(obj, config):
         obj.__qualname__,
         members,
         obj.__module__,
-        _get_or_create_tracker_id(obj, config),
+        _get_or_create_tracker_id(obj, config.id_generator),
         None,
     )
 
@@ -1060,7 +1060,9 @@ def _dynamic_class_reduce(obj, config):
             _enum_getstate(obj),
             None,
             None,
-            functools.partial(_class_setstate, config=config),
+            functools.partial(
+                _class_setstate,
+                skip_reset_dynamic_type_state=config.skip_reset_dynamic_type_state),
         )
     else:
         return (
@@ -1069,7 +1071,9 @@ def _dynamic_class_reduce(obj, config):
             _class_getstate(obj),
             None,
             None,
-            functools.partial(_class_setstate, config=config),
+            functools.partial(
+                _class_setstate,
+                skip_reset_dynamic_type_state=config.skip_reset_dynamic_type_state),
         )
 
 
@@ -1167,10 +1171,10 @@ def _function_setstate(obj, state):
     for k, v in slotstate.items():
         setattr(obj, k, v)
 
-def _class_setstate(obj, state, config):
+def _class_setstate(obj, state, skip_reset_dynamic_type_state):
     # Lock while potentially modifying class state.
     with _DYNAMIC_CLASS_TRACKER_LOCK:
-      if config.skip_reset_dynamic_type_state and obj in _DYNAMIC_CLASS_STATE_TRACKER_BY_CLASS:
+      if skip_reset_dynamic_type_state and obj in _DYNAMIC_CLASS_STATE_TRACKER_BY_CLASS:
         return obj
       _DYNAMIC_CLASS_STATE_TRACKER_BY_CLASS[obj] = True
       state, slotstate = state
