@@ -3042,6 +3042,14 @@ class CloudPickleTest(unittest.TestCase):
         """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
+    def test_pure_python_pickler_overrides_built_in_type_pickling(self):
+        bio = io.BytesIO()
+        pickler = cloudpickle.PurePythonPickler(bio)
+        pickler.dispatch[set] = lambda p, s: p.save_set([-e for e in s])
+        pickler.dump({1, 2, 3, 4, 5})
+        bio.seek(0)
+        self.assertEqual(cloudpickle.load(bio), {-1, -2, -3, -4, -5})
+
 
 class Protocol2CloudPickleTest(CloudPickleTest):
     protocol = 2
