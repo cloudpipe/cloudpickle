@@ -2513,6 +2513,12 @@ class CloudPickleTest(unittest.TestCase):
         sys.version_info < (3, 9),
         reason="Can cause CPython 3.8 to segfault",
     )
+    @pytest.mark.skipif(
+        sys.version_info > (3, 14),
+        reason="Can cause CPython 3.14 interpreter to crash",
+        # This interpreter crash is reported upstream in
+        # https://github.com/python/cpython/issues/131543
+    )
     def test_recursion_during_pickling(self):
         class A:
             def __getattribute__(self, name):
