@@ -2652,7 +2652,9 @@ class CloudPickleTest(unittest.TestCase):
                 MyClass.__annotations__ = {"attribute": type_}
 
                 def check_annotations(obj, expected_type, expected_type_str):
-                    assert obj.__annotations__["attribute"] == expected_type
+                    # On Python 3.14, it's no longer possible to access class
+                    # annotations from an instance, so use type().
+                    assert type(obj).__annotations__["attribute"] == expected_type
                     assert obj.method.__annotations__["arg"] == expected_type
                     assert obj.method.__annotations__["return"] == expected_type
                     return "ok"
