@@ -829,6 +829,11 @@ def _code_reduce(obj):
     # See the inline comment in _class_setstate for details.
     co_name = "".join(obj.co_name)
 
+    # co_filename is not used in the constructor of code objects, so we can
+    # safely set it to indicate that this is dynamic code. This also makes
+    # the payload deterministic, independent of where the function is defined.
+    co_filename = "".join("<dynamic-code>")
+
     # Create shallow copies of these tuple to make cloudpickle payload deterministic.
     # When creating a code object during load, copies of these four tuples are
     # created, while in the main process, these tuples can be shared.
@@ -851,7 +856,7 @@ def _code_reduce(obj):
             obj.co_consts,
             co_names,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_qualname,
             obj.co_firstlineno,
@@ -874,7 +879,7 @@ def _code_reduce(obj):
             obj.co_consts,
             co_names,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_linetable,
@@ -895,7 +900,7 @@ def _code_reduce(obj):
             obj.co_code,
             obj.co_consts,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
@@ -919,7 +924,7 @@ def _code_reduce(obj):
             obj.co_consts,
             co_names,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
