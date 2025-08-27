@@ -190,6 +190,13 @@ class CloudPickleTest(unittest.TestCase):
         out2 = pickle.loads(cloudpickle.dumps(out1, protocol=self.protocol))
         self.assertEqual(out1, out2)
 
+    @pytest.mark.skipif(
+        platform.python_implementation() == "GraalVM",
+        reason=(
+            "GraalPy doesn't support disassembling bytecode, so globals "
+            "cannot be distinguished from other names."
+        ),
+    )
     def test_func_globals(self):
         class Unpicklable:
             def __reduce__(self):
@@ -925,7 +932,7 @@ class CloudPickleTest(unittest.TestCase):
     @pytest.mark.skipif(
         (
             sys.version_info >= (3, 10, 8)
-            and platform.python_implementation() == "CPython"
+            and platform.python_implementation() in ("CPython", "GraalVM")
         ),
         reason=(
             "CPython dropped support for pickling classmethod_descriptor,"

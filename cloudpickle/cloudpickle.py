@@ -96,6 +96,7 @@ _DYNAMIC_CLASS_TRACKER_BY_ID = weakref.WeakValueDictionary()
 _DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
 
 PYPY = platform.python_implementation() == "PyPy"
+GRAALPY = platform.python_implementation() == "GraalVM"
 
 builtin_code_type = None
 if PYPY:
@@ -410,10 +411,15 @@ def _builtin_type(name):
 
 def _walk_global_ops(code):
     """Yield referenced name for global-referencing instructions in code."""
-    for instr in dis.get_instructions(code):
-        op = instr.opcode
-        if op in GLOBAL_OPS:
-            yield instr.argval
+    if not GRAALPY:
+        for instr in dis.get_instructions(code):
+            op = instr.opcode
+            if op in GLOBAL_OPS:
+                yield instr.argval
+    else:
+        # GraalPy doesn't support disassembling bytecode, assume all names
+        # reference globals
+        yield from code.co_names
 
 
 def _extract_class_dict(cls):
