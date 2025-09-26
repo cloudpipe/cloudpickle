@@ -1765,8 +1765,8 @@ class CloudPickleTest(unittest.TestCase):
         from testutils import get_config
         from cloudpickle import dumps, loads
 
-        def local_clone(obj, protocol=None, config=get_config('{config}')):
-            return loads(dumps(obj, protocol=protocol, config=config))
+        def local_clone(obj, protocol=None, config='{config}'):
+            return loads(dumps(obj, protocol=protocol, config=get_config('{config}')))
 
         VARIABLE = "default_value"
 
@@ -3101,6 +3101,9 @@ class NoTrackingConfigCloudPickleTest(CloudPickleTest):
 
 class SkipResetConfigCloudPickleTest(CloudPickleTest):
     config = 'skip_reset'
+
+class UseRelativeFilepathsCloudPickleTest(CloudPickleTest):
+    config = 'use_relative_filepaths'
 
 def test_lookup_module_and_qualname_dynamic_typevar():
     T = typing.TypeVar("T")

@@ -63,6 +63,7 @@ import io
 import itertools
 import logging
 import opcode
+import os
 import pickle
 from pickle import _getattribute as _pickle_getattribute
 import platform
@@ -107,6 +108,7 @@ class CloudPickleConfig:
     """Configuration for cloudpickle behavior."""
     id_generator: typing.Optional[callable] = uuid_generator
     skip_reset_dynamic_type_state: bool = False
+    use_relative_filepaths: bool = False
 
 DEFAULT_CONFIG = CloudPickleConfig()
 
@@ -396,6 +398,26 @@ def _find_imported_submodules(code, top_level_dependencies):
                         subimports.append(sys.modules[name])
     return subimports
 
+
+def _get_relative_path(path):
+  """Returns the path of a filename relative to the longest matching directory
+  in sys.path.
+  Args:
+    path: The path to the file.
+  """
+  abs_path = os.path.abspath(path)
+  longest_match = ""
+  
+  for dir_path in sys.path:
+    if not dir_path.endswith(os.path.sep):
+      dir_path += os.path.sep
+
+    if abs_path.startswith(dir_path) and len(dir_path) > len(longest_match):
+      longest_match = dir_path
+  
+  if not longest_match:
+    return path
+  return os.path.relpath(abs_path, longest_match)
 
 # relevant opcodes
 STORE_GLOBAL = opcode.opmap["STORE_GLOBAL"]
@@ -831,7 +853,7 @@ def _enum_getstate(obj):
 # these holes".
 
 
-def _code_reduce(obj):
+def _code_reduce(obj, config):
     """code object reducer."""
     # If you are not sure about the order of arguments, take a look at help
     # of the specific type from types, for example:
@@ -850,6 +872,11 @@ def _code_reduce(obj):
     co_varnames = tuple(name for name in obj.co_varnames)
     co_freevars = tuple(name for name in obj.co_freevars)
     co_cellvars = tuple(name for name in obj.co_cellvars)
+
+    co_filename = obj.co_filename
+    if (config and config.use_relative_filepaths):
+        co_filename = _get_relative_path(co_filename) 
+
     if hasattr(obj, "co_exceptiontable"):
         # Python 3.11 and later: there are some new attributes
         # related to the enhanced exceptions.
@@ -864,7 +891,7 @@ def _code_reduce(obj):
             obj.co_consts,
             co_names,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_qualname,
             obj.co_firstlineno,
@@ -887,7 +914,7 @@ def _code_reduce(obj):
             obj.co_consts,
             co_names,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_linetable,
@@ -908,7 +935,7 @@ def _code_reduce(obj):
             obj.co_code,
             obj.co_consts,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
@@ -932,7 +959,7 @@ def _code_reduce(obj):
             obj.co_consts,
             co_names,
             co_varnames,
-            obj.co_filename,
+            co_filename,
             co_name,
             obj.co_firstlineno,
             obj.co_lnotab,
@@ -1243,7 +1270,6 @@ class Pickler(pickle.Pickler):
     _dispatch_table[property] = _property_reduce
     _dispatch_table[staticmethod] = _classmethod_reduce
     _dispatch_table[CellType] = _cell_reduce
-    _dispatch_table[types.CodeType] = _code_reduce
     _dispatch_table[types.GetSetDescriptorType] = _getset_descriptor_reduce
     _dispatch_table[types.ModuleType] = _module_reduce
     _dispatch_table[types.MethodType] = _method_reduce
@@ -1407,6 +1433,8 @@ class Pickler(pickle.Pickler):
                 return _class_reduce(obj, self.config)
             elif isinstance(obj, typing.TypeVar):  # Add this check
               return _typevar_reduce(obj, self.config)
+            elif isinstance(obj, types.CodeType):
+              return _code_reduce(obj, self.config)
             elif isinstance(obj, types.FunctionType):
                 return self._function_reduce(obj)
             else:
@@ -1485,6 +1513,11 @@ class Pickler(pickle.Pickler):
           return self.save_reduce(*_typevar_reduce(obj, self.config), obj=obj)
         
         dispatch[typing.TypeVar] = save_typevar
+
+        def save_code(self, obj, name=None):
+            return self.save_reduce(*_code_reduce(obj, self.config), obj=obj)
+
+        dispatch[types.CodeType] = save_code
 
         def save_function(self, obj, name=None):
             """Registered with the dispatch to handle all function types.
