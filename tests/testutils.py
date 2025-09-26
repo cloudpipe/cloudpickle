@@ -34,13 +34,15 @@ def sequential_id_generator(_):
 _SEQUENTIAL_CONFIG = CloudPickleConfig(id_generator=sequential_id_generator)
 _NO_TRACKING_CONFIG = CloudPickleConfig(id_generator=None)
 _SKIP_RESET_CONFIG = CloudPickleConfig(skip_reset_dynamic_type_state=True)
+_USE_RELATIVE_FILEPATHS = CloudPickleConfig(use_relative_filepaths=True)
 
 
 CONFIG_REGISTRY = {
     "default": DEFAULT_CONFIG,
     "sequential": _SEQUENTIAL_CONFIG,
     "no_tracking": _NO_TRACKING_CONFIG,
-    "skip_reset": _SKIP_RESET_CONFIG
+    "skip_reset": _SKIP_RESET_CONFIG,
+    "use_relative_filepaths": _USE_RELATIVE_FILEPATHS
 }
 
 def get_config(config_key):
