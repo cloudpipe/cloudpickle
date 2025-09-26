@@ -3029,6 +3029,33 @@ class CloudPickleTest(unittest.TestCase):
         for f in found_fields:
             assert f._field_type is expected_ftypes[f.name]
 
+    def test_relative_filepaths_with_dynamic_types(self):
+      """Test relative filepath conversion using dynamically created types."""
+      import os
+      import collections
+      
+      # Dynamic namedtuple (creates code objects with __file__)
+      DynamicTuple = collections.namedtuple('DynamicTuple', ['field1', 'field2'])
+      
+      original_file = DynamicTuple._make.__code__.co_filename
+      self.assertTrue(os.path.isabs(original_file), 
+                    f"Original co_filename should be absolute: {original_file}")
+      
+      pickled_tuple_class = self.pickle_depickle(DynamicTuple)
+      pickled_file = pickled_tuple_class._make.__code__.co_filename
+      
+      if self.config == 'use_relative_filepaths':
+          self.assertNotEqual(original_file, pickled_file,
+                            "With relative config, co_filename should be converted")
+          self.assertTrue(not os.path.isabs(pickled_file),
+                        f"Should be relative path: {pickled_file}")
+      else:
+          self.assertEqual(original_file, pickled_file,
+                          "With default config, co_filename should be preserved")
+          self.assertTrue(os.path.isabs(pickled_file),
+                        f"Should remain absolute: {pickled_file}")
+
+
     def test_interactively_defined_dataclass_with_initvar_and_classvar(self):
         code = """if __name__ == "__main__":
         import dataclasses

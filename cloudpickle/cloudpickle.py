@@ -1329,6 +1329,12 @@ class Pickler(pickle.Pickler):
         base_globals = self.globals_ref.setdefault(id(func.__globals__), {})
 
         if base_globals == {}:
+            if "__file__" in func.__globals__:
+              # Apply normalization ONLY to the __file__ attribute
+              file_path = func.__globals__["__file__"]
+              if self.config.use_relative_filepaths:
+                  file_path = _get_relative_path(file_path)
+              base_globals["__file__"] = file_path
             # Add module attributes used to resolve relative imports
             # instructions inside func.
             for k in ["__package__", "__name__", "__path__", "__file__"]:
