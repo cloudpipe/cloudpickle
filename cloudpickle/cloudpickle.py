@@ -1337,7 +1337,7 @@ class Pickler(pickle.Pickler):
               base_globals["__file__"] = file_path
             # Add module attributes used to resolve relative imports
             # instructions inside func.
-            for k in ["__package__", "__name__", "__path__", "__file__"]:
+            for k in ["__package__", "__name__", "__path__"]:
                 if k in func.__globals__:
                     base_globals[k] = func.__globals__[k]
 

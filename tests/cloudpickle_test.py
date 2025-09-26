@@ -3042,18 +3042,20 @@ class CloudPickleTest(unittest.TestCase):
                     f"Original co_filename should be absolute: {original_file}")
       
       pickled_tuple_class = self.pickle_depickle(DynamicTuple)
-      pickled_file = pickled_tuple_class._make.__code__.co_filename
+      pickled_co_filename = pickled_tuple_class._make.__code__.co_filename
+      pickled_file_path = pickled_tuple_class.__getnewargs__.__globals__['__file__']
       
       if self.config == 'use_relative_filepaths':
-          self.assertNotEqual(original_file, pickled_file,
+          self.assertEqual(pickled_file_path, pickled_co_filename)
+          self.assertNotEqual(original_file, pickled_co_filename,
                             "With relative config, co_filename should be converted")
-          self.assertTrue(not os.path.isabs(pickled_file),
-                        f"Should be relative path: {pickled_file}")
+          self.assertTrue(not os.path.isabs(pickled_co_filename),
+                        f"Should be relative path: {pickled_co_filename}")
       else:
-          self.assertEqual(original_file, pickled_file,
+          self.assertEqual(original_file, pickled_co_filename,
                           "With default config, co_filename should be preserved")
-          self.assertTrue(os.path.isabs(pickled_file),
-                        f"Should remain absolute: {pickled_file}")
+          self.assertTrue(os.path.isabs(pickled_co_filename),
+                        f"Should remain absolute: {pickled_co_filename}")
 
 
     def test_interactively_defined_dataclass_with_initvar_and_classvar(self):
