@@ -837,29 +837,51 @@ def _code_reduce(obj):
     co_varnames = tuple(name for name in obj.co_varnames)
     co_freevars = tuple(name for name in obj.co_freevars)
     co_cellvars = tuple(name for name in obj.co_cellvars)
-    if hasattr(obj, "co_exceptiontable"):
+    if hasattr(obj, "co_qualname"):
         # Python 3.11 and later: there are some new attributes
         # related to the enhanced exceptions.
-        args = (
-            obj.co_argcount,
-            obj.co_posonlyargcount,
-            obj.co_kwonlyargcount,
-            obj.co_nlocals,
-            obj.co_stacksize,
-            obj.co_flags,
-            obj.co_code,
-            obj.co_consts,
-            co_names,
-            co_varnames,
-            obj.co_filename,
-            co_name,
-            obj.co_qualname,
-            obj.co_firstlineno,
-            obj.co_linetable,
-            obj.co_exceptiontable,
-            co_freevars,
-            co_cellvars,
-        )
+        if hasattr(obj, "co_exceptiontable"):
+            args = (
+                obj.co_argcount,
+                obj.co_posonlyargcount,
+                obj.co_kwonlyargcount,
+                obj.co_nlocals,
+                obj.co_stacksize,
+                obj.co_flags,
+                obj.co_code,
+                obj.co_consts,
+                co_names,
+                co_varnames,
+                obj.co_filename,
+                co_name,
+                obj.co_qualname,
+                obj.co_firstlineno,
+                obj.co_linetable,
+                obj.co_exceptiontable,
+                co_freevars,
+                co_cellvars,
+            )
+        else:
+            # pypy 3.11 7.3.19+ has co_qualname but not co_exceptiontable
+            args = (
+                obj.co_argcount,
+                obj.co_posonlyargcount,
+                obj.co_kwonlyargcount,
+                obj.co_nlocals,
+                obj.co_stacksize,
+                obj.co_flags,
+                obj.co_code,
+                obj.co_consts,
+                co_names,
+                co_varnames,
+                obj.co_filename,
+                co_name,
+                obj.co_qualname,
+                obj.co_firstlineno,
+                obj.co_linetable,
+                co_freevars,
+                co_cellvars,
+            )
     elif hasattr(obj, "co_linetable"):
         # Python 3.10 and later: obj.co_lnotab is deprecated and constructor
         # expects obj.co_linetable instead.
