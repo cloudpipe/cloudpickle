@@ -105,7 +105,27 @@ def uuid_generator(_):
 
 @dataclasses.dataclass
 class CloudPickleConfig:
-    """Configuration for cloudpickle behavior."""
+    """Configuration for cloudpickle behavior.
+    
+    This class controls various aspects of how cloudpickle serializes objects.
+
+    Attributes:
+        id_generator: Callable that generates unique identifiers for dynamic
+            types. Controls isinstance semantics preservation. If None,
+            disables type tracking and isinstance relationships are not
+            preserved across pickle/unpickle cycles. If callable, generates
+            unique IDs to maintain object identity.
+            Default: uuid_generator (generates UUID hex strings).
+            
+        skip_reset_dynamic_type_state: Whether to skip resetting state when
+            reconstructing dynamic types. If True, skips state reset for
+            already-reconstructed types.
+            
+        use_relative_filepaths: Whether to convert absolute file paths to
+            relative paths in code objects and function globals. If True,
+            converts paths relative to sys.path for better determinism across
+            environments. If False, preserves original absolute paths.
+    """
     id_generator: typing.Optional[callable] = uuid_generator
     skip_reset_dynamic_type_state: bool = False
     use_relative_filepaths: bool = False
@@ -634,7 +654,7 @@ def _make_typevar(name, bound, constraints, covariant, contravariant, class_trac
     return _lookup_class_or_track(class_tracker_id, tv)
 
 
-def _decompose_typevar(obj, config):
+def _decompose_typevar(obj, config: CloudPickleConfig):
     return (
         obj.__name__,
         obj.__bound__,
@@ -645,7 +665,7 @@ def _decompose_typevar(obj, config):
     )
 
 
-def _typevar_reduce(obj, config):
+def _typevar_reduce(obj, config: CloudPickleConfig):
     # TypeVar instances require the module information hence why we
     # are not using the _should_pickle_by_reference directly
     module_and_name = _lookup_module_and_qualname(obj, name=obj.__name__)
@@ -697,7 +717,7 @@ def _make_dict_items(obj, is_ordered=False):
 # -------------------------------------------------
 
 
-def _class_getnewargs(obj, config):
+def _class_getnewargs(obj, config: CloudPickleConfig):
     type_kwargs = {}
     if "__module__" in obj.__dict__:
         type_kwargs["__module__"] = obj.__module__
@@ -716,7 +736,7 @@ def _class_getnewargs(obj, config):
     )
 
 
-def _enum_getnewargs(obj, config):
+def _enum_getnewargs(obj, config: CloudPickleConfig):
     members = {e.name: e.value for e in obj}
     return (
         obj.__bases__,
@@ -853,7 +873,7 @@ def _enum_getstate(obj):
 # these holes".
 
 
-def _code_reduce(obj, config):
+def _code_reduce(obj, config: CloudPickleConfig):
     """code object reducer."""
     # If you are not sure about the order of arguments, take a look at help
     # of the specific type from types, for example:
@@ -1073,7 +1093,7 @@ def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
 
-def _dynamic_class_reduce(obj, config):
+def _dynamic_class_reduce(obj, config: CloudPickleConfig):
     """Save a class that can't be referenced as a module attribute.
 
     This method is used to serialize classes that are defined inside
@@ -1104,7 +1124,7 @@ def _dynamic_class_reduce(obj, config):
         )
 
 
-def _class_reduce(obj, config):
+def _class_reduce(obj, config: CloudPickleConfig):
     """Select the reducer depending on the dynamic nature of the class obj."""
     if obj is type(None):  # noqa
         return type, (None,)
@@ -1360,7 +1380,7 @@ class Pickler(pickle.Pickler):
             else:
                 raise
 
-    def __init__(self, file, protocol=None, buffer_callback=None, config=DEFAULT_CONFIG):
+    def __init__(self, file, protocol=None, buffer_callback=None, config: CloudPickleConfig=DEFAULT_CONFIG):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         super().__init__(file, protocol=protocol, buffer_callback=buffer_callback)
@@ -1571,7 +1591,7 @@ class Pickler(pickle.Pickler):
 # Shorthands similar to pickle.dump/pickle.dumps
 
 
-def dump(obj, file, protocol=None, buffer_callback=None, config=DEFAULT_CONFIG):
+def dump(obj, file, protocol=None, buffer_callback=None, config: CloudPickleConfig=DEFAULT_CONFIG):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -1587,7 +1607,7 @@ def dump(obj, file, protocol=None, buffer_callback=None, config=DEFAULT_CONFIG):
     Pickler(file, protocol=protocol, buffer_callback=buffer_callback, config=config).dump(obj)
 
 
-def dumps(obj, protocol=None, buffer_callback=None, config=DEFAULT_CONFIG):
+def dumps(obj, protocol=None, buffer_callback=None, config: CloudPickleConfig=DEFAULT_CONFIG):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
