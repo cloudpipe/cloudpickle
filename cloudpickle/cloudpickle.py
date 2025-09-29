@@ -121,14 +121,12 @@ class CloudPickleConfig:
             reconstructing dynamic types. If True, skips state reset for
             already-reconstructed types.
             
-        use_relative_filepaths: Whether to convert absolute file paths to
-            relative paths in code objects and function globals. If True,
-            converts paths relative to sys.path for better determinism across
-            environments. If False, preserves original absolute paths.
+        filepath_interceptor: Used to modify filepaths in `co_filename` and
+            function.__globals__['__file__'].
     """
     id_generator: typing.Optional[callable] = uuid_generator
     skip_reset_dynamic_type_state: bool = False
-    use_relative_filepaths: bool = False
+    filepath_interceptor: typing.Optional[callable]  = None
 
 DEFAULT_CONFIG = CloudPickleConfig()
 
@@ -419,7 +417,7 @@ def _find_imported_submodules(code, top_level_dependencies):
     return subimports
 
 
-def _get_relative_path(path):
+def get_relative_path(path):
   """Returns the path of a filename relative to the longest matching directory
   in sys.path.
   Args:
@@ -894,8 +892,8 @@ def _code_reduce(obj, config: CloudPickleConfig):
     co_cellvars = tuple(name for name in obj.co_cellvars)
 
     co_filename = obj.co_filename
-    if (config and config.use_relative_filepaths):
-        co_filename = _get_relative_path(co_filename) 
+    if (config and config.filepath_interceptor):
+        co_filename = config.filepath_interceptor(co_filename) 
 
     if hasattr(obj, "co_exceptiontable"):
         # Python 3.11 and later: there are some new attributes
@@ -1352,8 +1350,8 @@ class Pickler(pickle.Pickler):
             if "__file__" in func.__globals__:
               # Apply normalization ONLY to the __file__ attribute
               file_path = func.__globals__["__file__"]
-              if self.config.use_relative_filepaths:
-                  file_path = _get_relative_path(file_path)
+              if self.config.filepath_interceptor:
+                  file_path = self.config.filepath_interceptor(file_path)
               base_globals["__file__"] = file_path
             # Add module attributes used to resolve relative imports
             # instructions inside func.

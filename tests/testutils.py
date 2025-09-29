@@ -11,11 +11,11 @@ from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor
 
 import psutil
+from cloudpickle import get_relative_path
 from cloudpickle import dumps
 from cloudpickle import CloudPickleConfig
 from cloudpickle import DEFAULT_CONFIG
 from subprocess import TimeoutExpired
-import logging
 
 loads = pickle.loads
 TIMEOUT = 60
@@ -25,8 +25,6 @@ TEST_GLOBALS = "a test value"
 _NEXT_DYNAMIC_CLASS_TRACKER_ID = 1
 
 def sequential_id_generator(_):
-    # logging.warning('CLAUDE HELLO ')
-    # raise ValueError('hello')
     global _NEXT_DYNAMIC_CLASS_TRACKER_ID
     _NEXT_DYNAMIC_CLASS_TRACKER_ID += 1
     return str(_NEXT_DYNAMIC_CLASS_TRACKER_ID)
@@ -34,7 +32,7 @@ def sequential_id_generator(_):
 _SEQUENTIAL_CONFIG = CloudPickleConfig(id_generator=sequential_id_generator)
 _NO_TRACKING_CONFIG = CloudPickleConfig(id_generator=None)
 _SKIP_RESET_CONFIG = CloudPickleConfig(skip_reset_dynamic_type_state=True)
-_USE_RELATIVE_FILEPATHS = CloudPickleConfig(use_relative_filepaths=True)
+_USE_RELATIVE_FILEPATHS = CloudPickleConfig(filepath_interceptor=get_relative_path)
 
 
 CONFIG_REGISTRY = {
@@ -149,7 +147,6 @@ def pickle_echo(stream_in=None, stream_out=None, protocol=None, config=None):
     input_bytes = _read_all_bytes(stream_in)
     stream_in.close()
     obj = loads(input_bytes)
-    # logging.warning(f"CLAUDE {config} {get_config(config)}")
     repickled_bytes = dumps(obj, protocol=protocol, config=get_config(config))
     stream_out.write(repickled_bytes)
     stream_out.close()
