@@ -1218,7 +1218,7 @@ def _function_setstate(obj, state):
     for k, v in slotstate.items():
         setattr(obj, k, v)
 
-def _class_setstate(obj, state, skip_reset_dynamic_type_state):
+def _class_setstate(obj, state, skip_reset_dynamic_type_state=False):
     # Lock while potentially modifying class state.
     with _DYNAMIC_CLASS_TRACKER_LOCK:
       if skip_reset_dynamic_type_state and obj in _DYNAMIC_CLASS_STATE_TRACKER_BY_CLASS:
