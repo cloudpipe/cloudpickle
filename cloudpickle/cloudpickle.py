@@ -789,8 +789,6 @@ def _class_getstate(obj):
         # __annotations__ is accessed at unpickling time.
         clsdict.pop("__annotate_func__", None)
 
-    print(clsdict)
-
     return (clsdict, {})
 
 
