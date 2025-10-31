@@ -2672,6 +2672,15 @@ class CloudPickleTest(unittest.TestCase):
         C1 = pickle_depickle(C, protocol=self.protocol)
         assert C1.__annotations__ == C.__annotations__
 
+    def test_class_annotations_abstractclass(self):
+        # see https://github.com/cloudpipe/cloudpickle/issues/572
+
+        class C(abc.ABC):
+            a: int
+
+        C1 = pickle_depickle(C, protocol=self.protocol)
+        assert C1.__annotations__ == C.__annotations__
+
     def test_function_annotations(self):
         def f(a: int) -> str:
             pass
