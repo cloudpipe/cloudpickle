@@ -750,6 +750,12 @@ def _function_getstate(func):
 def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop("__weakref__", None)
+    
+    # In Python 3.13+, classes with annotations have an __annotate__ function
+    # that may have closures referencing unpicklable objects in the class
+    # namespace. We don't need to pickle it as Python will regenerate it from
+    # __annotations__ when the class is reconstructed.
+    clsdict.pop("__annotate__", None)
 
     if issubclass(type(obj), abc.ABCMeta):
         # If obj is an instance of an ABCMeta subclass, don't pickle the

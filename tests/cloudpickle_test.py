@@ -1429,6 +1429,52 @@ class CloudPickleTest(unittest.TestCase):
 
         self.assertRaises(TypeError, IncompleteBaseSubclass)
 
+    def test_abc_with_annotations(self):
+        # Test pickling abstract classes with type annotations.
+        # This is a regression test for Python 3.14+ where __annotate__
+        # functions can have closures that reference _abc_impl.
+        # See: https://github.com/cloudpipe/cloudpickle/issues/???
+        
+        def class_factory():
+            class Model(abc.ABC):
+                field: int
+            return Model
+        
+        Model = class_factory()
+        
+        # This should not raise TypeError about unpicklable _abc._abc_data
+        depickled = pickle_depickle(Model, protocol=self.protocol)
+        
+        # Verify the annotation is preserved
+        self.assertEqual(depickled.__annotations__, {'field': int})
+        
+        # Verify it's still an ABC
+        self.assertTrue(issubclass(depickled, abc.ABC))
+        
+        # Test with a concrete subclass
+        class ConcreteModel(Model):
+            def __init__(self, field: int):
+                self.field = field
+        
+        instance = ConcreteModel(42)
+        depickled_instance = pickle_depickle(instance, protocol=self.protocol)
+        self.assertEqual(depickled_instance.field, 42)
+        
+        # Test multiple annotations
+        def multi_annotation_factory():
+            class MultiModel(abc.ABC):
+                field1: int
+                field2: str
+                field3: float
+            return MultiModel
+        
+        MultiModel = multi_annotation_factory()
+        depickled_multi = pickle_depickle(MultiModel, protocol=self.protocol)
+        self.assertEqual(
+            depickled_multi.__annotations__,
+            {'field1': int, 'field2': str, 'field3': float}
+        )
+
     def test_weakset_identity_preservation(self):
         # Test that weaksets don't lose all their inhabitants if they're
         # pickled in a larger data structure that includes other references to
