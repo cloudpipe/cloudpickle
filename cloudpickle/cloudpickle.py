@@ -784,7 +784,7 @@ def _class_getstate(obj):
     clsdict.pop("__dict__", None)  # unpicklable property object
 
     if sys.version_info >= (3, 14):
-        # PEP-649/749: __annotate_func_ contains a closure that references the class
+        # PEP-649/749: __annotate_func__ contains a closure that references the class
         # dict. We need to exclude it from pickling. Python will recreate it when
         # __annotations__ is accessed at unpickling time.
         clsdict.pop("__annotate_func__", None)
