@@ -758,6 +758,8 @@ def _class_getstate(obj):
     # namespace. We don't need to pickle it as Python will regenerate it from
     # __annotations__ when the class is reconstructed.
     clsdict.pop("__annotate__", None)
+    # Also handle __annotate_func__ which may appear in some Python 3.14 builds
+    clsdict.pop("__annotate_func__", None)
 
     if issubclass(type(obj), abc.ABCMeta):
         # If obj is an instance of an ABCMeta subclass, don't pickle the
