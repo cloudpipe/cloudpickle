@@ -751,9 +751,6 @@ def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop("__weakref__", None)
 
-    print(obj)
-    print(clsdict)
-
     if issubclass(type(obj), abc.ABCMeta):
         # If obj is an instance of an ABCMeta subclass, don't pickle the
         # cache/negative caches populated during isinstance/issubclass
