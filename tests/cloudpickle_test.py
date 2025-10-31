@@ -1433,9 +1433,8 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_abc_with_annotations(self):
         # Test pickling abstract classes with type annotations.
-        # This is a regression test for Python 3.14+ where __annotate__
+        # This is a regression test for Python 3.13+ (PEP 649) where __annotate__
         # functions can have closures that reference _abc_impl.
-        # See: https://github.com/cloudpipe/cloudpickle/issues/???
 
         def class_factory():
             class Model(abc.ABC):
