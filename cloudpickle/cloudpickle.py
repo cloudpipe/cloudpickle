@@ -751,6 +751,9 @@ def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop("__weakref__", None)
 
+    print(obj)
+    print(clsdict)
+
     if issubclass(type(obj), abc.ABCMeta):
         # If obj is an instance of an ABCMeta subclass, don't pickle the
         # cache/negative caches populated during isinstance/issubclass
@@ -782,6 +785,14 @@ def _class_getstate(obj):
                 clsdict.pop(k, None)
 
     clsdict.pop("__dict__", None)  # unpicklable property object
+
+    if sys.version_info >= (3, 14):
+        # PEP-649/749: __annotate_func_ contains a closure that references the class
+        # dict. We need to exclude it from pickling. Python will recreate it when
+        # __annotations__ is accessed at unpickling time.
+        clsdict.pop("__annotate_func__", None)
+
+    print(clsdict)
 
     return (clsdict, {})
 
@@ -1189,6 +1200,10 @@ def _class_setstate(obj, state):
     if registry is not None:
         for subclass in registry:
             obj.register(subclass)
+
+    # PEP-649/749: During pickling, we excluded the __annotate_func__ attribute but it
+    # will be created by Python. Subsequently, annotations will be recreated when
+    # __annotations__ is accessed.
 
     return obj
 
