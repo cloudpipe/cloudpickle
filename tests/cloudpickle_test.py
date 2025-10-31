@@ -55,6 +55,7 @@ from .testutils import subprocess_pickle_string
 from .testutils import assert_run_python_script
 from .testutils import check_deterministic_pickle
 
+
 _TEST_GLOBAL_VARIABLE = "default_value"
 _TEST_GLOBAL_VARIABLE2 = "another_value"
 
@@ -352,6 +353,7 @@ class CloudPickleTest(unittest.TestCase):
             A_roundtrip = pickle_depickle(A, protocol=self.protocol)
             assert hasattr(A_roundtrip, "__firstlineno__")
             assert A_roundtrip.__firstlineno__ == A.__firstlineno__
+
 
     def test_dynamically_generated_class_that_uses_super(self):
         class Base:
@@ -1065,9 +1067,7 @@ class CloudPickleTest(unittest.TestCase):
         def f():
             x = {tup}
             return zlib.crc32(bytes(bytearray(x)))
-        """.format(
-            tup=", ".join(names)
-        )
+        """.format(tup=", ".join(names))
         exec(textwrap.dedent(code), d, d)
         f = d["f"]
         res = f()
@@ -1206,9 +1206,7 @@ class CloudPickleTest(unittest.TestCase):
             logging.basicConfig(level=logging.INFO)
             logger = cloudpickle.loads(base64.b32decode(b'{}'))
             logger.info('hello')
-            """.format(
-            base64.b32encode(dumped).decode("ascii")
-        )
+            """.format(base64.b32encode(dumped).decode("ascii"))
         proc = subprocess.Popen(
             [sys.executable, "-W ignore", "-c", code],
             stdout=subprocess.PIPE,
@@ -1535,8 +1533,7 @@ class CloudPickleTest(unittest.TestCase):
 
     def test_importing_multiprocessing_does_not_impact_whichmodule(self):
         # non-regression test for #528
-        script = textwrap.dedent(
-            """
+        script = textwrap.dedent("""
         import multiprocessing
         import cloudpickle
         from cloudpickle.cloudpickle import dumps
@@ -1546,8 +1543,7 @@ class CloudPickleTest(unittest.TestCase):
         dumps.__module__ = None
 
         print(cloudpickle.cloudpickle._whichmodule(dumps, dumps.__name__))
-        """
-        )
+        """)
         script_path = Path(self.tmpdir) / "whichmodule_and_multiprocessing.py"
         with open(script_path, mode="w") as f:
             f.write(script)
@@ -1560,6 +1556,7 @@ class CloudPickleTest(unittest.TestCase):
         out, _ = proc.communicate()
         self.assertEqual(proc.wait(), 0, msg="Stdout: " + str(out))
         self.assertEqual(out.strip(), b"cloudpickle.cloudpickle")
+
 
     def test_unrelated_faulty_module(self):
         # Check that pickling a dynamically defined function or class does not
@@ -1763,9 +1760,7 @@ class CloudPickleTest(unittest.TestCase):
 
         cloned = subprocess_pickle_echo(f5, protocol={protocol})
         assert cloned(7) == f5(7) == 7
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
     def test_interactively_defined_global_variable(self):
@@ -1904,9 +1899,7 @@ class CloudPickleTest(unittest.TestCase):
             # previous definition of `interactive_function`:
 
             assert w.run(wrapper_func, 41) == 40
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
     def test_interactive_remote_function_calls_no_side_effect(self):
@@ -1950,9 +1943,7 @@ class CloudPickleTest(unittest.TestCase):
             assert is_in_main("GLOBAL_VARIABLE")
             assert not w.run(is_in_main, "GLOBAL_VARIABLE")
 
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
     def test_interactive_dynamic_type_and_remote_instances(self):
@@ -1991,9 +1982,7 @@ class CloudPickleTest(unittest.TestCase):
             assert isinstance(c1, CustomCounter)
             assert isinstance(c2, CustomCounter)
 
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
     def test_interactive_dynamic_type_and_stored_remote_instances(self):
@@ -2070,9 +2059,7 @@ class CloudPickleTest(unittest.TestCase):
             # method:
             assert w.run(lambda obj_id: lookup(obj_id).echo(43), id2) == 43
 
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
     def test_dynamic_func_deterministic_roundtrip(self):
@@ -2260,9 +2247,7 @@ class CloudPickleTest(unittest.TestCase):
             # iterations instead of 100 as used now (100x more data)
             assert growth < 5e7, growth
 
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
     def test_pickle_reraise(self):
@@ -2464,9 +2449,7 @@ class CloudPickleTest(unittest.TestCase):
 
             result = w.run(check_positive, 1)
             assert result is Color.BLUE
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
     def test_relative_import_inside_function(self):
@@ -2520,9 +2503,7 @@ class CloudPickleTest(unittest.TestCase):
             with pytest.raises(TypeError):
                 func(a=2)
 
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(textwrap.dedent(code))
 
     def test___reduce___returns_string(self):
@@ -3079,9 +3060,7 @@ class CloudPickleTest(unittest.TestCase):
             cloned_value, cloned_type = w.run(echo, value, SampleDataclass)
             assert cloned_type is SampleDataclass
             assert isinstance(cloned_value, SampleDataclass)
-        """.format(
-            protocol=self.protocol
-        )
+        """.format(protocol=self.protocol)
         assert_run_python_script(code)
 
 
