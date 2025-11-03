@@ -79,7 +79,6 @@ import weakref
 # cloudpickle. See: tests/test_backward_compat.py
 from types import CellType  # noqa: F401
 
-
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
@@ -193,9 +192,12 @@ def _is_registered_pickle_by_value(module):
 
 
 if sys.version_info >= (3, 14):
+
     def _getattribute(obj, name):
-        return _pickle_getattribute(obj, name.split('.'))
+        return _pickle_getattribute(obj, name.split("."))
+
 else:
+
     def _getattribute(obj, name):
         return _pickle_getattribute(obj, name)[0]
 
