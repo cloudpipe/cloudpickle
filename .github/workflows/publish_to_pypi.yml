@@ -103,6 +103,7 @@ jobs:
     name: Publish cloudpickle 🥒 distribution 📦 to TestPyPI
     needs:
     - build
+    if: github.ref_name == 'master'
     runs-on: ubuntu-latest
 
     environment:

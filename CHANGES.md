@@ -1,6 +1,12 @@
 In development
 ==============
 
+3.1.2
+=====
+
+- Fix pickling of abstract base classes containing type annotations for
+  Python 3.14. ([PR#578](https://github.com/cloudpipe/cloudpickle/pull/578))
+
 3.1.1
 =====
 
