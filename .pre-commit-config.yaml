@@ -13,4 +13,4 @@ repos:
     rev: v0.14.3
     hooks:
     -   id: ruff
-        args: ["--fix", "--show-source"]
+        args: ["--fix", "--show-files"]

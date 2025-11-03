@@ -243,10 +243,7 @@ def check_deterministic_pickle(a, b):
         full_diff = "".join(full_diff)
         if len(full_diff) > 1500:
             full_diff = full_diff[:1494] + " [...]"
-        raise AssertionError(
-           "Pickle payloads are not bitwise equal:\n"
-           + full_diff
-        )
+        raise AssertionError("Pickle payloads are not bitwise equal:\n" + full_diff)
 
 
 if __name__ == "__main__":

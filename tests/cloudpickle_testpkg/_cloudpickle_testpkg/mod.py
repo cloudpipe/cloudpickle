@@ -1,7 +1,6 @@
 import sys
 import types
 
-
 # #354: To emulate package capabilities while being a single file, an extension
 # module (for instance a mod.so file) can dynamically create a module object
 # (most likely using the *package_name*.*parent_module_name*.*submodule_name*
