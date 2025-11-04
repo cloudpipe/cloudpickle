@@ -18,7 +18,7 @@ def run_in_notebook(code):
     km.start_kernel()
     kc = km.client()
     kc.start_channels()
-    status, output, err = "run", None, None
+    status, output, err = "kernel_started", None, None
     try:
         assert km.is_alive() and kc.is_alive()
         kc.wait_for_ready()
