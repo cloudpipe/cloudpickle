@@ -1,6 +1,8 @@
 import sys
+import time
 import pytest
 import textwrap
+from _queue import Empty
 
 from .testutils import check_deterministic_pickle
 
@@ -13,7 +15,7 @@ if sys.platform == "win32":
 ipykernel = pytest.importorskip("ipykernel")
 
 
-def run_in_notebook(code):
+def run_in_notebook(code, timeout=10):
     km = ipykernel.connect.jupyter_client.KernelManager()
     km.start_kernel()
     kc = km.client()
@@ -25,7 +27,11 @@ def run_in_notebook(code):
         idx = kc.execute(code)
         running = True
         while running:
-            res = kc.iopub_channel.get_msg(timeout=None)
+            try:
+                res = kc.iopub_channel.get_msg(timeout=timeout)
+            except Empty:
+                status = "timeout"
+                break
             if res['parent_header'].get('msg_id') != idx:
                 continue
             content = res['content']
@@ -40,9 +46,29 @@ def run_in_notebook(code):
         kc.stop_channels()
         km.shutdown_kernel(now=True, restart=False)
         assert not km.is_alive()
-    if status != "error":
+    if status not in ["error", "timeout"]:
         status = "ok" if not running else "exec_error"
     return status, output, err
+
+
+@pytest.mark.parametrize("code, expected", [
+    ("1 + 1", "ok"),
+    ("raise ValueError('This is a test error')", "error"),
+    ("import time; time.sleep(100)", "timeout")
+
+])
+def test_run_in_notebook(code, expected):
+    code = textwrap.dedent(code)
+
+    t_start = time.time()
+    status, output, err = run_in_notebook(code, timeout=1)
+    duration = time.time() - t_start
+    assert status == expected, (
+        f"Unexpected status: {status}, output: {output}, err: {err}, duration: {duration}"
+    )
+    assert duration < 10, "Timeout not enforced properly"
+    if expected == "error":
+        assert "This is a test error" in err
 
 
 def test_deterministic_payload_for_dynamic_func_in_notebook():
