@@ -2,6 +2,7 @@ import sys
 import time
 import pytest
 import textwrap
+from queue import Empty
 
 from .testutils import check_deterministic_pickle
 
@@ -16,7 +17,6 @@ ipykernel = pytest.importorskip("ipykernel")
 
 def run_in_notebook(code, timeout=10):
 
-    from _queue import Empty
 
     km = ipykernel.connect.jupyter_client.KernelManager()
     km.start_kernel()
