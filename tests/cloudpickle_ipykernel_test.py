@@ -1,6 +1,7 @@
 import sys
 import time
 import pytest
+import platform
 import textwrap
 from queue import Empty
 
@@ -16,7 +17,6 @@ ipykernel = pytest.importorskip("ipykernel")
 
 
 def run_in_notebook(code, timeout=10):
-
 
     km = ipykernel.connect.jupyter_client.KernelManager()
     km.start_kernel()
@@ -53,6 +53,10 @@ def run_in_notebook(code, timeout=10):
     return status, output, err
 
 
+@pytest.mark.skipif(
+    platform.python_implementation() == "PyPy",
+    reason="Skip PyPy because tests are too slow",
+)
 @pytest.mark.parametrize("code, expected", [
     ("1 + 1", "ok"),
     ("raise ValueError('This is a test error')", "error"),
