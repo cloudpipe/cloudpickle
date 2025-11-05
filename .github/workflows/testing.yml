@@ -69,7 +69,7 @@ jobs:
       shell: bash
       run: |
         COVERAGE_PROCESS_START=$GITHUB_WORKSPACE/.coveragerc \
-          PYTHONPATH='.:tests' python -m pytest -r s
+          PYTHONPATH='.:tests' python -m pytest -r s -vs
         coverage combine --append
         coverage xml -i
     - name: Publish coverage results
