@@ -837,7 +837,9 @@ def _code_reduce(obj):
 
     # co_filename is not used in the constructor of code objects, so we can
     # safely set it to indicate that this is dynamic code. This also makes
-    # the payload deterministic, independent of where the function is defined.
+    # the payload deterministic, independent of where the function is defined
+    # which is especially useful when defining classes in jupyter/ipython
+    # cells which do not have a deterministic filename.
     co_filename = "".join("<dynamic-code>")
 
     # Create shallow copies of these tuple to make cloudpickle payload deterministic.
