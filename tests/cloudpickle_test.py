@@ -1103,6 +1103,50 @@ class CloudPickleTest(unittest.TestCase):
         f = pickle.loads(s)
         f()  # smoke test
 
+    def test_submodule_aliased(self):
+        # Same as test_submodule except the submodule is aliased
+        import xml.etree.ElementTree as et
+
+        def example():
+            _ = et.Comment  # noqa: F821
+
+        example()  # smoke test
+
+        s = cloudpickle.dumps(example, protocol=self.protocol)
+
+        # refresh the environment, i.e., unimport the dependency
+        del et
+        for item in list(sys.modules):
+            if item.split(".")[0] == "xml":
+                del sys.modules[item]
+
+        # deserialise
+        f = pickle.loads(s)
+        f()  # smoke test
+
+    def test_submodule_aliased_package(self):
+        # Same as test_submodule except the xml package is aliased and
+        # the submodule is accessed through the alias
+        import xml.etree.ElementTree
+        _xml = xml
+
+        def example():
+            _ = _xml.etree.ElementTree.Comment  # noqa: F821
+
+        example()  # smoke test
+
+        s = cloudpickle.dumps(example, protocol=self.protocol)
+
+        # refresh the environment, i.e., unimport the dependency
+        del xml, _xml
+        for item in list(sys.modules):
+            if item.split(".")[0] == "xml":
+                del sys.modules[item]
+
+        # deserialise
+        f = pickle.loads(s)
+        f()  # smoke test
+
     def test_submodule_closure(self):
         # Same as test_submodule except the xml package has not been imported
         def scope():
