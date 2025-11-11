@@ -58,6 +58,7 @@ import copyreg
 import dataclasses
 import dis
 from enum import Enum
+import hashlib
 import io
 import itertools
 import logging
@@ -92,9 +93,36 @@ _PICKLE_BY_VALUE_MODULES = set()
 # appropriate and preserve the usual "isinstance" semantics of Python objects.
 _DYNAMIC_CLASS_TRACKER_BY_CLASS = weakref.WeakKeyDictionary()
 _DYNAMIC_CLASS_TRACKER_BY_ID = weakref.WeakValueDictionary()
-_DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
+_DYNAMIC_CLASS_TRACKER_LOCK = threading.RLock()
 
 PYPY = platform.python_implementation() == "PyPy"
+
+
+def uuid_generator(_):
+    return uuid.uuid4().hex
+
+
+@dataclasses.dataclass
+class CloudPickleConfig:
+    """Configuration for cloudpickle behavior.
+
+    This class controls various aspects of how cloudpickle serializes objects.
+
+    Attributes:
+        id_generator: Callable that generates unique identifiers for dynamic
+            types. Controls isinstance semantics preservation. If None,
+            disables type tracking and isinstance relationships are not
+            preserved across pickle/unpickle cycles. If callable, generates
+            unique IDs to maintain object identity.
+            Default: uuid_generator (generates UUID hex strings).
+    """
+
+    id_generator: typing.Optional[callable] = uuid_generator
+
+
+DEFAULT_CONFIG = CloudPickleConfig()
+
+_GENERATING_SENTINEL = object()
 
 builtin_code_type = None
 if PYPY:
@@ -104,13 +132,25 @@ if PYPY:
 _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
 
-def _get_or_create_tracker_id(class_def):
+def _get_or_create_tracker_id(class_def, id_generator):
     with _DYNAMIC_CLASS_TRACKER_LOCK:
         class_tracker_id = _DYNAMIC_CLASS_TRACKER_BY_CLASS.get(class_def)
-        if class_tracker_id is None:
-            class_tracker_id = uuid.uuid4().hex
-            _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
-            _DYNAMIC_CLASS_TRACKER_BY_ID[class_tracker_id] = class_def
+
+        if class_tracker_id is _GENERATING_SENTINEL and id_generator:
+            raise RuntimeError(
+                f"Recursive ID generation detected for {class_def}. "
+                f"The id_generator cannot recursively request an ID for the same class."
+            )
+
+        if class_tracker_id is None and id_generator is not None:
+            _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = _GENERATING_SENTINEL
+            try:
+                class_tracker_id = id_generator(class_def)
+                _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
+                _DYNAMIC_CLASS_TRACKER_BY_ID[class_tracker_id] = class_def
+            except:
+                _DYNAMIC_CLASS_TRACKER_BY_CLASS.pop(class_def, None)
+                raise
     return class_tracker_id
 
 
@@ -601,26 +641,26 @@ def _make_typevar(name, bound, constraints, covariant, contravariant, class_trac
     return _lookup_class_or_track(class_tracker_id, tv)
 
 
-def _decompose_typevar(obj):
+def _decompose_typevar(obj, config: CloudPickleConfig):
     return (
         obj.__name__,
         obj.__bound__,
         obj.__constraints__,
         obj.__covariant__,
         obj.__contravariant__,
-        _get_or_create_tracker_id(obj),
+        _get_or_create_tracker_id(obj, config.id_generator),
     )
 
 
-def _typevar_reduce(obj):
+def _typevar_reduce(obj, config: CloudPickleConfig):
     # TypeVar instances require the module information hence why we
     # are not using the _should_pickle_by_reference directly
     module_and_name = _lookup_module_and_qualname(obj, name=obj.__name__)
 
     if module_and_name is None:
-        return (_make_typevar, _decompose_typevar(obj))
+        return (_make_typevar, _decompose_typevar(obj, config))
     elif _is_registered_pickle_by_value(module_and_name[0]):
-        return (_make_typevar, _decompose_typevar(obj))
+        return (_make_typevar, _decompose_typevar(obj, config))
 
     return (getattr, module_and_name)
 
@@ -664,7 +704,7 @@ def _make_dict_items(obj, is_ordered=False):
 # -------------------------------------------------
 
 
-def _class_getnewargs(obj):
+def _class_getnewargs(obj, config: CloudPickleConfig):
     type_kwargs = {}
     if "__module__" in obj.__dict__:
         type_kwargs["__module__"] = obj.__module__
@@ -678,12 +718,12 @@ def _class_getnewargs(obj):
         obj.__name__,
         _get_bases(obj),
         type_kwargs,
-        _get_or_create_tracker_id(obj),
+        _get_or_create_tracker_id(obj, config.id_generator),
         None,
     )
 
 
-def _enum_getnewargs(obj):
+def _enum_getnewargs(obj, config: CloudPickleConfig):
     members = {e.name: e.value for e in obj}
     return (
         obj.__bases__,
@@ -691,7 +731,7 @@ def _enum_getnewargs(obj):
         obj.__qualname__,
         members,
         obj.__module__,
-        _get_or_create_tracker_id(obj),
+        _get_or_create_tracker_id(obj, config.id_generator),
         None,
     )
 
@@ -1048,7 +1088,7 @@ def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
 
-def _dynamic_class_reduce(obj):
+def _dynamic_class_reduce(obj, config: CloudPickleConfig):
     """Save a class that can't be referenced as a module attribute.
 
     This method is used to serialize classes that are defined inside
@@ -1058,7 +1098,7 @@ def _dynamic_class_reduce(obj):
     if Enum is not None and issubclass(obj, Enum):
         return (
             _make_skeleton_enum,
-            _enum_getnewargs(obj),
+            _enum_getnewargs(obj, config),
             _enum_getstate(obj),
             None,
             None,
@@ -1067,7 +1107,7 @@ def _dynamic_class_reduce(obj):
     else:
         return (
             _make_skeleton_class,
-            _class_getnewargs(obj),
+            _class_getnewargs(obj, config=config),
             _class_getstate(obj),
             None,
             None,
@@ -1075,7 +1115,7 @@ def _dynamic_class_reduce(obj):
         )
 
 
-def _class_reduce(obj):
+def _class_reduce(obj, config: CloudPickleConfig):
     """Select the reducer depending on the dynamic nature of the class obj."""
     if obj is type(None):  # noqa
         return type, (None,)
@@ -1086,7 +1126,7 @@ def _class_reduce(obj):
     elif obj in _BUILTIN_TYPE_NAMES:
         return _builtin_type, (_BUILTIN_TYPE_NAMES[obj],)
     elif not _should_pickle_by_reference(obj):
-        return _dynamic_class_reduce(obj)
+        return _dynamic_class_reduce(obj, config)
     return NotImplemented
 
 
@@ -1247,7 +1287,6 @@ class Pickler(pickle.Pickler):
     _dispatch_table[types.MethodType] = _method_reduce
     _dispatch_table[types.MappingProxyType] = _mappingproxy_reduce
     _dispatch_table[weakref.WeakSet] = _weakset_reduce
-    _dispatch_table[typing.TypeVar] = _typevar_reduce
     _dispatch_table[_collections_abc.dict_keys] = _dict_keys_reduce
     _dispatch_table[_collections_abc.dict_values] = _dict_values_reduce
     _dispatch_table[_collections_abc.dict_items] = _dict_items_reduce
@@ -1324,7 +1363,13 @@ class Pickler(pickle.Pickler):
             msg = "Could not pickle object as excessively deep recursion required."
             raise pickle.PicklingError(msg) from e
 
-    def __init__(self, file, protocol=None, buffer_callback=None):
+    def __init__(
+        self,
+        file,
+        protocol=None,
+        buffer_callback=None,
+        config: CloudPickleConfig = DEFAULT_CONFIG,
+    ):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         super().__init__(file, protocol=protocol, buffer_callback=buffer_callback)
@@ -1333,6 +1378,7 @@ class Pickler(pickle.Pickler):
         # their global namespace at unpickling time.
         self.globals_ref = {}
         self.proto = int(protocol)
+        self.config = config
 
     if not PYPY:
         # pickle.Pickler is the C implementation of the CPython pickler and
@@ -1399,7 +1445,9 @@ class Pickler(pickle.Pickler):
                 is_anyclass = False
 
             if is_anyclass:
-                return _class_reduce(obj)
+                return _class_reduce(obj, self.config)
+            elif isinstance(obj, typing.TypeVar):
+                return _typevar_reduce(obj, self.config)
             elif isinstance(obj, types.FunctionType):
                 return self._function_reduce(obj)
             else:
@@ -1467,11 +1515,19 @@ class Pickler(pickle.Pickler):
             if name is not None:
                 super().save_global(obj, name=name)
             elif not _should_pickle_by_reference(obj, name=name):
-                self._save_reduce_pickle5(*_dynamic_class_reduce(obj), obj=obj)
+                self._save_reduce_pickle5(
+                    *_dynamic_class_reduce(obj, self.config), obj=obj
+                )
             else:
                 super().save_global(obj, name=name)
 
         dispatch[type] = save_global
+
+        def save_typevar(self, obj, name=None):
+            """Handle TypeVar objects with access to config."""
+            return self.save_reduce(*_typevar_reduce(obj, self.config), obj=obj)
+
+        dispatch[typing.TypeVar] = save_typevar
 
         def save_function(self, obj, name=None):
             """Registered with the dispatch to handle all function types.
@@ -1519,7 +1575,13 @@ class Pickler(pickle.Pickler):
 # Shorthands similar to pickle.dump/pickle.dumps
 
 
-def dump(obj, file, protocol=None, buffer_callback=None):
+def dump(
+    obj,
+    file,
+    protocol=None,
+    buffer_callback=None,
+    config: CloudPickleConfig = DEFAULT_CONFIG,
+):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -1532,10 +1594,14 @@ def dump(obj, file, protocol=None, buffer_callback=None):
     implementation details that can change from one Python version to the
     next).
     """
-    Pickler(file, protocol=protocol, buffer_callback=buffer_callback).dump(obj)
+    Pickler(
+        file, protocol=protocol, buffer_callback=buffer_callback, config=config
+    ).dump(obj)
 
 
-def dumps(obj, protocol=None, buffer_callback=None):
+def dumps(
+    obj, protocol=None, buffer_callback=None, config: CloudPickleConfig = DEFAULT_CONFIG
+):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -1549,7 +1615,9 @@ def dumps(obj, protocol=None, buffer_callback=None):
     next).
     """
     with io.BytesIO() as file:
-        cp = Pickler(file, protocol=protocol, buffer_callback=buffer_callback)
+        cp = Pickler(
+            file, protocol=protocol, buffer_callback=buffer_callback, config=config
+        )
         cp.dump(obj)
         return file.getvalue()
 
@@ -1559,3 +1627,10 @@ load, loads = pickle.load, pickle.loads
 
 # Backward compat alias.
 CloudPickler = Pickler
+
+
+def hash_dynamic_classdef(classdef):
+    hexidgest = hashlib.sha256(
+        dumps(classdef, config=CloudPickleConfig(id_generator=None))
+    ).hexdigest()
+    return hexidgest
