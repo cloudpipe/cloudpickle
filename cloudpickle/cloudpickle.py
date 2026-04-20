@@ -63,6 +63,8 @@ import itertools
 import logging
 import opcode
 import pickle
+
+# pyrefly:ignore[missing-module-attribute]
 from pickle import _getattribute as _pickle_getattribute
 import platform
 import struct
@@ -124,7 +126,7 @@ def _lookup_class_or_track(class_tracker_id, class_def):
     return class_def
 
 
-def register_pickle_by_value(module):
+def register_pickle_by_value(module) -> None:
     """Register a module to make its functions and classes picklable by value.
 
     By default, functions and classes that are attributes of an importable
@@ -163,7 +165,7 @@ def register_pickle_by_value(module):
     _PICKLE_BY_VALUE_MODULES.add(module.__name__)
 
 
-def unregister_pickle_by_value(module):
+def unregister_pickle_by_value(module) -> None:
     """Unregister that the input module should be pickled by value."""
     if not isinstance(module, types.ModuleType):
         raise ValueError(f"Input should be a module object, got {str(module)} instead")
@@ -518,6 +520,7 @@ def _make_function(code, globals, name, argdefs, closure):
     return types.FunctionType(code, globals, name, argdefs, closure)
 
 
+@typing.no_type_check
 def _make_empty_cell():
     if False:
         # trick the compiler into creating an empty cell in our lambda
@@ -590,6 +593,7 @@ def _make_skeleton_enum(
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
+@typing.no_type_check
 def _make_typevar(name, bound, constraints, covariant, contravariant, class_tracker_id):
     tv = typing.TypeVar(
         name,
@@ -765,6 +769,7 @@ def _class_getstate(obj):
             # The abc caches and registered subclasses of a
             # class are bundled into the single _abc_impl attribute
             clsdict.pop("_abc_impl", None)
+            # pyrefly:ignore[missing-attribute]
             (registry, _, _, _) = abc._get_dump(obj)
 
             clsdict["_abc_impl"] = [subclass_weakref() for subclass_weakref in registry]
@@ -1220,8 +1225,11 @@ def _class_setstate(obj, state):
 
 
 _DATACLASSE_FIELD_TYPE_SENTINELS = {
+    # pyrefly:ignore[missing-attribute]
     dataclasses._FIELD.name: dataclasses._FIELD,
+    # pyrefly:ignore[missing-attribute]
     dataclasses._FIELD_CLASSVAR.name: dataclasses._FIELD_CLASSVAR,
+    # pyrefly:ignore[missing-attribute]
     dataclasses._FIELD_INITVAR.name: dataclasses._FIELD_INITVAR,
 }
 
@@ -1232,7 +1240,7 @@ def _get_dataclass_field_type_sentinel(name):
 
 class Pickler(pickle.Pickler):
     # set of reducers defined and used by cloudpickle (private)
-    _dispatch_table = {}
+    _dispatch_table: dict = {}
     _dispatch_table[classmethod] = _classmethod_reduce
     _dispatch_table[io.TextIOWrapper] = _file_reduce
     _dispatch_table[logging.Logger] = _logger_reduce
@@ -1258,8 +1266,10 @@ class Pickler(pickle.Pickler):
     _dispatch_table[abc.abstractclassmethod] = _classmethod_reduce
     _dispatch_table[abc.abstractstaticmethod] = _classmethod_reduce
     _dispatch_table[abc.abstractproperty] = _property_reduce
+    # pyrefly:ignore[missing-attribute]
     _dispatch_table[dataclasses._FIELD_BASE] = _dataclass_field_base_reduce
 
+    # pyrefly:ignore[bad-argument-type]
     dispatch_table = ChainMap(_dispatch_table, copyreg.dispatch_table)
 
     # function reducers are defined as instance methods of cloudpickle.Pickler
@@ -1412,8 +1422,9 @@ class Pickler(pickle.Pickler):
         # Pickler's types.FunctionType and type savers. Note: the type saver
         # must override Pickler.save_global, because pickle.py contains a
         # hard-coded call to save_global when pickling meta-classes.
-        dispatch = pickle.Pickler.dispatch.copy()
+        dispatch = pickle.Pickler.dispatch.copy()  # pyrefly:ignore[missing-attribute]
 
+        @typing.no_type_check
         def _save_reduce_pickle5(
             self,
             func,
@@ -1447,6 +1458,7 @@ class Pickler(pickle.Pickler):
             # the stack.
             write(pickle.POP)
 
+        @typing.no_type_check
         def save_global(self, obj, name=None, pack=struct.pack):
             """Main dispatch method.
 
@@ -1473,6 +1485,7 @@ class Pickler(pickle.Pickler):
 
         dispatch[type] = save_global
 
+        @typing.no_type_check
         def save_function(self, obj, name=None):
             """Registered with the dispatch to handle all function types.
 
@@ -1488,6 +1501,7 @@ class Pickler(pickle.Pickler):
                     *self._dynamic_function_reduce(obj), obj=obj
                 )
 
+        @typing.no_type_check
         def save_pypy_builtin_func(self, obj):
             """Save pypy equivalent of builtin functions.
 
