@@ -126,7 +126,7 @@ def _lookup_class_or_track(class_tracker_id, class_def):
     return class_def
 
 
-def register_pickle_by_value(module) -> None:
+def register_pickle_by_value(module: types.ModuleType) -> None:
     """Register a module to make its functions and classes picklable by value.
 
     By default, functions and classes that are attributes of an importable
@@ -165,7 +165,7 @@ def register_pickle_by_value(module) -> None:
     _PICKLE_BY_VALUE_MODULES.add(module.__name__)
 
 
-def unregister_pickle_by_value(module) -> None:
+def unregister_pickle_by_value(module: types.ModuleType) -> None:
     """Unregister that the input module should be pickled by value."""
     if not isinstance(module, types.ModuleType):
         raise ValueError(f"Input should be a module object, got {str(module)} instead")
