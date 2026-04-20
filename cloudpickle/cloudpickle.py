@@ -1336,14 +1336,19 @@ class Pickler(pickle.Pickler):
 
         return code, base_globals, None, None, closure
 
-    def dump(self, obj):
+    def dump(self, obj: object) -> None:
         try:
             return super().dump(obj)
         except RecursionError as e:
             msg = "Could not pickle object as excessively deep recursion required."
             raise pickle.PicklingError(msg) from e
 
-    def __init__(self, file, protocol=None, buffer_callback=None):
+    def __init__(
+        self,
+        file: "SupportsWrite[bytes]",
+        protocol: "int | None" = None,
+        buffer_callback: "_BufferCallback" = None,
+    ) -> None:
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         super().__init__(file, protocol=protocol, buffer_callback=buffer_callback)
