@@ -81,6 +81,15 @@ import weakref
 # cloudpickle. See: tests/test_backward_compat.py
 from types import CellType  # noqa: F401
 
+# always False; this is purely intended for type-checkers
+if typing.TYPE_CHECKING:
+    from _typeshed import SupportsWrite
+    from typing import Any, Callable
+    from typing_extensions import TypeAlias
+
+    # same as `_BufferCallback` in `typeshed/stdlib/_pickle.pyi`
+    _BufferCallback: TypeAlias = Callable[[pickle.PickleBuffer], Any] | None
+
 # cloudpickle is meant for inter process communication: we expect all
 # communicating processes to run the same Python version hence we favor
 # communication speed over compatibility:
@@ -1533,7 +1542,12 @@ class Pickler(pickle.Pickler):
 # Shorthands similar to pickle.dump/pickle.dumps
 
 
-def dump(obj, file, protocol=None, buffer_callback=None):
+def dump(
+    obj: object,
+    file: "SupportsWrite[bytes]",
+    protocol: "int | None" = None,
+    buffer_callback: "_BufferCallback" = None,
+) -> None:
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -1549,7 +1563,11 @@ def dump(obj, file, protocol=None, buffer_callback=None):
     Pickler(file, protocol=protocol, buffer_callback=buffer_callback).dump(obj)
 
 
-def dumps(obj, protocol=None, buffer_callback=None):
+def dumps(
+    obj: object,
+    protocol: "int | None" = None,
+    buffer_callback: "_BufferCallback" = None,
+) -> bytes:
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
