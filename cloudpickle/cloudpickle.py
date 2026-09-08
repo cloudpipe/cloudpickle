@@ -388,9 +388,14 @@ def _find_imported_submodules(code, top_level_dependencies):
 
 # relevant opcodes
 STORE_GLOBAL = opcode.opmap["STORE_GLOBAL"]
-DELETE_GLOBAL = opcode.opmap["DELETE_GLOBAL"]
+_glbl_ops = [STORE_GLOBAL]
+if sys.version_info < (3, 16):
+    DELETE_GLOBAL = opcode.opmap["DELETE_GLOBAL"]
+    _glbl_ops.append(DELETE_GLOBAL)
 LOAD_GLOBAL = opcode.opmap["LOAD_GLOBAL"]
-GLOBAL_OPS = (STORE_GLOBAL, DELETE_GLOBAL, LOAD_GLOBAL)
+_glbl_ops.append(LOAD_GLOBAL)
+GLOBAL_OPS = tuple(_glbl_ops)
+del _glbl_ops
 HAVE_ARGUMENT = dis.HAVE_ARGUMENT
 EXTENDED_ARG = dis.EXTENDED_ARG
 
