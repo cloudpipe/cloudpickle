@@ -14,3 +14,9 @@ repos:
     hooks:
     -   id: ruff
         args: ["--fix", "--show-files"]
+-   repo: https://github.com/facebook/pyrefly-pre-commit
+    rev: 0.61.1
+    hooks:
+      - id: pyrefly-check
+        name: Pyrefly (type checking)
+        pass_filenames: false  # full repo checks

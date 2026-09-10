@@ -19,3 +19,5 @@ coverage
 ./tests/cloudpickle_testpkg
 # Required for setup of the above utility package:
 setuptools; python_version >= '3.12'
+# type-checking
+pyrefly==0.61.1
