@@ -48,6 +48,7 @@ from cloudpickle.cloudpickle import _should_pickle_by_reference
 from cloudpickle.cloudpickle import _make_empty_cell
 from cloudpickle.cloudpickle import _extract_class_dict, _whichmodule
 from cloudpickle.cloudpickle import _lookup_module_and_qualname
+from cloudpickle.cloudpickle import _function_setstate
 
 from .testutils import subprocess_worker
 from .testutils import subprocess_pickle_echo
@@ -3178,6 +3179,19 @@ def test_module_level_pickler():
     # cloudpickle.Pickler
     assert hasattr(cloudpickle, "Pickler")
     assert cloudpickle.Pickler is cloudpickle.CloudPickler
+
+
+def test_function_setstate_without_submodules_key():
+    # #593: a payload whose slotstate lacks "_cloudpickle_submodules" must not
+    # crash with an opaque KeyError. Valid cloudpickle payloads always carry
+    # that key, but malformed ones need not, and the guard that used to allow
+    # for its absence was dropped when the module was consolidated.
+    def f(x):
+        return x
+
+    _function_setstate(f, ({}, {"__globals__": {}, "__closure__": None}))
+
+    assert f(1) == 1
 
 
 if __name__ == "__main__":

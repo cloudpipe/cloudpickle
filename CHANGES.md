@@ -4,6 +4,11 @@ In development
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
+- Tolerate a missing `_cloudpickle_submodules` key when restoring the state of
+  a dynamic function, so that a malformed payload no longer crashes with an
+  opaque `KeyError`.
+  ([issue#593](https://github.com/cloudpipe/cloudpickle/issues/593))
+
 3.1.2
 =====
 

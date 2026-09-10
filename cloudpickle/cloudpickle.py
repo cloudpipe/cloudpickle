@@ -1157,8 +1157,10 @@ def _function_setstate(obj, state):
     # the pickled function to work correctly at unpickling time. Now that these
     # submodules are depickled (hence imported), they can be removed from the
     # object's state (the object state only served as a reference holder to
-    # these submodules)
-    slotstate.pop("_cloudpickle_submodules")
+    # these submodules). Tolerate its absence: valid cloudpickle payloads always
+    # set this key, but a malformed one need not, and popping it unguarded turns
+    # that into an opaque KeyError.
+    slotstate.pop("_cloudpickle_submodules", None)
 
     obj.__globals__.update(obj_globals)
     obj.__globals__["__builtins__"] = __builtins__
