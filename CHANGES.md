@@ -1,6 +1,10 @@
 In development
 ==============
 
+- Fix pickling of objects decorated with `functools.update_wrapper` when the
+  wrapped callable uses Python 3.14 lazy annotations. ([issue #585](
+  https://github.com/cloudpipe/cloudpickle/issues/585))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 

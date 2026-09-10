@@ -2707,6 +2707,51 @@ class CloudPickleTest(unittest.TestCase):
         c2 = C2()
         assert isinstance(c2, C2)
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 14),
+        reason="functools.update_wrapper copies __annotate__ starting in Python 3.14",
+    )
+    def test_update_wrapper_with_annotated_abc_method(self):
+        # see https://github.com/cloudpipe/cloudpickle/issues/585
+        class FuncWrapper:
+            def __init__(self, function):
+                self.function = function
+                functools.update_wrapper(self, self.function)
+
+            def __call__(self, *args, **kwargs):
+                return self.function(*args, **kwargs)
+
+        class AbstractClass(abc.ABC):
+            a: int
+
+            def method(self, arg: str) -> str:
+                return arg.upper()
+
+        wrapped = FuncWrapper(AbstractClass().method)
+        assert "__annotate__" in wrapped.__dict__
+
+        # Simulate CPython builds where the annotation function copied by
+        # update_wrapper is distinct from __wrapped__.__annotate__.
+        copied_annotate = wrapped.__dict__["__annotate__"]
+        wrapped.__annotate__ = types.FunctionType(
+            copied_annotate.__code__,
+            copied_annotate.__globals__,
+            copied_annotate.__name__,
+            copied_annotate.__defaults__,
+            copied_annotate.__closure__,
+        )
+        wrapped.__annotate__.__kwdefaults__ = copied_annotate.__kwdefaults__
+        wrapped.__annotate__.__qualname__ = copied_annotate.__qualname__
+        wrapped.__annotate__.__module__ = copied_annotate.__module__
+        assert wrapped.__annotate__ is not wrapped.__wrapped__.__annotate__
+
+        wrapped_clone = pickle_depickle(wrapped, protocol=self.protocol)
+
+        assert wrapped_clone("abc") == "ABC"
+        assert wrapped_clone.__name__ == "method"
+        assert "__annotate__" not in wrapped_clone.__dict__
+        assert wrapped_clone.__wrapped__.__annotations__ == {"arg": str, "return": str}
+
     def test_function_annotations(self):
         def f(a: int) -> str:
             pass

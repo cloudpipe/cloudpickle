@@ -754,6 +754,73 @@ def _function_getstate(func):
     return state, slotstate
 
 
+def _is_copied_annotation_function(obj):
+    """Detect __annotate__ copied by functools.update_wrapper on Python 3.14+."""
+    if sys.version_info < (3, 14):
+        return False
+
+    try:
+        obj_dict = obj.__dict__
+    except Exception:
+        return False
+    if not isinstance(obj_dict, dict):
+        return False
+
+    annotate = obj_dict.get("__annotate__")
+    if not isinstance(annotate, types.FunctionType):
+        return False
+
+    wrapped = obj_dict.get("__wrapped__")
+    if wrapped is None:
+        return False
+
+    if annotate.__name__ != "__annotate__":
+        return False
+
+    annotate_module = getattr(annotate, "__module__", None)
+    wrapped_module = getattr(wrapped, "__module__", None)
+    if (
+        annotate_module is not None
+        and wrapped_module is not None
+        and annotate_module != wrapped_module
+    ):
+        return False
+
+    return True
+
+
+def _remove_key_from_state(state, key):
+    if isinstance(state, dict):
+        if key not in state:
+            return state
+        state = state.copy()
+        state.pop(key, None)
+        return state
+
+    if (
+        isinstance(state, tuple)
+        and len(state) == 2
+        and isinstance(state[0], dict)
+        and key in state[0]
+    ):
+        state_dict = state[0].copy()
+        state_dict.pop(key, None)
+        return state_dict, state[1]
+
+    return state
+
+
+def _reduced_without_copied_annotation_function(obj, proto):
+    """Remove redundant __annotate__ copied from a wrapped callable."""
+    rv = obj.__reduce_ex__(proto)
+    if not isinstance(rv, tuple) or len(rv) < 3:
+        return rv
+
+    state = rv[2]
+    state = _remove_key_from_state(state, "__annotate__")
+    return rv[:2] + (state,) + rv[3:]
+
+
 def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop("__weakref__", None)
@@ -1407,6 +1474,8 @@ class Pickler(pickle.Pickler):
                 return _class_reduce(obj)
             elif isinstance(obj, types.FunctionType):
                 return self._function_reduce(obj)
+            elif _is_copied_annotation_function(obj):
+                return _reduced_without_copied_annotation_function(obj, self.proto)
             else:
                 # fallback to save_global, including the Pickler's
                 # dispatch_table
