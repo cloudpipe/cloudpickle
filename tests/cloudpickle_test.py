@@ -2404,6 +2404,20 @@ class CloudPickleTest(unittest.TestCase):
         assert green1 is not ClonedDynamicColor.BLUE
         assert ClonedDynamicColor is DynamicColor
 
+    def test_locally_defined_flags(self):
+        members = {"NONE": 0, "FIRST": 11, "SECOND": 37, "THIRD": 389, "ALIAS": 37}
+
+        def check_members(flags):
+            assert flags.ALIAS is flags.SECOND
+            return {name: member.value for name, member in flags.__members__.items()}
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            for enum_type in (enum.Flag, enum.IntFlag):
+                flags = enum_type("DynamicFlags", members)
+                restored = pickle_depickle(flags.SECOND, protocol=self.protocol)
+                assert restored is flags.SECOND
+                assert worker.run(check_members, flags) == members
+
     def test_interactively_defined_enum(self):
         code = """if __name__ == "__main__":
         from enum import Enum
