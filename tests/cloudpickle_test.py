@@ -2313,6 +2313,38 @@ class CloudPickleTest(unittest.TestCase):
         t = typing.Union[list, int]
         assert pickle_depickle(t) == t
 
+    def test_typing_extensions_namedtuple(self):
+        typing_extensions = pytest.importorskip("typing_extensions")
+
+        class MyTuple(typing_extensions.NamedTuple):
+            value: int
+
+        restored = subprocess_pickle_echo(MyTuple(42), protocol=self.protocol)
+        assert restored.value == 42
+        assert not hasattr(restored, "__dict__")
+
+    def test_slotted_class_layout_in_subprocess(self):
+        class Base:
+            __slots__ = ("base_value",)
+
+        class Child(Base):
+            __slots__ = ("child_value",)
+
+        obj = Child()
+        obj.base_value = 1
+        obj.child_value = 2
+
+        def check_layout(restored):
+            assert restored.base_value == 1
+            assert restored.child_value == 2
+            assert not hasattr(restored, "__dict__")
+            with pytest.raises(AttributeError):
+                restored.extra = 3
+            return restored.base_value + restored.child_value
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(check_layout, obj) == 3
+
     def test_instance_with_slots(self):
         for slots in [["registered_attribute"], "registered_attribute"]:
 
