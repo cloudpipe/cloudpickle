@@ -671,8 +671,20 @@ def _make_dict_items(obj, is_ordered=False):
 
 def _class_getnewargs(obj):
     type_kwargs = {}
+    bases = _get_bases(obj)
     if "__module__" in obj.__dict__:
         type_kwargs["__module__"] = obj.__module__
+    # Slots must be present when the class is created: assigning __slots__
+    # afterward cannot restore the instance layout. NamedTuple creates its own
+    # slots and rejects an explicit __slots__ entry in the class namespace.
+    named_tuple_bases = (
+        typing.NamedTuple,
+        getattr(sys.modules.get("typing_extensions"), "NamedTuple", None),
+    )
+    if "__slots__" in obj.__dict__ and not any(
+        base in named_tuple_bases for base in bases
+    ):
+        type_kwargs["__slots__"] = obj.__slots__
 
     __dict__ = obj.__dict__.get("__dict__", None)
     if isinstance(__dict__, property):
@@ -681,7 +693,7 @@ def _class_getnewargs(obj):
     return (
         type(obj),
         obj.__name__,
-        _get_bases(obj),
+        bases,
         type_kwargs,
         _get_or_create_tracker_id(obj),
         None,
