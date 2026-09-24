@@ -1,6 +1,11 @@
 In development
 ==============
 
+- Preserve explicit subclass attributes and methods that reference the same
+  objects as attributes on a base class, so updating the base after unpickling
+  does not change the subclass's overrides.
+  ([issue#584](https://github.com/cloudpipe/cloudpickle/issues/584))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 

@@ -423,28 +423,30 @@ def _walk_global_ops(code):
             yield instr.argval
 
 
+class _BaseAttributeRef:
+    """Reference an explicit class attribute to one of its direct bases."""
+
+    __slots__ = ("base_index",)
+
+    def __init__(self, base_index):
+        self.base_index = base_index
+
+
 def _extract_class_dict(cls):
-    """Retrieve a copy of the dict of a class without the inherited method."""
+    """Copy a class's own attributes, including explicit overrides of its bases."""
     # Hack to circumvent non-predictable memoization caused by string interning.
     # See the inline comment in _class_setstate for details.
     clsdict = {"".join(k): cls.__dict__[k] for k in sorted(cls.__dict__)}
-
-    if len(cls.__bases__) == 1:
-        inherited_dict = cls.__bases__[0].__dict__
-    else:
-        inherited_dict = {}
-        for base in reversed(cls.__bases__):
-            inherited_dict.update(base.__dict__)
-    to_remove = []
     for name, value in clsdict.items():
-        try:
-            base_value = inherited_dict[name]
-            if value is base_value:
-                to_remove.append(name)
-        except KeyError:
-            pass
-    for name in to_remove:
-        clsdict.pop(name)
+        if name == "__module__":
+            continue
+        for index, base in enumerate(cls.__bases__):
+            if name in base.__dict__:
+                if value is base.__dict__[name]:
+                    # Preserve the local binding without serializing the same
+                    # value again, which might not be picklable by itself.
+                    clsdict[name] = _BaseAttributeRef(index)
+                break
     return clsdict
 
 
@@ -1179,8 +1181,21 @@ def _class_setstate(obj, state):
     state, slotstate = state
     registry = None
     for attrname, attr in state.items():
+        if isinstance(attr, _BaseAttributeRef):
+            # A tracked dynamic class may already have its original binding.
+            if attrname in obj.__dict__:
+                continue
+            try:
+                attr = obj.__bases__[attr.base_index].__dict__[attrname]
+            except (IndexError, KeyError):
+                # The base may have changed since this class was pickled.
+                continue
         if attrname == "_abc_impl":
             registry = attr
+        elif attrname == "__module__" and obj.__dict__.get(attrname) == attr:
+            # Skeleton construction already sets __module__. Avoid invoking
+            # custom metaclass setters again unless the value has changed.
+            continue
         else:
             # Note: setting attribute names on a class automatically triggers their
             # interning in CPython:
