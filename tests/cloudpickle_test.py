@@ -2591,6 +2591,85 @@ class CloudPickleTest(unittest.TestCase):
 
         assert AnyStr is pickle_depickle(AnyStr, protocol=self.protocol)
 
+    newtype_only = pytest.mark.skipif(
+        sys.version_info < (3, 10),
+        reason="typing.NewType is a class from Python 3.10 onwards only",
+    )
+
+    @newtype_only
+    def test_pickle_dynamic_newtype(self):
+        MyInt = typing.NewType("MyInt", int)
+        depickled_myint = pickle_depickle(MyInt, protocol=self.protocol)
+        assert depickled_myint is MyInt
+
+    @newtype_only
+    def test_pickle_dynamic_newtype_tracking(self):
+        MyInt = typing.NewType("MyInt", int)
+        MyInt2 = subprocess_pickle_echo(MyInt, protocol=self.protocol)
+        assert MyInt is MyInt2
+
+    @newtype_only
+    def test_pickle_dynamic_newtype_memoization(self):
+        MyInt = typing.NewType("MyInt", int)
+        depickled_1, depickled_2 = pickle_depickle(
+            (MyInt, MyInt), protocol=self.protocol
+        )
+        assert depickled_1 is depickled_2
+
+    @newtype_only
+    def test_pickle_newtype_with_newtype_supertype(self):
+        MyInt = typing.NewType("MyInt", int)
+        MyOtherInt = typing.NewType("MyOtherInt", MyInt)
+        MyInt2, MyOtherInt2 = subprocess_pickle_echo(
+            (MyInt, MyOtherInt), protocol=self.protocol
+        )
+        assert MyInt is MyInt2
+        assert MyOtherInt is MyOtherInt2
+        assert MyOtherInt2.__supertype__ is MyInt2
+
+    @newtype_only
+    def test_pickle_importable_newtype(self):
+        _cloudpickle_testpkg = pytest.importorskip("_cloudpickle_testpkg")
+        MyInt = pickle_depickle(_cloudpickle_testpkg.MyInt, protocol=self.protocol)
+        assert MyInt is _cloudpickle_testpkg.MyInt
+
+    @newtype_only
+    def test_pickle_newtype_in_main_module(self):
+        # Non-regression test for
+        # https://github.com/cloudpipe/cloudpickle/issues/520
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pickle_file = os.path.join(tmpdir, "newtype.pickle")
+            assert_run_python_script(
+                textwrap.dedent(
+                    """
+                    import cloudpickle
+                    from typing import NewType
+
+                    RunDict = NewType("RunDict", dict)
+                    with open(%r, "wb") as f:
+                        f.write(cloudpickle.dumps(RunDict, protocol=%d))
+                    """
+                    % (pickle_file, self.protocol)
+                )
+            )
+            assert_run_python_script(
+                textwrap.dedent(
+                    """
+                    import pickle
+
+                    with open(%r, "rb") as f:
+                        RunDict = pickle.load(f)
+
+                    assert RunDict.__name__ == "RunDict"
+                    assert RunDict.__qualname__ == "RunDict"
+                    assert RunDict.__module__ == "__main__"
+                    assert RunDict.__supertype__ is dict
+                    assert RunDict({"a": 1}) == {"a": 1}
+                    """
+                    % pickle_file
+                )
+            )
+
     def test_generic_type(self):
         T = typing.TypeVar("T")
 
@@ -2791,7 +2870,12 @@ class CloudPickleTest(unittest.TestCase):
                 # The constructs whose pickling mechanism is changed using
                 # register_pickle_by_value are functions, classes, TypeVar and
                 # modules.
-                from mock_local_folder.mod import local_function, LocalT, LocalClass
+                from mock_local_folder.mod import (
+                    local_function,
+                    LocalT,
+                    LocalClass,
+                    LocalNewType,
+                )
 
                 # Make sure the module/constructs are unimportable in the
                 # worker.
@@ -2809,6 +2893,8 @@ class CloudPickleTest(unittest.TestCase):
                 assert w.run(lambda: local_function()) == local_function()
                 # typevar
                 assert w.run(lambda: LocalT.__name__) == LocalT.__name__
+                # newtype
+                assert w.run(lambda: LocalNewType.__name__) == LocalNewType.__name__
                 # classes
                 assert w.run(lambda: LocalClass().method()) == LocalClass().method()
                 # modules

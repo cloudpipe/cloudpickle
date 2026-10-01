@@ -630,6 +630,36 @@ def _typevar_reduce(obj):
     return (getattr, module_and_name)
 
 
+def _make_newtype(name, qualname, module, supertype, class_tracker_id):
+    nt = typing.NewType(name, supertype)
+    nt.__qualname__ = qualname
+    nt.__module__ = module
+    return _lookup_class_or_track(class_tracker_id, nt)
+
+
+def _decompose_newtype(obj):
+    return (
+        obj.__name__,
+        obj.__qualname__,
+        obj.__module__,
+        obj.__supertype__,
+        _get_or_create_tracker_id(obj),
+    )
+
+
+def _newtype_reduce(obj):
+    # NewType instances require the module information hence why we
+    # are not using the _should_pickle_by_reference directly
+    module_and_name = _lookup_module_and_qualname(obj, name=obj.__qualname__)
+
+    if module_and_name is None:
+        return (_make_newtype, _decompose_newtype(obj))
+    elif _is_registered_pickle_by_value(module_and_name[0]):
+        return (_make_newtype, _decompose_newtype(obj))
+
+    return (getattr, module_and_name)
+
+
 def _get_bases(typ):
     if "__orig_bases__" in getattr(typ, "__dict__", {}):
         # For generic types (see PEP 560)
@@ -1253,6 +1283,10 @@ class Pickler(pickle.Pickler):
     _dispatch_table[types.MappingProxyType] = _mappingproxy_reduce
     _dispatch_table[weakref.WeakSet] = _weakset_reduce
     _dispatch_table[typing.TypeVar] = _typevar_reduce
+    if isinstance(typing.NewType, type):
+        # NewType was a function before Python 3.10: its instances only
+        # exist as instances of typing.NewType from Python 3.10 onwards.
+        _dispatch_table[typing.NewType] = _newtype_reduce
     _dispatch_table[_collections_abc.dict_keys] = _dict_keys_reduce
     _dispatch_table[_collections_abc.dict_values] = _dict_values_reduce
     _dispatch_table[_collections_abc.dict_items] = _dict_items_reduce

@@ -19,3 +19,4 @@ class LocalClass:
 
 
 LocalT = typing.TypeVar("LocalT")
+LocalNewType = typing.NewType("LocalNewType", int)

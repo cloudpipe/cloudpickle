@@ -46,3 +46,4 @@ def relative_imports_factory():
 
 some_singleton = _SingletonClass()
 T = typing.TypeVar("T")
+MyInt = typing.NewType("MyInt", int)

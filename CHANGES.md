@@ -1,6 +1,10 @@
 In development
 ==============
 
+- Fix pickling of `typing.NewType` instances defined in the `__main__`
+  module on Python 3.10 and newer.
+  ([issue #520](https://github.com/cloudpipe/cloudpickle/issues/520))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
