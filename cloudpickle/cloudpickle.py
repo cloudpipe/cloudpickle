@@ -58,6 +58,7 @@ import copyreg
 import dataclasses
 import dis
 from enum import Enum
+import functools
 import io
 import itertools
 import logging
@@ -1049,6 +1050,15 @@ def _property_reduce(obj):
     return property, (obj.fget, obj.fset, obj.fdel, obj.__doc__)
 
 
+def _cached_property_reduce(obj):
+    # Recreate the descriptor's lock (Python < 3.12), not its locked state.
+    state = obj.__dict__.copy()
+    state.pop("func")
+    if sys.version_info < (3, 12):
+        state.pop("lock", None)
+    return functools.cached_property, (obj.func,), state
+
+
 def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
@@ -1244,6 +1254,7 @@ class Pickler(pickle.Pickler):
     _dispatch_table[logging.RootLogger] = _root_logger_reduce
     _dispatch_table[memoryview] = _memoryview_reduce
     _dispatch_table[property] = _property_reduce
+    _dispatch_table[functools.cached_property] = _cached_property_reduce
     _dispatch_table[staticmethod] = _classmethod_reduce
     _dispatch_table[CellType] = _cell_reduce
     _dispatch_table[types.CodeType] = _code_reduce

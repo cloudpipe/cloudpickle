@@ -1,6 +1,9 @@
 In development
 ==============
 
+- Support pickling `functools.cached_property` descriptors on Python 3.8-3.11.
+  ([issue #438](https://github.com/cloudpipe/cloudpickle/issues/438))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 

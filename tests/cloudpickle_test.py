@@ -1640,6 +1640,92 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_obj.read_write_value == 3
         type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
 
+    def test_cached_property(self):
+        class MyObject:
+            def __init__(self, value):
+                self.value = value
+                self.calls = 0
+
+            @functools.cached_property
+            def doubled(self):
+                "A cached result"
+                self.calls += 1
+                return self.value * 2
+
+        original = MyObject(3)
+        clone = subprocess_pickle_echo(original, protocol=self.protocol)
+        assert clone.doubled == 6
+        clone.value = 10
+        assert clone.doubled == 6
+        assert clone.calls == 1
+        del clone.doubled
+        assert clone.doubled == 20
+        assert clone.calls == 2
+        assert type(clone).doubled.__doc__ == "A cached result"
+
+        original.doubled
+        original.value = 10
+        clone = subprocess_pickle_echo(original, protocol=self.protocol)
+        assert clone.doubled == 6
+        assert clone.calls == 1
+
+    def test_cached_property_descriptor(self):
+        def func(obj):
+            "Original documentation"
+            return obj.value * 2
+
+        descriptor = functools.cached_property(func)
+        descriptor.__set_name__(object, "doubled")
+        descriptor.__doc__ = "Updated documentation"
+        descriptor.extra = [1, 2]
+        if sys.version_info >= (3, 12):
+            descriptor.lock = "a user-defined attribute"
+        clone, repeated = subprocess_pickle_echo(
+            [descriptor, descriptor], protocol=self.protocol
+        )
+        assert clone is repeated
+        assert clone.attrname == "doubled"
+        assert clone.__doc__ == "Updated documentation"
+        assert clone.extra == [1, 2]
+        if sys.version_info < (3, 12):
+            assert clone.lock is not descriptor.lock
+        else:
+            assert clone.lock == "a user-defined attribute"
+        obj = types.SimpleNamespace(value=4)
+        assert clone.__get__(obj) == 8
+        obj.value = 10
+        assert clone.__get__(obj) == 8
+
+    def test_cached_property_unbound(self):
+        descriptor = functools.cached_property(lambda obj: 42)
+        clone = subprocess_pickle_echo(descriptor, protocol=self.protocol)
+        assert clone.attrname is None
+        with pytest.raises(TypeError, match="__set_name__"):
+            clone.__get__(types.SimpleNamespace())
+        clone.__set_name__(object, "answer")
+        assert clone.__get__(types.SimpleNamespace()) == 42
+
+    def test_cached_property_class_in_fresh_process(self):
+        script = """
+            import functools
+            import cloudpickle
+            import pickle
+            import subprocess
+            import sys
+
+            class MyObject:
+                @functools.cached_property
+                def myself(self):
+                    return MyObject
+
+            payload = cloudpickle.dumps(MyObject, protocol={protocol})
+            code = "import pickle,sys; C=pickle.loads(sys.stdin.buffer.read()); "
+            code += "obj=C(); assert obj.myself is C; "
+            code += "assert obj.__dict__['myself'] is C"
+            subprocess.run([sys.executable, "-c", code], input=payload, check=True)
+        """
+        assert_run_python_script(textwrap.dedent(script.format(protocol=self.protocol)))
+
     def test_namedtuple(self):
         MyTuple = collections.namedtuple("MyTuple", ["a", "b", "c"])
         t1 = MyTuple(1, 2, 3)
