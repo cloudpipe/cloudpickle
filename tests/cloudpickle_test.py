@@ -87,6 +87,50 @@ def _maybe_remove(list_, item):
     return list_
 
 
+@pytest.mark.parametrize("pickler_name", ["Pickler", "_Pickler"])
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_pickle_implementations(pickler_name, protocol):
+    # Select the implementation before importing cloudpickle, as PyPy switched
+    # from the pure-Python Pickler to an accelerated one in PyPy 7.3.22.
+    code = f"""
+import collections
+import io
+import pickle
+pickle.Pickler = getattr(pickle, {pickler_name!r})
+import cloudpickle
+
+class CustomMeta(type):
+    pass
+
+class DynamicClass(metaclass=CustomMeta):
+    value = 42
+
+objects = [pickle.whichmodule, collections.Counter, collections.Counter("ababa"),
+           {{"value": 42}}, b"\\x00\\xff", DynamicClass, DynamicClass()]
+restored = pickle.loads(cloudpickle.dumps(objects, protocol={protocol}))
+assert restored[0] is pickle.whichmodule
+assert restored[1] is collections.Counter
+assert restored[:5] == objects[:5]
+assert isinstance(restored[5], CustomMeta)
+assert isinstance(restored[6], restored[5])
+assert restored[6].value == 42
+
+if hasattr(cloudpickle.Pickler, "reducer_override"):
+    sentinel = lambda: None
+
+    class CustomPickler(cloudpickle.Pickler):
+        def _function_reduce(self, obj):
+            if obj is sentinel:
+                return str, ("hook",)
+            return super()._function_reduce(obj)
+
+    stream = io.BytesIO()
+    CustomPickler(stream, protocol={protocol}).dump(sentinel)
+    assert pickle.loads(stream.getvalue()) == "hook"
+"""
+    assert_run_python_script(code)
+
+
 def test_extract_class_dict():
     class A(int):
         """A docstring"""

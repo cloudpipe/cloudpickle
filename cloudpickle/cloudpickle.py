@@ -96,6 +96,10 @@ _DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
 
 PYPY = platform.python_implementation() == "PyPy"
 
+# Keep using the pure-Python pickler on PyPy: its accelerated reducer_override
+# does not support the state setters used by cloudpickle.
+_PicklerBase = pickle._Pickler if PYPY else pickle.Pickler
+
 builtin_code_type = None
 if PYPY:
     # builtin-code objects only exist in pypy
@@ -1235,7 +1239,7 @@ def _get_dataclass_field_type_sentinel(name):
     return _DATACLASSE_FIELD_TYPE_SENTINELS[name]
 
 
-class Pickler(pickle.Pickler):
+class Pickler(_PicklerBase):
     # set of reducers defined and used by cloudpickle (private)
     _dispatch_table = {}
     _dispatch_table[classmethod] = _classmethod_reduce
@@ -1339,16 +1343,15 @@ class Pickler(pickle.Pickler):
         self.globals_ref = {}
         self.proto = int(protocol)
 
-    if not PYPY:
-        # pickle.Pickler is the C implementation of the CPython pickler and
-        # therefore we rely on reduce_override method to customize the pickler
-        # behavior.
+    if not hasattr(_PicklerBase, "dispatch"):
+        # Accelerated Pickler implementations do not expose a dispatch
+        # dictionary. Rely on reducer_override to customize their behavior.
 
         # `cloudpickle.Pickler.dispatch` is only left for backward
         # compatibility - note that when using protocol 5,
         # `cloudpickle.Pickler.dispatch` is not an extension of
         # `pickle._Pickler.dispatch` dictionary, because `cloudpickle.Pickler`
-        # subclasses the C-implemented `pickle.Pickler`, which does not expose
+        # subclasses the accelerated `pickle.Pickler`, which does not expose
         # a `dispatch` attribute.  Earlier versions of `cloudpickle.Pickler`
         # used `cloudpickle.Pickler.dispatch` as a class-level attribute
         # storing all reducers implemented by cloudpickle, but the attribute
@@ -1359,12 +1362,7 @@ class Pickler(pickle.Pickler):
 
         # Implementation of the reducer_override callback, in order to
         # efficiently serialize dynamic functions and classes by subclassing
-        # the C-implemented `pickle.Pickler`.
-        # TODO: decorrelate reducer_override (which is tied to CPython's
-        # implementation - would it make sense to backport it to pypy? - and
-        # pickle's protocol 5 which is implementation agnostic. Currently, the
-        # availability of both notions coincide on CPython's pickle, but it may
-        # not be the case anymore when pypy implements protocol 5.
+        # the accelerated `pickle.Pickler`.
 
         def reducer_override(self, obj):
             """Type-agnostic reducing callback for function and classes.
@@ -1413,11 +1411,10 @@ class Pickler(pickle.Pickler):
                 return NotImplemented
 
     else:
-        # When reducer_override is not available, hack the pure-Python
-        # Pickler's types.FunctionType and type savers. Note: the type saver
-        # must override Pickler.save_global, because pickle.py contains a
-        # hard-coded call to save_global when pickling meta-classes.
-        dispatch = pickle.Pickler.dispatch.copy()
+        # For pure-Python Picklers, customize the types.FunctionType and type
+        # savers. The type saver must override Pickler.save_global, because
+        # pickle.py contains a hard-coded call to save_global for meta-classes.
+        dispatch = _PicklerBase.dispatch.copy()
 
         def _save_reduce_pickle5(
             self,
