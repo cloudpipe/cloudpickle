@@ -1,6 +1,11 @@
 In development
 ==============
 
+- Preserve unread lazy class annotations when pickling by value on Python
+  3.14. Annotations are evaluated at pickling time, matching dynamic function
+  annotations; unresolved bare names raise `NameError`.
+  ([issue #608](https://github.com/cloudpipe/cloudpickle/issues/608))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
