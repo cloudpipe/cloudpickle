@@ -87,6 +87,210 @@ def _maybe_remove(list_, item):
     return list_
 
 
+@pytest.fixture
+def module_facade():
+    class Facade(types.ModuleType):
+        pass
+
+    module = Facade("_cloudpickle_module_facade")
+    module.foo = 42
+    return module
+
+
+def _module_facade_roundtrip(
+    module, protocol, shape, pickler_class=cloudpickle.Pickler
+):
+    obj = module
+    if shape == "function":
+        namespace = {"mod": module, "__name__": "__main__"}
+        exec("def f():\n    return mod.foo\n", namespace)
+        obj = namespace["f"]
+    buffer = io.BytesIO()
+    pickler_class(buffer, protocol=protocol).dump(obj)
+    cloned = pickle.loads(buffer.getvalue())
+    if shape == "function":
+        assert cloned is not obj
+        return cloned.__globals__["mod"]
+    return cloned
+
+
+@pytest.mark.skipif(
+    platform.python_implementation() != "CPython", reason="CPython hook"
+)
+@pytest.mark.parametrize("protocol", [2, 4, 5])
+@pytest.mark.parametrize("shape", ["module", "function"])
+def test_importable_module_facade(module_facade, monkeypatch, protocol, shape):
+    # #397: a module subclass must not prevent by-value function serialization.
+    module = module_facade
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    state = module.__dict__.copy()
+    cloned = _module_facade_roundtrip(module, protocol, shape)
+    assert cloned is module
+    assert cloned.foo == 42
+    assert module.__dict__ == state
+
+
+@pytest.mark.skipif(
+    platform.python_implementation() != "CPython", reason="CPython hook"
+)
+@pytest.mark.parametrize("protocol", [2, 4, 5])
+@pytest.mark.parametrize("shape", ["module", "function"])
+@pytest.mark.parametrize("by_value", [False, True])
+def test_module_facade_by_value_is_not_flattened(
+    module_facade, monkeypatch, protocol, shape, by_value
+):
+    # By-value subclass reconstruction is a separate, unsupported contract.
+    module = module_facade
+    state = module.__dict__.copy()
+    if by_value:
+        monkeypatch.setitem(sys.modules, module.__name__, module)
+        register_pickle_by_value(module)
+    try:
+        with pytest.raises(TypeError, match="cannot pickle.*Facade"):
+            _module_facade_roundtrip(module, protocol, shape)
+        assert module.__dict__ == state
+    finally:
+        if by_value:
+            unregister_pickle_by_value(module)
+
+
+@pytest.mark.parametrize("protocol", [2, 4, 5])
+@pytest.mark.parametrize("shape", ["module", "function"])
+@pytest.mark.parametrize(
+    "reducer",
+    [
+        "copyreg",
+        "dispatch",
+        "reduce",
+        "reduce_ex",
+        "instance_reduce",
+        "instance_reduce_ex",
+        "getattribute",
+    ],
+)
+def test_module_facade_custom_reducer(monkeypatch, protocol, shape, reducer):
+    import copyreg
+
+    def reduce_module(module):
+        return str, (reducer,)
+
+    class Facade(types.ModuleType):
+        pass
+
+    if reducer == "reduce":
+        Facade.__reduce__ = reduce_module
+    elif reducer == "reduce_ex":
+        Facade.__reduce_ex__ = lambda self, protocol: reduce_module(self)
+    elif reducer == "getattribute":
+
+        def getattribute(self, name):
+            if name == "__reduce_ex__":
+                return lambda protocol: reduce_module(self)
+            return types.ModuleType.__getattribute__(self, name)
+
+        Facade.__getattribute__ = getattribute
+
+    module = Facade("_cloudpickle_custom_module_facade")
+    module.foo = 42
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    pickler_class = cloudpickle.Pickler
+    if reducer == "copyreg":
+        monkeypatch.setitem(copyreg.dispatch_table, Facade, reduce_module)
+    elif reducer == "dispatch":
+
+        class CustomPickler(cloudpickle.Pickler):
+            dispatch_table = cloudpickle.Pickler.dispatch_table.new_child(
+                {Facade: reduce_module}
+            )
+
+        pickler_class = CustomPickler
+    elif reducer == "instance_reduce":
+        module.__reduce__ = lambda: reduce_module(module)
+    elif reducer == "instance_reduce_ex":
+        module.__reduce_ex__ = lambda protocol: reduce_module(module)
+    if reducer == "instance_reduce":
+        # ModuleType's inherited __reduce_ex__ does not delegate to an instance
+        # __reduce__ override. Keep that existing failure instead of ignoring
+        # the override and accidentally importing the module by reference.
+        with pytest.raises(TypeError, match="cannot pickle.*Facade"):
+            _module_facade_roundtrip(module, protocol, shape, pickler_class)
+    else:
+        assert (
+            _module_facade_roundtrip(module, protocol, shape, pickler_class) == reducer
+        )
+
+
+@pytest.mark.skipif(
+    platform.python_implementation() != "CPython", reason="CPython hook"
+)
+@pytest.mark.parametrize("protocol", [2, 4, 5])
+def test_module_facade_fresh_process(tmp_path, monkeypatch, protocol):
+    module_name = "_cloudpickle_importable_module_facade"
+    (tmp_path / (module_name + ".py")).write_text(
+        "import sys\nfrom types import ModuleType\n"
+        "class Facade(ModuleType):\n    pass\n"
+        "sys.modules[__name__].__class__ = Facade\nfoo = 42\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    module = __import__(module_name)
+    try:
+        namespace = {"mod": module, "__name__": "__main__"}
+        exec("def f():\n    return mod.foo\n", namespace)
+        payload = cloudpickle.dumps(namespace["f"], protocol=protocol)
+        script = (
+            "import sys, pickle\n"
+            "sys.path.insert(0, sys.argv[1])\n"
+            "f = pickle.loads(sys.stdin.buffer.read())\n"
+            "assert f() == 42\n"
+            f"assert f.__globals__['mod'] is __import__({module_name!r})\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", script, str(tmp_path)],
+            input=payload,
+            capture_output=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr.decode("utf-8")
+        missing = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                "import sys, pickle; pickle.loads(sys.stdin.buffer.read())",
+            ],
+            input=payload,
+            capture_output=True,
+            timeout=60,
+        )
+        assert missing.returncode != 0
+        assert b"ModuleNotFoundError" in missing.stderr
+        assert module_name.encode() in missing.stderr
+    finally:
+        sys.modules.pop(module_name)
+
+
+@pytest.mark.parametrize("protocol", [2, 4, 5])
+@pytest.mark.parametrize("shape", ["module", "function"])
+@pytest.mark.parametrize("hidden", ["__name__", "__reduce__"])
+def test_module_facade_custom_reducer_no_introspection(
+    monkeypatch, protocol, shape, hidden
+):
+    class Facade(types.ModuleType):
+        def __reduce_ex__(self, protocol):
+            return str, ("custom",)
+
+        def __getattribute__(self, name):
+            if name == hidden:
+                raise ValueError("must not inspect custom reducer module")
+            return types.ModuleType.__getattribute__(self, name)
+
+    module = Facade("_cloudpickle_hidden_module_facade")
+    module.foo = 42
+    monkeypatch.setitem(sys.modules, "_cloudpickle_hidden_module_facade", module)
+    assert _module_facade_roundtrip(module, protocol, shape) == "custom"
+
+
 def test_extract_class_dict():
     class A(int):
         """A docstring"""

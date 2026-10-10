@@ -1367,7 +1367,7 @@ class Pickler(pickle.Pickler):
         # not be the case anymore when pypy implements protocol 5.
 
         def reducer_override(self, obj):
-            """Type-agnostic reducing callback for function and classes.
+            """Type-agnostic callback for functions, classes and module subclasses.
 
             For performance reasons, subclasses of the C `pickle.Pickler` class
             cannot register custom reducers for functions and classes in the
@@ -1407,6 +1407,24 @@ class Pickler(pickle.Pickler):
                 return _class_reduce(obj)
             elif isinstance(obj, types.FunctionType):
                 return self._function_reduce(obj)
+            elif isinstance(obj, types.ModuleType) and t not in self.dispatch_table:
+                # Module subclasses miss the exact-type dispatch entry (#397).
+                # Only fill in their default, unsupported reduction: custom
+                # dispatch entries and reduction hooks must retain precedence.
+                reduce_ex = getattr(obj, "__reduce_ex__", None)
+                if not (
+                    isinstance(reduce_ex, types.BuiltinMethodType)
+                    and reduce_ex == object.__reduce_ex__.__get__(obj)
+                ):
+                    return NotImplemented
+                reduce = getattr(obj, "__reduce__", None)
+                if (
+                    isinstance(reduce, types.BuiltinMethodType)
+                    and reduce == object.__reduce__.__get__(obj)
+                    and _should_pickle_by_reference(obj)
+                ):
+                    return _module_reduce(obj)
+                return NotImplemented
             else:
                 # fallback to save_global, including the Pickler's
                 # dispatch_table

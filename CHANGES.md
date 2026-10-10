@@ -1,6 +1,10 @@
 In development
 ==============
 
+- Allow importable module subclasses with default reduction hooks to be
+  referenced when pickling functions on CPython. Custom reducers retain their
+  existing behavior; by-value module subclass reconstruction is unchanged.
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
