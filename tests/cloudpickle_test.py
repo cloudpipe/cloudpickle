@@ -2591,6 +2591,116 @@ class CloudPickleTest(unittest.TestCase):
 
         assert AnyStr is pickle_depickle(AnyStr, protocol=self.protocol)
 
+    def _skip_unless_newtype_is_class(self):
+        if not isinstance(typing.NewType, type):
+            self.skipTest("typing.NewType is a function before Python 3.10")
+
+    def test_pickle_dynamic_newtype(self):
+        self._skip_unless_newtype_is_class()
+        run_dict = typing.NewType("RunDict", dict)
+        restored = pickle_depickle(run_dict, protocol=self.protocol)
+        assert restored is run_dict
+        assert restored({"a": 1}) == {"a": 1}
+
+        echoed = subprocess_pickle_echo(run_dict, protocol=self.protocol)
+        assert echoed is run_dict
+        assert echoed({"a": 1}) == {"a": 1}
+
+    def test_pickle_dynamic_newtype_memoization(self):
+        self._skip_unless_newtype_is_class()
+        run_dict = typing.NewType("RunDict", dict)
+        first, second = pickle_depickle((run_dict, run_dict), protocol=self.protocol)
+        assert first is second
+
+    def test_pickle_nested_newtype(self):
+        self._skip_unless_newtype_is_class()
+        inner = typing.NewType("Inner", int)
+        outer = typing.NewType("Outer", inner)
+        restored_outer = pickle_depickle(outer, protocol=self.protocol)
+        assert restored_outer is outer
+        assert restored_outer.__supertype__ is inner
+        assert restored_outer.__qualname__ == "Outer"
+        assert restored_outer.__module__ == outer.__module__
+        assert restored_outer(5) == 5
+
+    def test_pickle_newtype_dotted_qualname(self):
+        self._skip_unless_newtype_is_class()
+        alias = typing.NewType("Foo.Bar", int)
+        restored = pickle_depickle(alias, protocol=self.protocol)
+        assert restored is alias
+        assert restored.__qualname__ == "Foo.Bar"
+        assert restored.__name__ == "Bar"
+        assert restored.__supertype__ is int
+
+    def test_pickle_importable_newtype_by_reference(self):
+        self._skip_unless_newtype_is_class()
+        module_name = "cloudpickle_newtype_ref_mod"
+        module = types.ModuleType(module_name)
+        user_id = typing.NewType("UserId", int)
+        user_id.__module__ = module_name
+        module.UserId = user_id
+        sys.modules[module_name] = module
+        try:
+            payload = cloudpickle.dumps(user_id, protocol=self.protocol)
+            assert b"_make_newtype" not in payload
+            assert pickle.loads(payload) is user_id
+        finally:
+            sys.modules.pop(module_name, None)
+
+    def test_pickle_registered_newtype_by_value(self):
+        self._skip_unless_newtype_is_class()
+        module_name = "cloudpickle_newtype_value_mod"
+        module = types.ModuleType(module_name)
+        user_id = typing.NewType("UserId", int)
+        user_id.__module__ = module_name
+        module.UserId = user_id
+        sys.modules[module_name] = module
+        registered = False
+        try:
+            register_pickle_by_value(module)
+            registered = True
+            payload = cloudpickle.dumps(user_id, protocol=self.protocol)
+            assert b"_make_newtype" in payload
+            echoed = subprocess_pickle_echo(user_id, protocol=self.protocol)
+            assert echoed.__name__ == "UserId"
+            assert echoed.__supertype__ is int
+            assert echoed(3) == 3
+        finally:
+            if registered:
+                unregister_pickle_by_value(module)
+            sys.modules.pop(module_name, None)
+
+    def test_newtype_defined_in_main(self):
+        # https://github.com/cloudpipe/cloudpickle/issues/520
+        self._skip_unless_newtype_is_class()
+        folder = Path(self.tmpdir)
+        pickle_path = folder / "tmp.pickle"
+        (folder / "a.py").write_text(
+            "import cloudpickle\n"
+            "from typing import Any, NewType\n"
+            "RunDict = NewType('RunDict', dict[str, Any])\n"
+            f"open(r'{pickle_path}', 'wb').write(cloudpickle.dumps(RunDict))\n",
+            encoding="utf-8",
+        )
+        (folder / "b.py").write_text(
+            "import cloudpickle\n"
+            f"value = cloudpickle.load(open(r'{pickle_path}', 'rb'))\n"
+            "assert value.__name__ == 'RunDict'\n"
+            "assert value({'a': 1}) == {'a': 1}\n",
+            encoding="utf-8",
+        )
+        env = os.environ.copy()
+        repo = Path(__file__).resolve().parents[1]
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(repo), env.get("PYTHONPATH", "")]
+        ).rstrip(os.pathsep)
+        subprocess.check_call(
+            [sys.executable, str(folder / "a.py")], cwd=folder, env=env
+        )
+        subprocess.check_call(
+            [sys.executable, str(folder / "b.py")], cwd=folder, env=env
+        )
+
     def test_generic_type(self):
         T = typing.TypeVar("T")
 
