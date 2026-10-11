@@ -2576,6 +2576,18 @@ class CloudPickleTest(unittest.TestCase):
         T2 = subprocess_pickle_echo(T, protocol=self.protocol)
         assert T is T2
 
+    @pytest.mark.skipif(sys.version_info < (3, 12), reason="Needs PEP 695")
+    def test_pickle_dynamic_typevar_infer_variance(self):
+        T = typing.TypeVar("T", infer_variance=True)
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(lambda t: t.__infer_variance__, T) is True
+
+    @pytest.mark.skipif(sys.version_info < (3, 13), reason="Needs PEP 696")
+    def test_pickle_dynamic_typevar_default(self):
+        T = typing.TypeVar("T", default=int)
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(lambda t: t.__default__, T) is int
+
     def test_pickle_dynamic_typevar_memoization(self):
         T = typing.TypeVar("T")
         depickled_T1, depickled_T2 = pickle_depickle((T, T), protocol=self.protocol)

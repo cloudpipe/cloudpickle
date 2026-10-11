@@ -595,18 +595,25 @@ def _make_skeleton_enum(
     return _lookup_class_or_track(class_tracker_id, enum_class)
 
 
-def _make_typevar(name, bound, constraints, covariant, contravariant, class_tracker_id):
+def _make_typevar(
+    name, bound, constraints, covariant, contravariant, class_tracker_id, extra=None
+):
     tv = typing.TypeVar(
         name,
         *constraints,
         bound=bound,
         covariant=covariant,
         contravariant=contravariant,
+        **(extra or {}),
     )
     return _lookup_class_or_track(class_tracker_id, tv)
 
 
 def _decompose_typevar(obj):
+    extra = {}
+    for attr in ("infer_variance", "default"):
+        if hasattr(obj, f"__{attr}__"):
+            extra[attr] = getattr(obj, f"__{attr}__")
     return (
         obj.__name__,
         obj.__bound__,
@@ -614,6 +621,7 @@ def _decompose_typevar(obj):
         obj.__covariant__,
         obj.__contravariant__,
         _get_or_create_tracker_id(obj),
+        extra,
     )
 
 
