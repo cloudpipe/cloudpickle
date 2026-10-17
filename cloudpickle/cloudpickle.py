@@ -1030,7 +1030,9 @@ def _module_reduce(obj):
         # restore a default value for it at unpickling time.
         state = obj.__dict__.copy()
         state.pop("__builtins__", None)
-        return dynamic_subimport, (obj.__name__, state)
+        # Memoize the module before restoring its state, which can refer back
+        # to the module (for example through a circular package import).
+        return dynamic_subimport, (obj.__name__, {}), state
 
 
 def _method_reduce(obj):
