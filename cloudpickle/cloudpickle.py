@@ -961,7 +961,7 @@ def _cell_reduce(obj):
 
 def _classmethod_reduce(obj):
     orig_func = obj.__func__
-    return type(obj), (orig_func,)
+    return type(obj), (orig_func,), obj.__dict__
 
 
 def _file_reduce(obj):
