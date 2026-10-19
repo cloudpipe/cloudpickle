@@ -1,6 +1,10 @@
 In development
 ==============
 
+- Support pickling classes and instances with `functools.cached_property` on
+  Python versions before 3.12.
+  ([issue #438](https://github.com/cloudpipe/cloudpickle/issues/438))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 

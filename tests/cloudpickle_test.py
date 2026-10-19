@@ -1640,6 +1640,105 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_obj.read_write_value == 3
         type(depickled_obj).read_only_value.__doc__ == "A read-only attribute"
 
+    def test_cached_property_descriptor(self):
+        def getter(obj):
+            "Original documentation"
+            return obj.value * 3
+
+        descriptor = functools.cached_property(getter)
+        descriptor.__set_name__(object, "tripled")
+        descriptor.__doc__ = "Custom documentation"
+        descriptor.metadata = {"units": "widgets"}
+        descriptor.reference = descriptor
+        if sys.version_info >= (3, 12):
+            descriptor.lock = "user-defined lock attribute"
+
+        clone, repeated = pickle_depickle(
+            [descriptor, descriptor], protocol=self.protocol
+        )
+        assert clone is repeated
+        assert clone.reference is clone
+        assert clone is not descriptor
+        assert clone.attrname == "tripled"
+        assert clone.__doc__ == "Custom documentation"
+        assert clone.metadata == descriptor.metadata
+        assert clone.func(types.SimpleNamespace(value=2)) == 6
+        if sys.version_info < (3, 12):
+            assert clone.lock is not descriptor.lock
+            with clone.lock:
+                pass
+        else:
+            assert clone.lock == descriptor.lock
+
+    def test_cached_property_class(self):
+        class Cached:
+            calls = 0
+
+            @functools.cached_property
+            def value(self):
+                "Computed once per instance"
+                self.calls += 1
+                return self.calls * 3
+
+        payload = cloudpickle.dumps([Cached, Cached], protocol=self.protocol)
+        # A fresh interpreter cannot reuse the original dynamic class.
+        code = f"""\
+        import pickle
+
+        cls, repeated = pickle.loads({payload!r})
+        assert cls is repeated
+        assert cls.value.attrname == 'value'
+        assert cls.value.__doc__ == 'Computed once per instance'
+        instance = cls()
+        assert instance.value == 3
+        assert instance.value == 3
+        assert instance.calls == 1
+        del instance.value
+        assert instance.value == 6
+        assert instance.calls == 2
+        """
+        assert_run_python_script(textwrap.dedent(code))
+
+    def test_cached_property_instance(self):
+        class Cached:
+            def __init__(self):
+                self.calls = 0
+
+            @functools.cached_property
+            def value(self):
+                self.calls += 1
+                return self.calls * 3
+
+        original = Cached()
+        uncached = subprocess_pickle_echo(original, protocol=self.protocol)
+        assert uncached.calls == 0
+        assert "value" not in uncached.__dict__
+        assert uncached.value == 3
+        assert uncached.calls == 1
+
+        assert original.value == 3
+        original.calls = 10
+        cached = subprocess_pickle_echo(original, protocol=self.protocol)
+        assert cached.value == 3
+        assert cached.calls == 10
+        del cached.value
+        assert cached.value == 33
+        assert cached.calls == 11
+        assert original.value == 3
+        assert original.calls == 10
+
+    def test_cached_property_unbound(self):
+        descriptor = functools.cached_property(lambda obj: 42)
+        clone = pickle_depickle(descriptor, protocol=self.protocol)
+        assert clone.attrname is None
+
+        class Cached:
+            answer = clone
+
+        assert clone.attrname == "answer"
+        assert Cached().answer == 42
+        assert descriptor.attrname is None
+
     def test_namedtuple(self):
         MyTuple = collections.namedtuple("MyTuple", ["a", "b", "c"])
         t1 = MyTuple(1, 2, 3)
