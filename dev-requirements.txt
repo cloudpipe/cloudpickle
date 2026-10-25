@@ -5,6 +5,8 @@ pre-commit
 pytest
 pytest-cov
 psutil
+# Build distributions in the packaging regression tests
+flit_core >=3.2,<5
 # To be able to test tornado coroutines
 tornado
 # To be able to test behavior in jupyter-notebooks
