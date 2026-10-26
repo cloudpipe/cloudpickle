@@ -992,17 +992,25 @@ def _file_reduce(obj):
     retval = io.StringIO()
 
     try:
-        # Read the whole file
         curloc = obj.tell()
-        obj.seek(0)
-        contents = obj.read()
-        obj.seek(curloc)
+        try:
+            # TextIOWrapper positions are opaque cookies, not StringIO character
+            # offsets. Count the unread characters to locate the snapshot cursor.
+            remaining_chars = len(obj.read())
+            tail_end = obj.buffer.tell()
+            obj.seek(0)
+            contents = obj.read()
+            file_end = obj.buffer.tell()
+        finally:
+            obj.seek(curloc)
     except OSError as e:
         raise pickle.PicklingError(
             "Cannot pickle file %s as it cannot be read" % name
         ) from e
     retval.write(contents)
-    retval.seek(curloc)
+    # Preserve the existing behavior for files explicitly positioned past EOF.
+    # The public byte-stream positions distinguish this from a large text cookie.
+    retval.seek(curloc if tail_end > file_end else len(contents) - remaining_chars)
 
     retval.name = name
     return _file_reconstructor, (retval,)
