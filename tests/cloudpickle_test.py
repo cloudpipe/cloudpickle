@@ -1,11 +1,14 @@
 import _collections_abc
 import abc
+import asyncio
 import collections
+import contextlib
 import base64
 import dataclasses
 import functools
 import io
 import itertools
+import json
 import logging
 import math
 import multiprocessing
@@ -3076,6 +3079,325 @@ class CloudPickleTest(unittest.TestCase):
 
 class Protocol2CloudPickleTest(CloudPickleTest):
     protocol = 2
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_contextmanager_decorator_in_subprocess(protocol, asynchronous):
+    if asynchronous and sys.version_info < (3, 10):
+        pytest.skip("asynccontextmanager supports decorators since Python 3.10")
+    events = []
+
+    if asynchronous:
+
+        @contextlib.asynccontextmanager
+        async def manager(prefix, *, suffix):
+            events.append(prefix)
+            try:
+                yield
+            finally:
+                events.append(suffix)
+
+    else:
+
+        @contextlib.contextmanager
+        def manager(prefix, *, suffix):
+            events.append(prefix)
+            try:
+                yield
+            finally:
+                events.append(suffix)
+
+    decorator = manager("enter", suffix="exit")
+    decorator.note = "preserved"
+    decorator_copy = pickle_depickle(decorator, protocol=protocol)
+    assert decorator_copy.note == "preserved"
+
+    if asynchronous:
+
+        @decorator
+        async def target(value):
+            events.append(value)
+            if value == "fail":
+                raise ValueError(value)
+
+    else:
+
+        @decorator
+        def target(value):
+            events.append(value)
+            if value == "fail":
+                raise ValueError(value)
+
+    def invoke():
+        async def invoke_async():
+            await target("first")
+            with pytest.raises(ValueError, match="fail"):
+                await target("fail")
+
+        if asynchronous:
+            asyncio.run(invoke_async())
+        else:
+            target("first")
+            with pytest.raises(ValueError, match="fail"):
+                target("fail")
+        return events
+
+    payload = cloudpickle.dumps(invoke, protocol=protocol)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import json,pickle,sys; print(json.dumps(pickle.loads(sys.stdin.buffer.read())()))",
+        ],
+        input=payload,
+        capture_output=True,
+        cwd=Path(cloudpickle.__file__).resolve().parent.parent,
+        timeout=30,
+        check=True,
+    )
+    assert json.loads(result.stdout) == [
+        "enter",
+        "first",
+        "exit",
+        "enter",
+        "fail",
+        "exit",
+    ]
+    assert events == []
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_contextmanager_rejects_started_and_closed_generators(protocol, asynchronous):
+    if asynchronous:
+
+        @contextlib.asynccontextmanager
+        async def manager():
+            yield
+
+        async def check_states():
+            instance = manager()
+            async with instance:
+                with pytest.raises((TypeError, pickle.PicklingError)):
+                    pickle_depickle(instance, protocol=protocol)
+            with pytest.raises((TypeError, pickle.PicklingError)):
+                pickle_depickle(instance, protocol=protocol)
+            instance = manager()
+            await instance.gen.aclose()
+            with pytest.raises((TypeError, pickle.PicklingError)):
+                pickle_depickle(instance, protocol=protocol)
+
+        asyncio.run(check_states())
+    else:
+
+        @contextlib.contextmanager
+        def manager():
+            yield
+
+        instance = manager()
+        with instance:
+            with pytest.raises((TypeError, pickle.PicklingError)):
+                pickle_depickle(instance, protocol=protocol)
+        with pytest.raises((TypeError, pickle.PicklingError)):
+            pickle_depickle(instance, protocol=protocol)
+        instance = manager()
+        instance.gen.close()
+        with pytest.raises((TypeError, pickle.PicklingError)):
+            pickle_depickle(instance, protocol=protocol)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("asynchronous", [False, True])
+@pytest.mark.parametrize("factory_kind", ["function", "method", "partial"])
+def test_contextmanager_cyclic_state(protocol, asynchronous, factory_kind):
+    contexts = {}
+    if asynchronous:
+
+        async def manager(owner, positional, *, keyword):
+            assert owner == ["owner"]
+            assert positional[0] is keyword["instance"] is contexts["instance"]
+            yield contexts["instance"]
+
+        decorate = contextlib.asynccontextmanager
+    else:
+
+        def manager(owner, positional, *, keyword):
+            assert owner == ["owner"]
+            assert positional[0] is keyword["instance"] is contexts["instance"]
+            yield contexts["instance"]
+
+        decorate = contextlib.contextmanager
+
+    positional = []
+    owner = ["owner"]
+    if factory_kind == "method":
+        manager = types.MethodType(manager, owner)
+    elif factory_kind == "partial":
+        manager = functools.partial(functools.partial(manager), owner)
+    else:
+        positional_args = (owner, positional)
+    if factory_kind != "function":
+        positional_args = (positional,)
+    instance = decorate(manager)(*positional_args, keyword=contexts)
+    positional.append(instance)
+    contexts["instance"] = instance
+    instance.members = weakref.WeakSet([instance])
+    clone = pickle_depickle(instance, protocol=protocol)
+    assert list(clone.members) == [clone]
+    if asynchronous:
+
+        async def check_clone():
+            async with clone as value:
+                assert value is clone
+
+        asyncio.run(check_clone())
+    else:
+        with clone as value:
+            assert value is clone
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("asynchronous", [False, True])
+@pytest.mark.parametrize(
+    "factory_kind",
+    ["function", "function_like", "partial_subclass", "partialmethod_flag"],
+)
+def test_contextmanager_rejects_non_generator_factory(
+    protocol, asynchronous, factory_kind
+):
+    calls = []
+    if asynchronous:
+
+        async def generator():
+            yield
+
+        decorate = contextlib.asynccontextmanager
+    else:
+
+        def generator():
+            yield
+
+        decorate = contextlib.contextmanager
+
+    def construct():
+        calls.append("construct")
+        return generator()
+
+    if factory_kind == "function_like":
+
+        class Factory:
+            __code__ = generator.__code__
+            __name__ = "factory"
+            __defaults__ = None
+            __kwdefaults__ = None
+            __annotations__ = {}
+
+            def __call__(self):
+                return construct()
+
+        factory = Factory()
+    elif factory_kind == "partial_subclass":
+
+        class Factory(functools.partial):
+            def __call__(self):
+                calls.append("construct")
+                return super().__call__()
+
+        factory = Factory(generator)
+    else:
+        factory = construct
+        if factory_kind == "partialmethod_flag":
+            factory._partialmethod = functools.partialmethod(generator)
+
+    instance = decorate(factory)()
+    with pytest.raises((TypeError, pickle.PicklingError)):
+        pickle_depickle(instance, protocol=protocol)
+    assert calls == ["construct"]
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_generators_remain_unpickleable(protocol, asynchronous):
+    if asynchronous:
+
+        async def generator():
+            yield
+
+    else:
+
+        def generator():
+            yield
+
+    instance = generator()
+    with pytest.raises(TypeError, match="generator"):
+        pickle_depickle(instance, protocol=protocol)
+    if asynchronous:
+        asyncio.run(instance.aclose())
+    else:
+        instance.close()
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("asynchronous", [False, True])
+@pytest.mark.parametrize("entered", [False, True])
+def test_contextmanager_preserves_pickleable_iterators(protocol, asynchronous, entered):
+    calls = []
+
+    if asynchronous:
+
+        class AsyncIterator:
+            def __init__(self):
+                self.iterator = iter([7])
+
+            async def __anext__(self):
+                try:
+                    return next(self.iterator)
+                except StopIteration:
+                    raise StopAsyncIteration from None
+
+        def factory():
+            calls.append("construct")
+            return AsyncIterator()
+
+        decorate = contextlib.asynccontextmanager
+    else:
+
+        def factory():
+            calls.append("construct")
+            return iter([7])
+
+        decorate = contextlib.contextmanager
+
+    instance = decorate(factory)()
+    instance.self = instance
+
+    async def check_async():
+        if entered:
+            assert await instance.__aenter__() == 7
+        clone, restored_calls = pickle_depickle((instance, calls), protocol=protocol)
+        assert clone.self is clone
+        assert restored_calls == ["construct"]
+        if not entered:
+            assert await clone.__aenter__() == 7
+        assert not await clone.__aexit__(None, None, None)
+        clone = pickle_depickle(clone, protocol=protocol)
+        with pytest.raises(StopAsyncIteration):
+            await clone.gen.__anext__()
+
+    if asynchronous:
+        asyncio.run(check_async())
+    else:
+        if entered:
+            assert instance.__enter__() == 7
+        clone, restored_calls = pickle_depickle((instance, calls), protocol=protocol)
+        assert clone.self is clone
+        assert restored_calls == ["construct"]
+        if not entered:
+            assert clone.__enter__() == 7
+        assert not clone.__exit__(None, None, None)
+        clone = pickle_depickle(clone, protocol=protocol)
+        assert list(clone.gen) == []
 
 
 def test_lookup_module_and_qualname_dynamic_typevar():
