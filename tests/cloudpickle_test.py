@@ -109,15 +109,229 @@ def test_extract_class_dict():
             return "c"
 
     clsdict = _extract_class_dict(C)
-    expected_keys = ["C_CONSTANT", "__doc__", "method_c"]
+    expected_keys = ["C_CONSTANT", "__doc__", "__module__", "method_c"]
     # New attribute in Python 3.13 beta 1
     # https://github.com/python/cpython/pull/118475
     if sys.version_info >= (3, 13):
         expected_keys.insert(2, "__firstlineno__")
+        expected_keys.insert(4, "__static_attributes__")
     assert list(clsdict.keys()) == expected_keys
     assert clsdict["C_CONSTANT"] == 43
     assert clsdict["__doc__"] is None
     assert clsdict["method_c"](C()) == C().method_c()
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("multiple_inheritance", [False, True])
+def test_class_explicit_overrides(protocol, multiple_inheritance):
+    # Start the worker before defining the classes so fork cannot copy their
+    # entries in cloudpickle's dynamic class tracker.
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class Parent:
+            value = 1
+            inherited = 1
+
+            def method(self):
+                return "original"
+
+        class Mixin:
+            pass
+
+        bases = (Parent, Mixin) if multiple_inheritance else (Parent,)
+
+        class Child(*bases):
+            value = Parent.value
+            method = Parent.method
+
+        def check_overrides(child):
+            parent = child.__bases__[0]
+            parent.value = 2
+            parent.inherited = 2
+            parent.method = lambda self: "updated"
+            assert child.value == 1
+            assert child().method() == "original"
+            assert child.inherited == 2
+            assert "value" in child.__dict__
+            assert "method" in child.__dict__
+            assert "inherited" not in child.__dict__
+
+        worker.run(check_overrides, Child)
+        check_overrides(Child)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("multiple_inheritance", [False, True])
+def test_class_explicit_override_of_importable_unpicklable_attribute(
+    protocol, multiple_inheritance
+):
+    testpkg = pytest.importorskip("_cloudpickle_testpkg")
+
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class Mixin:
+            pass
+
+        bases = (
+            (Mixin, testpkg.BaseWithLock)
+            if multiple_inheritance
+            else (testpkg.BaseWithLock,)
+        )
+
+        class Child(*bases):
+            shared = testpkg.BaseWithLock.shared
+
+        def check_override(child):
+            assert "shared" in child.__dict__
+            base = next(base for base in child.__bases__ if "shared" in base.__dict__)
+            assert child.__dict__["shared"] is base.shared
+
+        worker.run(check_override, Child)
+        check_override(pickle_depickle(Child, protocol=protocol))
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("doc", ["parent documentation", None, ["non-string doc"]])
+def test_class_doc_override_restored_in_fresh_process(protocol, doc):
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class Parent:
+            __doc__ = doc
+
+        class Child(Parent):
+            __doc__ = Parent.__doc__
+
+        def check_doc(child, expected):
+            assert child.__dict__["__doc__"] == expected
+            child.__bases__[0].__doc__ = "changed parent documentation"
+            assert child.__dict__["__doc__"] == expected
+
+        worker.run(check_doc, Child, doc)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_explicit_override_replaces_metaclass_default(protocol):
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class DefaultMeta(type):
+            def __new__(mcls, name, bases, namespace):
+                namespace.setdefault("value", None)
+                return super().__new__(mcls, name, bases, namespace)
+
+        class Parent(metaclass=DefaultMeta):
+            value = 1
+
+        class Child(Parent):
+            value = Parent.value
+
+        payload = cloudpickle.dumps(Child, protocol=protocol)
+
+        def check_override(payload):
+            child = pickle.loads(payload)
+            assert child.__dict__["value"] == 1
+            child.value = 3
+            child.__bases__[0].value = 2
+            restored = pickle.loads(payload)
+            assert restored is child
+            assert restored.__dict__["value"] == 3
+
+        worker.run(check_override, payload)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_doc_override_restored_from_pickle(protocol):
+    class Parent:
+        """Parent documentation."""
+
+    class Child(Parent):
+        __doc__ = Parent.__doc__
+
+    original_doc = Child.__doc__
+    payload = cloudpickle.dumps(Child, protocol=protocol)
+    Child.__doc__ = None
+    restored = pickle.loads(payload)
+    assert restored is Child
+    assert restored.__doc__ == original_doc
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_explicit_override_keeps_existing_binding(monkeypatch, protocol):
+    testpkg = pytest.importorskip("_cloudpickle_testpkg")
+
+    class Child(testpkg.BaseWithLock):
+        shared = testpkg.BaseWithLock.shared
+
+    original = Child.shared
+    payload = cloudpickle.dumps(Child, protocol=protocol)
+    monkeypatch.setattr(testpkg.BaseWithLock, "shared", object())
+
+    restored = pickle.loads(payload)
+    assert restored is Child
+    assert restored.__dict__["shared"] is original
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_explicit_override_resolves_changed_importable_base(protocol):
+    testpkg = pytest.importorskip("_cloudpickle_testpkg")
+
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class Child(testpkg.BaseWithLock):
+            shared = testpkg.BaseWithLock.shared
+
+        def replace_base_attribute():
+            import _cloudpickle_testpkg
+
+            _cloudpickle_testpkg.BaseWithLock.shared = object()
+
+        def check_override(child):
+            assert "shared" in child.__dict__
+            assert child.__dict__["shared"] is child.__bases__[0].shared
+
+        worker.run(replace_base_attribute)
+        worker.run(check_override, Child)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_module_set_during_construction(monkeypatch, protocol):
+    testpkg = pytest.importorskip("_cloudpickle_testpkg")
+
+    class ModuleOnceMeta(type):
+        __module__ = testpkg.__name__
+        __qualname__ = "ModuleOnceMeta"
+
+        def __setattr__(cls, name, value):
+            if name == "__module__" and cls.__dict__.get(name) == value:
+                raise TypeError("redundant module assignment")
+            super().__setattr__(name, value)
+
+    class Parent(metaclass=ModuleOnceMeta):
+        __module__ = testpkg.__name__
+        __qualname__ = "ModuleOnceParent"
+
+    monkeypatch.setattr(testpkg, "ModuleOnceMeta", ModuleOnceMeta, raising=False)
+    monkeypatch.setattr(testpkg, "ModuleOnceParent", Parent, raising=False)
+    assert pickle.loads(pickle.dumps(Parent)) is Parent
+
+    class Child(Parent):
+        __module__ = testpkg.__name__
+
+    restored = pickle_depickle(Child, protocol=protocol)
+    assert restored.__module__ == testpkg.__name__
+    assert restored.__bases__ == (Parent,)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_module_restored_from_pickle(protocol):
+    class DynamicClass:
+        pass
+
+    original_module = DynamicClass.__module__
+    payload = cloudpickle.dumps(DynamicClass, protocol=protocol)
+    DynamicClass.__module__ = "changed_module"
+    restored = pickle.loads(payload)
+    assert restored is DynamicClass
+    assert restored.__module__ == original_module
 
 
 class CloudPickleTest(unittest.TestCase):
