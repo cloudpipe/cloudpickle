@@ -438,7 +438,9 @@ def _extract_class_dict(cls):
     # See the inline comment in _class_setstate for details.
     clsdict = {"".join(k): cls.__dict__[k] for k in sorted(cls.__dict__)}
     for name, value in clsdict.items():
-        if name == "__module__":
+        # Class construction supplies these attributes even when they are not
+        # explicitly declared, so restore their serialized values as metadata.
+        if name in ("__module__", "__doc__"):
             continue
         for index, base in enumerate(cls.__bases__):
             if name in base.__dict__:
@@ -563,7 +565,10 @@ def _make_skeleton_class(
         name, bases, {"metaclass": type_constructor}, lambda ns: ns.update(type_kwargs)
     )
 
-    return _lookup_class_or_track(class_tracker_id, skeleton_class)
+    tracked_class = _lookup_class_or_track(class_tracker_id, skeleton_class)
+    if extra is not None:
+        extra["is_new_class"] = tracked_class is skeleton_class
+    return tracked_class
 
 
 def _make_skeleton_enum(
@@ -594,7 +599,10 @@ def _make_skeleton_enum(
     enum_class.__module__ = module
     enum_class.__qualname__ = qualname
 
-    return _lookup_class_or_track(class_tracker_id, enum_class)
+    tracked_class = _lookup_class_or_track(class_tracker_id, enum_class)
+    if extra is not None:
+        extra["is_new_class"] = tracked_class is enum_class
+    return tracked_class
 
 
 def _make_typevar(name, bound, constraints, covariant, contravariant, class_tracker_id):
@@ -1063,23 +1071,18 @@ def _dynamic_class_reduce(obj):
     from importable modules.
     """
     if Enum is not None and issubclass(obj, Enum):
-        return (
-            _make_skeleton_enum,
-            _enum_getnewargs(obj),
-            _enum_getstate(obj),
-            None,
-            None,
-            _class_setstate,
-        )
+        constructor = _make_skeleton_enum
+        newargs = _enum_getnewargs(obj)
+        state = _enum_getstate(obj)
     else:
-        return (
-            _make_skeleton_class,
-            _class_getnewargs(obj),
-            _class_getstate(obj),
-            None,
-            None,
-            _class_setstate,
-        )
+        constructor = _make_skeleton_class
+        newargs = _class_getnewargs(obj)
+        state = _class_getstate(obj)
+
+    # Share per-load context with the constructor so state restoration can
+    # distinguish a new skeleton from a class reused by the tracker.
+    newargs = newargs[:-1] + (state[1],)
+    return constructor, newargs, state, None, None, _class_setstate
 
 
 def _class_reduce(obj):
@@ -1182,8 +1185,9 @@ def _class_setstate(obj, state):
     registry = None
     for attrname, attr in state.items():
         if isinstance(attr, _BaseAttributeRef):
-            # A tracked dynamic class may already have its original binding.
-            if attrname in obj.__dict__:
+            # Preserve an existing tracked binding, but replace attributes
+            # that a metaclass generated while constructing a new skeleton.
+            if not slotstate.get("is_new_class", False) and attrname in obj.__dict__:
                 continue
             try:
                 attr = obj.__bases__[attr.base_index].__dict__[attrname]

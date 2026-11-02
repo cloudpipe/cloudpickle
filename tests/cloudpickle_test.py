@@ -191,6 +191,70 @@ def test_class_explicit_override_of_importable_unpicklable_attribute(
 
 
 @pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+@pytest.mark.parametrize("doc", ["parent documentation", None, ["non-string doc"]])
+def test_class_doc_override_restored_in_fresh_process(protocol, doc):
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class Parent:
+            __doc__ = doc
+
+        class Child(Parent):
+            __doc__ = Parent.__doc__
+
+        def check_doc(child, expected):
+            assert child.__dict__["__doc__"] == expected
+            child.__bases__[0].__doc__ = "changed parent documentation"
+            assert child.__dict__["__doc__"] == expected
+
+        worker.run(check_doc, Child, doc)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_explicit_override_replaces_metaclass_default(protocol):
+    with subprocess_worker(protocol=protocol) as worker:
+
+        class DefaultMeta(type):
+            def __new__(mcls, name, bases, namespace):
+                namespace.setdefault("value", None)
+                return super().__new__(mcls, name, bases, namespace)
+
+        class Parent(metaclass=DefaultMeta):
+            value = 1
+
+        class Child(Parent):
+            value = Parent.value
+
+        payload = cloudpickle.dumps(Child, protocol=protocol)
+
+        def check_override(payload):
+            child = pickle.loads(payload)
+            assert child.__dict__["value"] == 1
+            child.value = 3
+            child.__bases__[0].value = 2
+            restored = pickle.loads(payload)
+            assert restored is child
+            assert restored.__dict__["value"] == 3
+
+        worker.run(check_override, payload)
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
+def test_class_doc_override_restored_from_pickle(protocol):
+    class Parent:
+        """Parent documentation."""
+
+    class Child(Parent):
+        __doc__ = Parent.__doc__
+
+    original_doc = Child.__doc__
+    payload = cloudpickle.dumps(Child, protocol=protocol)
+    Child.__doc__ = None
+    restored = pickle.loads(payload)
+    assert restored is Child
+    assert restored.__doc__ == original_doc
+
+
+@pytest.mark.parametrize("protocol", [2, cloudpickle.DEFAULT_PROTOCOL])
 def test_class_explicit_override_keeps_existing_binding(monkeypatch, protocol):
     testpkg = pytest.importorskip("_cloudpickle_testpkg")
 
