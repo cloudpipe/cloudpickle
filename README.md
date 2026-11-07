@@ -120,6 +120,44 @@ situations:
 - If a function pickled by reference uses a function pickled by value during its execution.
 
 
+Shared dynamically compiled Cython modules
+-----------------------------------------
+
+Functions and classes created by `pyximport` or the IPython `%%cython`
+magic may belong to modules outside Python's normal import search path. If
+the compiled extension files are accessible at the **same absolute paths**
+in every worker, enable `assume_shared_dynamic_cython_module_folder`:
+
+```python
+payload = cloudpickle.dumps(
+    compiled_function,
+    assume_shared_dynamic_cython_module_folder=True,
+)
+restored_function = pickle.loads(payload)
+```
+
+The option is also available on `cloudpickle.dump` and `cloudpickle.Pickler`.
+It defaults to `False`. Extensions already found on the normal import search
+path continue to use ordinary imports. With the option enabled, an extension
+outside that path is loaded from its recorded filename, and named functions
+and classes are looked up in that module. This also supports module references
+captured by Python functions. It does not serialize native code, compile
+sources on workers, or copy modified module globals.
+
+The compiled extension must be compatible with the worker's Python version,
+ABI, and platform, and its native libraries and parent packages must be
+available. The worker does not need Cython or a compilation hook. Definitions
+must be accessible by their qualified name in the module; locally defined
+Cython closures are outside this feature's scope. Modules explicitly registered
+with `register_pickle_by_value` retain that existing policy.
+
+Repeated loads reuse the module already loaded from the recorded path. If
+the same module name is already loaded from another location, loading raises
+`ImportError` instead of replacing it. Use distinct module names for different
+compiled versions. As with ordinary imports, module initialization runs when
+the extension is first loaded.
+
+
 Running the tests
 -----------------
 
