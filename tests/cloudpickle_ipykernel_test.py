@@ -1,7 +1,6 @@
 import sys
 import time
 import pytest
-import platform
 import textwrap
 from queue import Empty
 
@@ -54,7 +53,7 @@ def run_in_notebook(code, timeout=10):
 
 
 @pytest.mark.skipif(
-    platform.python_implementation() == "PyPy",
+    sys.implementation.name == "pypy",
     reason="Skip PyPy because tests are too slow",
 )
 @pytest.mark.parametrize("code, expected", [
