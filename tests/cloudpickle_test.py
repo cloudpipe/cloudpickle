@@ -11,7 +11,6 @@ import math
 import multiprocessing
 from operator import itemgetter, attrgetter
 import pickletools
-import platform
 import random
 import re
 import shutil
@@ -87,6 +86,19 @@ def _maybe_remove(list_, item):
     return list_
 
 
+def test_import_with_packaged_python_version():
+    code = """
+    import sys
+    sys.version = sys.version.replace(" ", " | packaged by example | ", 1)
+
+    import cloudpickle
+
+    func = cloudpickle.loads(cloudpickle.dumps(lambda x: x + 1))
+    assert func(1) == 2
+    """
+    assert_run_python_script(textwrap.dedent(code))
+
+
 def test_extract_class_dict():
     class A(int):
         """A docstring"""
@@ -130,7 +142,7 @@ class CloudPickleTest(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     @pytest.mark.skipif(
-        platform.python_implementation() != "CPython" or sys.version_info < (3, 8, 2),
+        sys.implementation.name != "cpython" or sys.version_info < (3, 8, 2),
         reason="Underlying bug fixed upstream starting Python 3.8.2",
     )
     def test_reducer_override_reference_cycle(self):
@@ -451,7 +463,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(partial_clone(4), 1)
 
     @pytest.mark.skipif(
-        platform.python_implementation() == "PyPy",
+        sys.implementation.name == "pypy",
         reason="Skip numpy and scipy tests on PyPy",
     )
     def test_ufunc(self):
@@ -554,7 +566,7 @@ class CloudPickleTest(unittest.TestCase):
         self.assertEqual(mod.f(5), mod2.f(5))
         self.assertEqual(mod.Foo().method(5), mod2.Foo().method(5))
 
-        if platform.python_implementation() != "PyPy":
+        if sys.implementation.name != "pypy":
             # XXX: this fails with excessive recursion on PyPy.
             mod3 = subprocess_pickle_echo(mod, protocol=self.protocol)
             self.assertEqual(mod.x, mod3.x)
@@ -776,7 +788,7 @@ class CloudPickleTest(unittest.TestCase):
         dynamic_module = types.ModuleType("dynamic_module")
         assert not _should_pickle_by_reference(dynamic_module)
 
-        if platform.python_implementation() == "PyPy":
+        if sys.implementation.name == "pypy":
             import _codecs
 
             assert _should_pickle_by_reference(_codecs)
@@ -921,10 +933,7 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_unbound_meth(arg) == unbound_clsmethod(arg)
 
     @pytest.mark.skipif(
-        (
-            sys.version_info >= (3, 10, 8)
-            and platform.python_implementation() == "CPython"
-        ),
+        (sys.version_info >= (3, 10, 8) and sys.implementation.name == "cpython"),
         reason=(
             "CPython dropped support for pickling classmethod_descriptor,"
             "https://github.com/python/cpython/issues/95196"
@@ -952,11 +961,11 @@ class CloudPickleTest(unittest.TestCase):
 
         # float.fromhex takes a string as input.
         arg = "0x1"
-        if platform.python_implementation() == "CPython":
+        if sys.implementation.name == "cpython":
             # Roundtripping a classmethod_descriptor results in a
             # builtin_function_or_method (CPython upstream issue).
             assert depickled_clsdict_meth(arg) == clsdict_clsmethod(float, arg)
-        if platform.python_implementation() == "PyPy":
+        if sys.implementation.name == "pypy":
             # builtin-classmethods are simple classmethod in PyPy (not
             # callable). We test equality of types and the functionality of the
             # __func__ attribute instead. We do not test the the identity of
@@ -989,7 +998,7 @@ class CloudPickleTest(unittest.TestCase):
         assert depickled_clsdict_meth is clsdict_slotmethod
 
     @pytest.mark.skipif(
-        platform.python_implementation() == "PyPy",
+        sys.implementation.name == "pypy",
         reason="No known staticmethod example in the pypy stdlib",
     )
     def test_builtin_staticmethod(self):
@@ -2187,7 +2196,7 @@ class CloudPickleTest(unittest.TestCase):
             check_deterministic_pickle(A_dump, cloudpickle.dumps(A))
 
     @pytest.mark.skipif(
-        platform.python_implementation() == "PyPy",
+        sys.implementation.name == "pypy",
         reason="Skip PyPy because memory grows too much",
     )
     def test_interactive_remote_function_calls_no_memory_leak(self):
