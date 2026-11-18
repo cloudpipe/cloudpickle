@@ -1339,7 +1339,7 @@ class Pickler(pickle.Pickler):
         self.globals_ref = {}
         self.proto = int(protocol)
 
-    if not PYPY:
+    if not hasattr(pickle.Pickler, "dispatch"):
         # pickle.Pickler is the C implementation of the CPython pickler and
         # therefore we rely on reduce_override method to customize the pickler
         # behavior.
