@@ -1,6 +1,9 @@
 In development
 ==============
 
+- Fix pickling modules by value when their state contains cyclic module
+  references, including circular package imports.
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
