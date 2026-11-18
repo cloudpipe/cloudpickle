@@ -1,6 +1,9 @@
 In development
 ==============
 
+3.1.3
+=====
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
