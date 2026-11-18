@@ -1,6 +1,15 @@
 In development
 ==============
 
+- Fix pickling of Python 3.14 lazy annotation (`__annotate__`) functions that
+  have to be pickled by value, for instance when `functools.update_wrapper`
+  copies the `__annotate__` function of a method onto a wrapper instance. Such
+  functions close over the namespace of the class they were defined in, which
+  can hold unpicklable objects such as `_abc_impl`. Their annotations are now
+  evaluated at pickling time instead, as is already the case for the
+  annotations of dynamic functions. ([issue #585](
+  https://github.com/cloudpipe/cloudpickle/issues/585))
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 

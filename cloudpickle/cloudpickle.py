@@ -754,6 +754,50 @@ def _function_getstate(func):
     return state, slotstate
 
 
+def _make_eager_annotate(annotations):
+    """Rebuild a PEP 649 ``__annotate__`` function from evaluated annotations.
+
+    The original annotate function is a closure over the namespace in which the
+    annotated object was defined (for methods, the class namespace). That
+    namespace can hold unpicklable objects such as ``_abc_impl``, so when the
+    annotate function has to be pickled by value we snapshot the annotations
+    instead, mirroring what ``_function_getstate`` already does for the
+    ``__annotations__`` of dynamic functions.
+    """
+
+    def __annotate__(format, /):
+        from annotationlib import Format, annotations_to_string
+
+        if format == Format.STRING:
+            return annotations_to_string(annotations)
+        elif format in (Format.VALUE, Format.FORWARDREF):
+            return dict(annotations)
+        raise NotImplementedError(format)
+
+    return __annotate__
+
+
+def _eager_annotate_reduce(func):
+    """Reducer for PEP 649 ``__annotate__`` functions pickled by value.
+
+    Returns NotImplemented when the annotations cannot be evaluated eagerly
+    (e.g. they contain forward references), in which case the generic dynamic
+    function reducer is used instead.
+    """
+    if sys.version_info < (3, 14) or func.__name__ != "__annotate__":
+        return NotImplemented
+
+    from annotationlib import Format, call_annotate_function
+
+    try:
+        annotations = call_annotate_function(func, Format.VALUE)
+    except Exception:
+        return NotImplemented
+    if not isinstance(annotations, dict):
+        return NotImplemented
+    return _make_eager_annotate, (annotations,)
+
+
 def _class_getstate(obj):
     clsdict = _extract_class_dict(obj)
     clsdict.pop("__weakref__", None)
@@ -1286,8 +1330,10 @@ class Pickler(pickle.Pickler):
         """
         if _should_pickle_by_reference(obj):
             return NotImplemented
-        else:
-            return self._dynamic_function_reduce(obj)
+        reduce = _eager_annotate_reduce(obj)
+        if reduce is not NotImplemented:
+            return reduce
+        return self._dynamic_function_reduce(obj)
 
     def _function_getnewargs(self, func):
         code = func.__code__

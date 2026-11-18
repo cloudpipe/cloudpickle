@@ -2707,6 +2707,99 @@ class CloudPickleTest(unittest.TestCase):
         c2 = C2()
         assert isinstance(c2, C2)
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 14),
+        reason="functools.update_wrapper copies __annotate__ starting in Python 3.14",
+    )
+    def test_update_wrapper_with_annotated_abc_method(self):
+        # see https://github.com/cloudpipe/cloudpickle/issues/585
+        # functools.update_wrapper copies the (lazy) __annotate__ function of
+        # the wrapped callable onto the wrapper instance on Python 3.14+. For a
+        # method, that function closes over the namespace of the defining
+        # class, which for an ABC holds an unpicklable _abc_impl object.
+        class FuncWrapper:
+            def __init__(self, function):
+                self.function = function
+                functools.update_wrapper(self, self.function)
+
+            def __call__(self, *args, **kwargs):
+                return self.function(*args, **kwargs)
+
+        class AbstractClass(abc.ABC):
+            a: int
+
+            def method(self, arg: str) -> str:
+                return arg.upper()
+
+        wrapped = FuncWrapper(AbstractClass().method)
+
+        wrapped_clone = pickle_depickle(wrapped, protocol=self.protocol)
+
+        assert wrapped_clone("abc") == "ABC"
+        assert wrapped_clone.__name__ == "method"
+        assert wrapped_clone.__wrapped__.__annotations__ == {"arg": str, "return": str}
+        if sys.version_info >= (3, 14):
+            import annotationlib
+
+            # The annotations copied onto the wrapper survive the roundtrip,
+            # evaluated eagerly at pickling time.
+            assert annotationlib.get_annotations(wrapped_clone) == {
+                "arg": str,
+                "return": str,
+            }
+            assert annotationlib.get_annotations(
+                wrapped_clone, format=annotationlib.Format.STRING
+            ) == {"arg": "str", "return": "str"}
+
+    @pytest.mark.skipif(
+        sys.version_info < (3, 14),
+        reason="PEP 649 lazy annotations require Python 3.14+",
+    )
+    def test_pickle_annotate_function_of_method(self):
+        # A PEP 649 __annotate__ function that has to be pickled by value is
+        # snapshotted into an eagerly evaluated one, see issue #585.
+        import annotationlib
+
+        class AbstractClass(abc.ABC):
+            a: int
+
+            def method(self, arg: str) -> "str":
+                return arg.upper()
+
+        annotate_clone = pickle_depickle(
+            AbstractClass.method.__annotate__, protocol=self.protocol
+        )
+        assert annotate_clone(annotationlib.Format.VALUE) == {
+            "arg": str,
+            "return": "str",
+        }
+        assert annotate_clone(annotationlib.Format.STRING) == {
+            "arg": "str",
+            "return": "str",
+        }
+
+    @pytest.mark.skipif(
+        sys.version_info < (3, 14),
+        reason="PEP 649 lazy annotations require Python 3.14+",
+    )
+    def test_unresolvable_annotations_stay_lazy(self):
+        # When the annotations cannot be evaluated eagerly, the annotate
+        # function is pickled by value as any other function.
+        import annotationlib
+
+        class FuncWrapper:
+            def __init__(self, function):
+                self.function = function
+                functools.update_wrapper(self, self.function)
+
+        def func(arg: "UndefinedName") -> int:  # noqa: F821
+            return 0
+
+        clone = pickle_depickle(FuncWrapper(func), protocol=self.protocol)
+        assert annotationlib.get_annotations(
+            clone, format=annotationlib.Format.STRING
+        ) == {"arg": "UndefinedName", "return": "int"}
+
     def test_function_annotations(self):
         def f(a: int) -> str:
             pass
