@@ -55,10 +55,13 @@ from collections import ChainMap, OrderedDict
 import abc
 import builtins
 import copyreg
+import contextlib
 import dataclasses
 import dis
 from enum import Enum
+import functools
 import io
+import inspect
 import itertools
 import logging
 import opcode
@@ -1049,6 +1052,46 @@ def _property_reduce(obj):
     return property, (obj.fget, obj.fset, obj.fdel, obj.__doc__)
 
 
+def _contextmanager_reduce(obj):
+    gen = obj.gen
+    if not isinstance(gen, (types.GeneratorType, types.AsyncGeneratorType)):
+        return object.__reduce_ex__(obj, 4)
+    if isinstance(gen, types.GeneratorType):
+        created = inspect.getgeneratorstate(gen) == inspect.GEN_CREATED
+    elif sys.version_info >= (3, 12):
+        created = inspect.getasyncgenstate(gen) == inspect.AGEN_CREATED
+    else:
+        # In 3.11, closure setup can precede RETURN_GENERATOR.
+        frame = gen.ag_frame
+        created = (
+            not gen.ag_running
+            and frame is not None
+            and (
+                frame.f_lasti == -1
+                or dis.opname[frame.f_code.co_code[frame.f_lasti]] == "RETURN_GENERATOR"
+            )
+        )
+    if not created:
+        raise pickle.PicklingError(
+            "Cannot pickle a context manager that has been entered or closed"
+        )
+    func = obj.func
+    while type(func) is functools.partial:
+        func = func.func
+    if type(func) is types.MethodType:
+        func = func.__func__
+    if type(func) is not types.FunctionType or not func.__code__.co_flags & (
+        inspect.CO_GENERATOR | inspect.CO_ASYNC_GENERATOR
+    ):
+        raise pickle.PicklingError(
+            "Cannot pickle a non-generator context manager factory"
+        )
+    state = obj.__dict__.copy()
+    for key in ("gen", "func", "args", "kwds"):
+        state.pop(key, None)
+    return type(obj), (obj.func, obj.args, obj.kwds), state
+
+
 def _weakset_reduce(obj):
     return weakref.WeakSet, (list(obj),)
 
@@ -1239,6 +1282,8 @@ class Pickler(pickle.Pickler):
     # set of reducers defined and used by cloudpickle (private)
     _dispatch_table = {}
     _dispatch_table[classmethod] = _classmethod_reduce
+    _dispatch_table[contextlib._GeneratorContextManager] = _contextmanager_reduce
+    _dispatch_table[contextlib._AsyncGeneratorContextManager] = _contextmanager_reduce
     _dispatch_table[io.TextIOWrapper] = _file_reduce
     _dispatch_table[logging.Logger] = _logger_reduce
     _dispatch_table[logging.RootLogger] = _root_logger_reduce

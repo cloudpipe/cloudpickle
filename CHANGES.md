@@ -1,6 +1,9 @@
 In development
 ==============
 
+- Support pickling unused context managers backed by Python generator functions
+  and functions decorated with them.
+
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
 
