@@ -6,7 +6,7 @@ clusters (such as PySpark, Dask, Ray...) with interactively defined code
 
 In particular this pickler adds the following features:
 - serialize interactively-defined or locally-defined functions, classes,
-  enums, typevars, lambdas and nested functions to compiled byte code;
+  enums, typevars, newtypes, lambdas and nested functions to compiled byte code;
 - deal with some other non-serializable objects in an ad-hoc manner where
   applicable.
 
@@ -626,6 +626,35 @@ def _typevar_reduce(obj):
         return (_make_typevar, _decompose_typevar(obj))
     elif _is_registered_pickle_by_value(module_and_name[0]):
         return (_make_typevar, _decompose_typevar(obj))
+
+    return (getattr, module_and_name)
+
+
+def _make_newtype(name, supertype, module, class_tracker_id):
+    newtype = typing.NewType(name, supertype)
+    # NewType.__init__ records the caller module. Reconstruction runs inside
+    # cloudpickle, so put the original module back before tracking the object.
+    newtype.__module__ = module
+    return _lookup_class_or_track(class_tracker_id, newtype)
+
+
+def _decompose_newtype(obj):
+    return (
+        obj.__qualname__,
+        obj.__supertype__,
+        obj.__module__,
+        _get_or_create_tracker_id(obj),
+    )
+
+
+def _newtype_reduce(obj):
+    # Same constraint as TypeVar: module information decides reference vs value.
+    module_and_name = _lookup_module_and_qualname(obj, name=obj.__name__)
+
+    if module_and_name is None:
+        return (_make_newtype, _decompose_newtype(obj))
+    elif _is_registered_pickle_by_value(module_and_name[0]):
+        return (_make_newtype, _decompose_newtype(obj))
 
     return (getattr, module_and_name)
 
@@ -1253,6 +1282,10 @@ class Pickler(pickle.Pickler):
     _dispatch_table[types.MappingProxyType] = _mappingproxy_reduce
     _dispatch_table[weakref.WeakSet] = _weakset_reduce
     _dispatch_table[typing.TypeVar] = _typevar_reduce
+    if isinstance(typing.NewType, type):
+        # Python 3.8 and 3.9 implement NewType as a function, which the
+        # function reducer already pickles by value when it is dynamic.
+        _dispatch_table[typing.NewType] = _newtype_reduce
     _dispatch_table[_collections_abc.dict_keys] = _dict_keys_reduce
     _dispatch_table[_collections_abc.dict_values] = _dict_values_reduce
     _dispatch_table[_collections_abc.dict_items] = _dict_items_reduce
