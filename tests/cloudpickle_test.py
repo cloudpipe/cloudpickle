@@ -2700,12 +2700,210 @@ class CloudPickleTest(unittest.TestCase):
         C1 = pickle_depickle(C, protocol=self.protocol)
         assert C1.__annotations__ == C.__annotations__
         C2 = pickle_depickle(C1, protocol=self.protocol)
-        if sys.version_info >= (3, 14):
-            # check that __annotate_func__ is created by Python
-            assert hasattr(C2, "__annotate_func__")
         assert C2.__annotations__ == C1.__annotations__
         c2 = C2()
         assert isinstance(c2, C2)
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations(self):
+        def get_annotations(cls):
+            return cls.__annotations__
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            for read_annotations in (False, True):
+
+                class C:
+                    a: int
+                    b: "UndefinedAnnotation"
+
+                expected = {"a": int, "b": "UndefinedAnnotation"}
+                if read_annotations:
+                    assert C.__annotations__ == expected
+                # Inspect the annotations in another process, before class
+                # provenance tracking can resolve the clone to the original.
+                assert worker.run(get_annotations, C) == expected
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_chained_pickling(self):
+        def repickle(payload, protocol):
+            return cloudpickle.dumps(pickle.loads(payload), protocol=protocol)
+
+        for read_annotations in (False, True):
+
+            class C:
+                a: int
+
+            if read_annotations:
+                assert C.__annotations__ == {"a": int}
+            original = payload = cloudpickle.dumps(C, protocol=self.protocol)
+            for _ in range(3):
+                with subprocess_worker(protocol=self.protocol) as worker:
+                    payload = worker.run(repickle, payload, self.protocol)
+                check_deterministic_pickle(original, payload)
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_inherited(self):
+        class Base:
+            base: bytes
+
+        class Derived(Base):
+            derived: str
+
+        class Unannotated(Derived):
+            pass
+
+        def get_annotations(*classes):
+            return [cls.__annotations__ for cls in classes]
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(get_annotations, Base, Derived, Unannotated) == [
+                {"base": bytes},
+                {"derived": str},
+                {},
+            ]
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_references(self):
+        class Local:
+            pass
+
+        class C:
+            local: Local
+            self_reference: C
+            forward: Later
+            quoted: "Local"
+
+        class Later:
+            pass
+
+        def check_annotations(cls, local, later):
+            return cls.__annotations__ == {
+                "local": local,
+                "self_reference": cls,
+                "forward": later,
+                "quoted": "Local",
+            }
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(check_annotations, C, Local, Later)
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_abstractclass(self):
+        class C(abc.ABC):
+            a: int
+
+            @abc.abstractmethod
+            def method(self):
+                pass
+
+        def check_annotations(cls):
+            return cls.__annotations__, sorted(cls.__abstractmethods__)
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(check_annotations, C) == ({"a": int}, ["method"])
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_manual(self):
+        class C:
+            a: int
+
+        C.__annotations__ = {"a": str}
+
+        def get_annotations(cls):
+            return cls.__annotations__
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(get_annotations, C) == {"a": str}
+
+    def test_class_annotations_future_import(self):
+        namespace = {"__name__": "not_importable"}
+        exec(
+            "from __future__ import annotations\n"
+            "class C:\n"
+            "    a: int\n"
+            "    b: UndefinedAnnotation\n",
+            namespace,
+        )
+
+        def get_annotations(cls):
+            return cls.__annotations__
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(get_annotations, namespace["C"]) == {
+                "a": "int",
+                "b": "UndefinedAnnotation",
+            }
+
+    def test_unannotated_class_annotations_metaclass(self):
+        class Meta(type):
+            @property
+            def __annotations__(cls):
+                raise RuntimeError("annotations must not be accessed")
+
+        class C(metaclass=Meta):
+            pass
+
+        def get_name(cls):
+            return cls.__name__
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(get_name, C) == "C"
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_metaclass_setter(self):
+        class Meta(type):
+            def __setattr__(cls, key, value):
+                if key == "__annotations__":
+                    raise RuntimeError("annotations cannot be assigned")
+                super().__setattr__(key, value)
+
+        class C(metaclass=Meta):
+            a: int
+
+        assert C.__annotations__ == {"a": int}
+
+        def get_annotations(cls):
+            return cls.__annotations__
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(get_annotations, C) == {"a": int}
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_cached_metaclass_getter(self):
+        class Meta(type):
+            def __getattribute__(cls, name):
+                if name == "__annotations__" and super().__getattribute__("blocked"):
+                    raise RuntimeError("annotations must not be accessed")
+                return super().__getattribute__(name)
+
+        class C(metaclass=Meta):
+            a: int
+            blocked = False
+
+        assert C.__annotations__ == {"a": int}
+        C.blocked = True
+
+        def get_cached_annotations(cls):
+            return cls.__dict__["__annotations_cache__"]
+
+        with subprocess_worker(protocol=self.protocol) as worker:
+            assert worker.run(get_cached_annotations, C) == {"a": int}
+
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="PEP 649 lazy annotations")
+    def test_lazy_class_annotations_unresolved(self):
+        def func(value: UndefinedAnnotation):  # noqa: F821
+            pass
+
+        # Like dynamic function annotations, lazy class annotations are
+        # evaluated at pickling time, and unresolved bare names raise.
+        with pytest.raises(NameError, match="UndefinedAnnotation"):
+            cloudpickle.dumps(func, protocol=self.protocol)
+
+        class C:
+            a: UndefinedAnnotation  # noqa: F821
+
+        with pytest.raises(NameError, match="UndefinedAnnotation"):
+            cloudpickle.dumps(C, protocol=self.protocol)
 
     def test_function_annotations(self):
         def f(a: int) -> str:

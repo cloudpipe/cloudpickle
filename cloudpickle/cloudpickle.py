@@ -755,6 +755,17 @@ def _function_getstate(func):
 
 
 def _class_getstate(obj):
+    if sys.version_info >= (3, 14):
+        namespace = obj.__dict__
+        if (
+            namespace.get("__annotate_func__") is not None
+            and "__annotations_cache__" not in namespace
+        ):
+            # PEP-649/749: materialize the annotations cache before extracting
+            # the class dict. Evaluate at pickling time, as we do for dynamic
+            # function annotations, but leave already-cached annotations alone.
+            _ = obj.__annotations__
+
     clsdict = _extract_class_dict(obj)
     clsdict.pop("__weakref__", None)
 
@@ -791,9 +802,8 @@ def _class_getstate(obj):
     clsdict.pop("__dict__", None)  # unpicklable property object
 
     if sys.version_info >= (3, 14):
-        # PEP-649/749: __annotate_func__ contains a closure that references the class
-        # dict. We need to exclude it from pickling. Python will recreate it when
-        # __annotations__ is accessed at unpickling time.
+        # The annotation closure references the class namespace, which can
+        # contain unpicklable objects. Its evaluated cache is saved instead.
         clsdict.pop("__annotate_func__", None)
 
     return (clsdict, {})
@@ -1209,10 +1219,6 @@ def _class_setstate(obj, state):
     if registry is not None:
         for subclass in registry:
             obj.register(subclass)
-
-    # PEP-649/749: During pickling, we excluded the __annotate_func__ attribute but it
-    # will be created by Python. Subsequently, annotations will be recreated when
-    # __annotations__ is accessed.
 
     return obj
 
