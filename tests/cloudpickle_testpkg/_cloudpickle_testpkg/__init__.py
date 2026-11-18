@@ -1,3 +1,4 @@
+import threading
 import typing
 from . import mod  # noqa
 
@@ -8,6 +9,10 @@ def package_function():
 
 
 global_variable = "some global variable"
+
+
+class BaseWithLock:
+    shared = threading.Lock()
 
 
 def package_function_with_global():
