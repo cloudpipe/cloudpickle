@@ -59,9 +59,13 @@ import dataclasses
 import dis
 from enum import Enum
 import io
+import importlib.machinery
+import importlib.util
+from importlib._bootstrap import _ModuleLockManager
 import itertools
 import logging
 import opcode
+import os
 import pickle
 from pickle import _getattribute as _pickle_getattribute
 import platform
@@ -310,6 +314,91 @@ def _lookup_module_and_qualname(obj, name=None):
     if obj2 is not obj:
         return None
     return module, name
+
+
+def _extension_module_path(module):
+    """Identify extensions that cannot be imported from the normal search path."""
+    loader = getattr(module, "__loader__", None)
+    path = getattr(module, "__file__", None)
+    if not isinstance(loader, importlib.machinery.ExtensionFileLoader) or not path:
+        return None
+    if _is_registered_pickle_by_value(module):
+        return None
+
+    path = os.path.realpath(path)
+    parent_name = module.__name__.rpartition(".")[0]
+    if parent_name:
+        parent = sys.modules.get(parent_name)
+        search_path = getattr(parent, "__path__", ())
+    else:
+        search_path = None
+    # Unlike importlib.util.find_spec, PathFinder does not return the spec
+    # cached in sys.modules or invoke a pyximport compilation hook.
+    spec = importlib.machinery.PathFinder.find_spec(module.__name__, search_path)
+    if spec is not None and spec.origin is not None:
+        if os.path.normcase(os.path.realpath(spec.origin)) == os.path.normcase(path):
+            return None
+    return path
+
+
+class _SharedExtensionFinder:
+    def __init__(self, module_name, path):
+        self.module_name = module_name
+        self.path = path
+
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == self.module_name:
+            spec = importlib.util.spec_from_file_location(fullname, self.path)
+            if spec is None or not isinstance(
+                spec.loader, importlib.machinery.ExtensionFileLoader
+            ):
+                raise ImportError(
+                    f"Cannot load shared Cython extension from {self.path!r}"
+                )
+            return spec
+        return None
+
+
+def _check_dynamic_cython_module(module, module_name, path):
+    if module is None:
+        raise ModuleNotFoundError(
+            f"Import of {module_name!r} halted; None in sys.modules",
+            name=module_name,
+        )
+    loaded_path = getattr(module, "__file__", None)
+    if loaded_path is None or os.path.normcase(
+        os.path.realpath(loaded_path)
+    ) != os.path.normcase(os.path.realpath(path)):
+        raise ImportError(
+            f"Module {module_name!r} is already loaded from a different "
+            "location; cannot restore the shared Cython extension."
+        )
+    return module
+
+
+def _load_dynamic_cython_module(module_name, path):
+    """Load an extension from its shared location without changing sys.path."""
+    with _ModuleLockManager(module_name):
+        if module_name in sys.modules:
+            return _check_dynamic_cython_module(
+                sys.modules[module_name], module_name, path
+            )
+
+        # A parent package can import this extension in its own __init__.
+        # Let the normal importer handle that cycle and publish initialization
+        # state to concurrent imports, while supplying only this exact path.
+        finder = _SharedExtensionFinder(module_name, path)
+        sys.meta_path.insert(0, finder)
+        try:
+            module = importlib.import_module(module_name)
+            return _check_dynamic_cython_module(module, module_name, path)
+        finally:
+            sys.meta_path.remove(finder)
+
+
+def _load_dynamic_cython_attribute(module_name, path, name):
+    module = _load_dynamic_cython_module(module_name, path)
+    return _getattribute(module, name)
 
 
 def _extract_code_globals(co):
@@ -1236,6 +1325,14 @@ def _get_dataclass_field_type_sentinel(name):
 
 
 class Pickler(pickle.Pickler):
+    """Serialize Python objects, including interactive functions and classes.
+
+    Set ``assume_shared_dynamic_cython_module_folder=True`` to restore
+    dynamically compiled Cython modules from their absolute extension paths.
+    The compiled files and their native dependencies must be accessible and
+    compatible on every unpickling process. This option is disabled by default.
+    """
+
     # set of reducers defined and used by cloudpickle (private)
     _dispatch_table = {}
     _dispatch_table[classmethod] = _classmethod_reduce
@@ -1329,7 +1426,50 @@ class Pickler(pickle.Pickler):
             msg = "Could not pickle object as excessively deep recursion required."
             raise pickle.PicklingError(msg) from e
 
-    def __init__(self, file, protocol=None, buffer_callback=None):
+    def _dynamic_cython_reduce(self, obj):
+        if isinstance(obj, types.ModuleType):
+            module, name = obj, None
+        else:
+            obj_type = type(obj)
+            if not (
+                issubclass(obj_type, type)
+                or isinstance(
+                    obj,
+                    (
+                        types.FunctionType,
+                        types.BuiltinFunctionType,
+                        types.MethodDescriptorType,
+                    ),
+                )
+                or obj_type.__name__
+                in ("cython_function_or_method", "fused_cython_function")
+            ):
+                return NotImplemented
+            module_and_name = _lookup_module_and_qualname(obj)
+            if module_and_name is None:
+                return NotImplemented
+            module, name = module_and_name
+
+        entry = self._dynamic_cython_modules.get(id(module))
+        if entry is None:
+            path = _extension_module_path(module)
+            self._dynamic_cython_modules[id(module)] = (module, path)
+        else:
+            _, path = entry
+        if path is None:
+            return NotImplemented
+        if name is None:
+            return _load_dynamic_cython_module, (module.__name__, path)
+        return _load_dynamic_cython_attribute, (module.__name__, path, name)
+
+    def __init__(
+        self,
+        file,
+        protocol=None,
+        buffer_callback=None,
+        *,
+        assume_shared_dynamic_cython_module_folder=False,
+    ):
         if protocol is None:
             protocol = DEFAULT_PROTOCOL
         super().__init__(file, protocol=protocol, buffer_callback=buffer_callback)
@@ -1338,6 +1478,12 @@ class Pickler(pickle.Pickler):
         # their global namespace at unpickling time.
         self.globals_ref = {}
         self.proto = int(protocol)
+        self.assume_shared_dynamic_cython_module_folder = (
+            assume_shared_dynamic_cython_module_folder
+        )
+        self._dynamic_cython_modules = (
+            {} if assume_shared_dynamic_cython_module_folder else None
+        )
 
     if not PYPY:
         # pickle.Pickler is the C implementation of the CPython pickler and
@@ -1397,6 +1543,11 @@ class Pickler(pickle.Pickler):
               reducers, such as Exceptions. See
               https://github.com/cloudpipe/cloudpickle/issues/248
             """
+            if self.assume_shared_dynamic_cython_module_folder:
+                reduction = self._dynamic_cython_reduce(obj)
+                if reduction is not NotImplemented:
+                    return reduction
+
             t = type(obj)
             try:
                 is_anyclass = issubclass(t, type)
@@ -1418,6 +1569,11 @@ class Pickler(pickle.Pickler):
         # must override Pickler.save_global, because pickle.py contains a
         # hard-coded call to save_global when pickling meta-classes.
         dispatch = pickle.Pickler.dispatch.copy()
+
+        def reducer_override(self, obj):
+            if self.assume_shared_dynamic_cython_module_folder:
+                return self._dynamic_cython_reduce(obj)
+            return NotImplemented
 
         def _save_reduce_pickle5(
             self,
@@ -1524,7 +1680,14 @@ class Pickler(pickle.Pickler):
 # Shorthands similar to pickle.dump/pickle.dumps
 
 
-def dump(obj, file, protocol=None, buffer_callback=None):
+def dump(
+    obj,
+    file,
+    protocol=None,
+    buffer_callback=None,
+    *,
+    assume_shared_dynamic_cython_module_folder=False,
+):
     """Serialize obj as bytes streamed into file
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -1536,11 +1699,28 @@ def dump(obj, file, protocol=None, buffer_callback=None):
     guaranteed to work because cloudpickle relies on some internal
     implementation details that can change from one Python version to the
     next).
+
+    ``assume_shared_dynamic_cython_module_folder`` has the same meaning as
+    for Pickler: opt in to loading dynamic Cython definitions from a shared
+    compiled-extension path.
     """
-    Pickler(file, protocol=protocol, buffer_callback=buffer_callback).dump(obj)
+    Pickler(
+        file,
+        protocol=protocol,
+        buffer_callback=buffer_callback,
+        assume_shared_dynamic_cython_module_folder=(
+            assume_shared_dynamic_cython_module_folder
+        ),
+    ).dump(obj)
 
 
-def dumps(obj, protocol=None, buffer_callback=None):
+def dumps(
+    obj,
+    protocol=None,
+    buffer_callback=None,
+    *,
+    assume_shared_dynamic_cython_module_folder=False,
+):
     """Serialize obj as a string of bytes allocated in memory
 
     protocol defaults to cloudpickle.DEFAULT_PROTOCOL which is an alias to
@@ -1552,9 +1732,20 @@ def dumps(obj, protocol=None, buffer_callback=None):
     guaranteed to work because cloudpickle relies on some internal
     implementation details that can change from one Python version to the
     next).
+
+    ``assume_shared_dynamic_cython_module_folder`` has the same meaning as
+    for Pickler: opt in to loading dynamic Cython definitions from a shared
+    compiled-extension path.
     """
     with io.BytesIO() as file:
-        cp = Pickler(file, protocol=protocol, buffer_callback=buffer_callback)
+        cp = Pickler(
+            file,
+            protocol=protocol,
+            buffer_callback=buffer_callback,
+            assume_shared_dynamic_cython_module_folder=(
+                assume_shared_dynamic_cython_module_folder
+            ),
+        )
         cp.dump(obj)
         return file.getvalue()
 

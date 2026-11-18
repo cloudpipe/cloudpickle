@@ -19,3 +19,6 @@ coverage
 ./tests/cloudpickle_testpkg
 # Required for setup of the above utility package:
 setuptools; python_version >= '3.12'
+
+# Compile interactive extension modules for the shared-folder tests.
+Cython>=3.0
