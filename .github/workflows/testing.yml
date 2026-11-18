@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.11
@@ -28,7 +28,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-latest, macos-latest]
         python_version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "pypy-3.9"]
         exclude:
           # Do not test all minor versions on all platforms, especially if they
@@ -79,7 +79,7 @@ jobs:
         file: ./coverage.xml
 
   distributed-downstream-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: "contains(github.event.pull_request.labels.*.name, 'ci distributed') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: distributed
@@ -115,7 +115,7 @@ jobs:
         source ./.github/scripts/test_downstream_project.sh
 
   joblib-downstream-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: "contains(github.event.pull_request.labels.*.name, 'ci joblib') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: joblib
@@ -143,7 +143,7 @@ jobs:
         bash ./.github/scripts/test_downstream_project.sh
 
   loky-downstream-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: "contains(github.event.pull_request.labels.*.name, 'ci loky') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: loky
@@ -170,7 +170,7 @@ jobs:
         bash ./.github/scripts/test_downstream_project.sh
 
   ray-downstream-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: "contains(github.event.pull_request.labels.*.name, 'ci ray') || contains(github.event.pull_request.labels.*.name, 'ci downstream')"
     env:
       PROJECT: ray
