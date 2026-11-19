@@ -689,7 +689,7 @@ def _class_getnewargs(obj):
 
 
 def _enum_getnewargs(obj):
-    members = {e.name: e.value for e in obj}
+    members = {name: e.value for name, e in obj.__members__.items()}
     return (
         obj.__bases__,
         obj.__name__,
@@ -802,7 +802,7 @@ def _class_getstate(obj):
 def _enum_getstate(obj):
     clsdict, slotstate = _class_getstate(obj)
 
-    members = {e.name: e.value for e in obj}
+    members = {name: e.value for name, e in obj.__members__.items()}
     # Cleanup the clsdict that will be passed to _make_skeleton_enum:
     # Those attributes are already handled by the metaclass.
     for attrname in [
