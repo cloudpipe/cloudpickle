@@ -3180,5 +3180,23 @@ def test_module_level_pickler():
     assert cloudpickle.Pickler is cloudpickle.CloudPickler
 
 
+def test_is_tornado_coroutine_without_tornado_gen(monkeypatch):
+    # is_tornado_coroutine returns False when tornado.gen was never
+    # imported. See https://github.com/cloudpipe/cloudpickle/issues/346
+    monkeypatch.delitem(sys.modules, "tornado.gen", raising=False)
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        assert cloudpickle.is_tornado_coroutine(lambda: None) is False
+
+
+def test_is_tornado_coroutine_with_old_tornado(monkeypatch):
+    # Simulate a Tornado version too old to provide
+    # tornado.gen.is_coroutine_function.
+    # See https://github.com/cloudpipe/cloudpickle/issues/346
+    stub_gen = types.ModuleType("tornado.gen")
+    monkeypatch.setitem(sys.modules, "tornado.gen", stub_gen)
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        assert cloudpickle.is_tornado_coroutine(lambda: None) is False
+
+
 if __name__ == "__main__":
     unittest.main()
