@@ -33,6 +33,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/cloudpipe/cloudpickle"
+Changelog = "https://github.com/cloudpipe/cloudpickle/blob/master/CHANGES.md"
 
 [tool.black]
 line-length = 88
