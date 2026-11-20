@@ -70,7 +70,6 @@ import sys
 import threading
 import types
 import typing
-import uuid
 import warnings
 import weakref
 
@@ -93,6 +92,7 @@ _PICKLE_BY_VALUE_MODULES = set()
 _DYNAMIC_CLASS_TRACKER_BY_CLASS = weakref.WeakKeyDictionary()
 _DYNAMIC_CLASS_TRACKER_BY_ID = weakref.WeakValueDictionary()
 _DYNAMIC_CLASS_TRACKER_LOCK = threading.Lock()
+_NEXT_DYNAMIC_CLASS_TRACKER_ID = 1  # do not use without _DYNAMIC_CLASS_TRACKER_LOCK
 
 PYPY = platform.python_implementation() == "PyPy"
 
@@ -105,10 +105,14 @@ _extract_code_globals_cache = weakref.WeakKeyDictionary()
 
 
 def _get_or_create_tracker_id(class_def):
+    global _NEXT_DYNAMIC_CLASS_TRACKER_ID
     with _DYNAMIC_CLASS_TRACKER_LOCK:
         class_tracker_id = _DYNAMIC_CLASS_TRACKER_BY_CLASS.get(class_def)
         if class_tracker_id is None:
-            class_tracker_id = uuid.uuid4().hex
+            # We use a 32 bit hex string to remain compatible with the
+            # previous uuid4 hex string representation.
+            class_tracker_id = f"{_NEXT_DYNAMIC_CLASS_TRACKER_ID:032x}"
+            _NEXT_DYNAMIC_CLASS_TRACKER_ID += 1
             _DYNAMIC_CLASS_TRACKER_BY_CLASS[class_def] = class_tracker_id
             _DYNAMIC_CLASS_TRACKER_BY_ID[class_tracker_id] = class_def
     return class_tracker_id
