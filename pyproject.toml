@@ -34,6 +34,15 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/cloudpipe/cloudpickle"
 
+[tool.flit.sdist]
+include = ["tests/", "dev-requirements.txt", "tox.ini"]
+exclude = [
+    "**/__pycache__",
+    "**/*.py[co]",
+    "tests/cloudpickle_testpkg/*.egg-info",
+    "tests/cloudpickle_testpkg/build",
+]
+
 [tool.black]
 line-length = 88
 target_version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
