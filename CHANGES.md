@@ -1,6 +1,10 @@
 In development
 ==============
 
+- Allow importable module subclasses with default reduction hooks to be
+  referenced when pickling functions on CPython. Custom reducers retain their
+  existing behavior; by-value module subclass reconstruction is unchanged.
+
 3.1.3
 =====
 
