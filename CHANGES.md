@@ -1,6 +1,12 @@
 In development
 ==============
 
+- Preserve the `co_filename` of code objects that are pickled by value when
+  their source file exists, so that source based tools (`coverage.py`,
+  `inspect`, `linecache`) can keep mapping the restored code to its source.
+  The `<dynamic-code>` placeholder is now only used for code that has no
+  source file. ([issue #628](https://github.com/cloudpipe/cloudpickle/issues/628))
+
 3.1.3
 =====
 
