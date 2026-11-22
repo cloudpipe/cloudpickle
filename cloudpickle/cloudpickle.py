@@ -62,6 +62,7 @@ import io
 import itertools
 import logging
 import opcode
+import os
 import pickle
 from pickle import _getattribute as _pickle_getattribute
 import platform
@@ -847,7 +848,13 @@ def _code_reduce(obj):
     # the payload deterministic, independent of where the function is defined
     # which is especially useful when defining classes in jupyter/ipython
     # cells which do not have a deterministic filename.
-    co_filename = "".join("<dynamic-code>")
+    # Code that comes from a source file that still exists on disk keeps its
+    # original filename so that source based tools (coverage.py, inspect,
+    # linecache) can keep mapping it back to its source.
+    if os.path.isfile(obj.co_filename):
+        co_filename = obj.co_filename
+    else:
+        co_filename = "".join("<dynamic-code>")
 
     # Create shallow copies of these tuple to make cloudpickle payload deterministic.
     # When creating a code object during load, copies of these four tuples are

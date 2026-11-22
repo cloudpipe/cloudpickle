@@ -4,6 +4,7 @@ import collections
 import base64
 import dataclasses
 import functools
+import inspect
 import io
 import itertools
 import logging
@@ -2047,6 +2048,40 @@ class CloudPickleTest(unittest.TestCase):
             protocol=self.protocol
         )
         assert_run_python_script(code)
+
+    def test_file_backed_func_preserves_co_filename(self):
+        # A nested function of this test module is pickled by value because it
+        # cannot be imported by reference. Its code object must keep the
+        # filename of the source file it was compiled from so that source based
+        # tools (coverage.py, tracebacks, inspect) can resolve it.
+        def make_func():
+            def func():
+                return 1
+
+            return func
+
+        func = make_func()
+        assert os.path.abspath(func.__code__.co_filename) == os.path.abspath(__file__)
+
+        restored = cloudpickle.loads(cloudpickle.dumps(func))
+        assert restored() == 1
+        assert restored.__code__.co_filename == func.__code__.co_filename
+        assert os.path.isfile(restored.__code__.co_filename)
+        # The source of the restored function is still reachable.
+        assert "def func():" in inspect.getsource(restored)
+
+    def test_dynamic_func_gets_placeholder_co_filename(self):
+        # A function whose code object has no backing source file keeps the
+        # placeholder filename that makes its payload deterministic.
+        namespace = {"__name__": "not_importable"}
+        exec("def func():\n    return 1\n", namespace)
+
+        func = namespace["func"]
+        assert not os.path.isfile(func.__code__.co_filename)
+
+        restored = cloudpickle.loads(cloudpickle.dumps(func))
+        assert restored() == 1
+        assert restored.__code__.co_filename == "<dynamic-code>"
 
     def test_dynamic_func_deterministic_roundtrip(self):
         # Check that the pickle serialization for a dynamic func is the same
