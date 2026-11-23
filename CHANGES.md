@@ -1,6 +1,8 @@
 In development
 ==============
 
+- Preserve abstract properties when reconstructing dynamic abstract base classes.
+
 3.1.3
 =====
 
