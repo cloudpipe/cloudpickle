@@ -2,9 +2,19 @@ In development
 ==============
 
 - Preserve instance attributes of staticmethod and classmethod descriptors.
+  ([PR#616](https://github.com/cloudpipe/cloudpickle/pull/616))
+
+3.1.3
+=====
 
 - Make pickling of functions depending on globals in notebook more
   deterministic. ([PR#560](https://github.com/cloudpipe/cloudpickle/pull/560))
+
+- Use PEP 621 metadata to fix building with `flit-core >= 4`.
+  ([PR #598]([PR#598](https://github.com/cloudpipe/cloudpickle/pull/598)))
+
+- Account for removed opcode in Python 3.16
+  ([PR #599]([PR#599](https://github.com/cloudpipe/cloudpickle/pull/599)))
 
 3.1.2
 =====
