@@ -1,6 +1,9 @@
 In development
 ==============
 
+- Preserve instance attributes of staticmethod and classmethod descriptors.
+  ([PR#616](https://github.com/cloudpipe/cloudpickle/pull/616))
+
 3.1.3
 =====
 

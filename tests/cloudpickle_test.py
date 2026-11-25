@@ -120,6 +120,39 @@ def test_extract_class_dict():
     assert clsdict["method_c"](C()) == C().method_c()
 
 
+@pytest.mark.parametrize(
+    "descriptor_type",
+    [classmethod, staticmethod, abc.abstractclassmethod, abc.abstractstaticmethod],
+)
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_method_descriptor_state(descriptor_type, protocol):
+    def callback(*values: int) -> int:
+        return values[-1]
+
+    shared = ["metadata"]
+    callback.shared = shared
+    descriptor = descriptor_type(callback)
+    callback.descriptor = descriptor
+    descriptor.metadata = shared
+    descriptor.alias = shared
+    descriptor.self = descriptor
+    descriptor.__doc__ = "Overridden descriptor documentation."
+
+    clone, shared_clone = subprocess_pickle_echo(
+        (descriptor, shared), protocol=protocol
+    )
+    assert clone.metadata is shared_clone
+    assert clone.alias is shared_clone
+    assert clone.__func__.shared is shared_clone
+    assert clone.__func__.descriptor is clone
+    assert clone.__func__.__annotations__ == callback.__annotations__
+    assert clone.self is clone
+    assert clone.__doc__ == descriptor.__doc__
+    assert clone.__isabstractmethod__ == descriptor.__isabstractmethod__
+    holder = type("Holder", (), {"callback": clone})
+    assert holder.callback(3) == 3
+
+
 class CloudPickleTest(unittest.TestCase):
     protocol = cloudpickle.DEFAULT_PROTOCOL
 
