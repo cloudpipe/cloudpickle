@@ -1,6 +1,11 @@
 In development
 ==============
 
+- Include globals that are only read inside a class body defined in a
+  function pickled by value (class scopes load them with LOAD_NAME or
+  LOAD_FROM_DICT_OR_GLOBALS rather than LOAD_GLOBAL).
+  ([issue #609](https://github.com/cloudpipe/cloudpickle/issues/609))
+
 3.1.3
 =====
 
