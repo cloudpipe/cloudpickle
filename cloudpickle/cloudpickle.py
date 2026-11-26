@@ -394,6 +394,15 @@ if sys.version_info < (3, 16):
     _glbl_ops.append(DELETE_GLOBAL)
 LOAD_GLOBAL = opcode.opmap["LOAD_GLOBAL"]
 _glbl_ops.append(LOAD_GLOBAL)
+if "LOAD_NAME" in opcode.opmap:
+    # Class bodies read names with LOAD_NAME instead of LOAD_GLOBAL. Names
+    # that do not refer to globals are filtered out by the consumers of
+    # _extract_code_globals, so collecting them here is harmless.
+    _glbl_ops.append(opcode.opmap["LOAD_NAME"])
+if "LOAD_FROM_DICT_OR_GLOBALS" in opcode.opmap:
+    # Class-scoped type aliases (3.12+) and class __annotate__ functions
+    # (3.14+) read globals with LOAD_FROM_DICT_OR_GLOBALS.
+    _glbl_ops.append(opcode.opmap["LOAD_FROM_DICT_OR_GLOBALS"])
 GLOBAL_OPS = tuple(_glbl_ops)
 del _glbl_ops
 HAVE_ARGUMENT = dis.HAVE_ARGUMENT

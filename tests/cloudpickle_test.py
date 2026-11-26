@@ -207,6 +207,48 @@ class CloudPickleTest(unittest.TestCase):
         self.assertTrue("exit" in foo.__code__.co_names)
         cloudpickle.dumps(foo)
 
+    def test_class_body_reads_globals(self):
+        # Non-importable namespaces force pickling by value. Names that a
+        # class body reads from the function's globals must be included in
+        # the pickled globals even though class scopes load them with
+        # LOAD_NAME/LOAD_FROM_DICT_OR_GLOBALS instead of LOAD_GLOBAL.
+        ns = {"__name__": "not_importable", "CONST": 42}
+        exec(
+            "def f():\n"
+            "    class Rec:\n"
+            "        q = CONST\n"
+            "    return Rec.q\n",
+            ns,
+        )
+        func = pickle_depickle(ns["f"], protocol=self.protocol)
+        self.assertEqual(func(), 42)
+
+        # A class-local name shadowing a global still resolves to the
+        # class-local value after depickling.
+        ns = {"__name__": "not_importable", "CONST": 99}
+        exec(
+            "def f():\n"
+            "    class Rec:\n"
+            "        CONST = 1\n"
+            "        q = CONST\n"
+            "    return Rec.q\n",
+            ns,
+        )
+        func = pickle_depickle(ns["f"], protocol=self.protocol)
+        self.assertEqual(func(), 1)
+
+    def test_class_annotation_reads_globals(self):
+        ns = {"__name__": "not_importable", "Point": tuple}
+        exec(
+            "def f():\n"
+            "    class Rec:\n"
+            "        p: Point\n"
+            "    return Rec.__annotations__['p'].__name__\n",
+            ns,
+        )
+        func = pickle_depickle(ns["f"], protocol=self.protocol)
+        self.assertEqual(func(), "tuple")
+
     def test_memoryview(self):
         buffer_obj = memoryview(b"Hello")
         self.assertEqual(
